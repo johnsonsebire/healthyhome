@@ -17,6 +17,7 @@ import { useError, ERROR_TYPES, ERROR_SEVERITY } from '../contexts/ErrorContext'
 import offlineStorageService from '../services/offlineStorage';
 import networkService from '../services/networkService';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { testFirebaseConnection } from '../services/firebaseTest';
 
 const HomeScreen = ({ navigation }) => {
   const { user, userProfile } = useAuth();
@@ -26,6 +27,17 @@ const HomeScreen = ({ navigation }) => {
   const [upcomingAppointments, setUpcomingAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(true);
+
+  useEffect(() => {
+    // Test Firebase connection on component mount
+    testFirebaseConnection()
+      .then(result => {
+        console.log('Firebase connection test result:', result);
+      })
+      .catch(error => {
+        console.error('Firebase connection test failed:', error);
+      });
+  }, []);
 
   useEffect(() => {
     if (user) {

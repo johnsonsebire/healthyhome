@@ -7,59 +7,46 @@ import { AuthProvider } from './src/contexts/AuthContext';
 import { SubscriptionProvider } from './src/contexts/SubscriptionContext';
 import { ErrorProvider, ErrorBoundary } from './src/contexts/ErrorContext';
 import AppNavigator from './src/navigation/AppNavigator';
-import auth, { onAuthStateChanged } from './src/services/firebaseAuth';
+import * as SplashScreen from 'expo-splash-screen';
+
+// Prevent auto-hiding the splash screen
+SplashScreen.preventAutoHideAsync().catch((error) => {
+  console.warn('Error preventing splash screen auto hide:', error);
+});
 
 export default function App() {
-  const [isFirebaseReady, setIsFirebaseReady] = useState(false);
-  const [authState, setAuthState] = useState({ loading: true, user: null });
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    console.log('📱 App.js: Starting initialization');
-
-    const initializeFirebase = async () => {
+    // Function to prepare the app
+    async function prepareApp() {
       try {
-        console.log('🔍 Checking auth instance:', {
-          hasAuth: !!auth,
-          authType: typeof auth,
-        });
-
-        const unsubscribe = onAuthStateChanged(
-          (user) => {
-            console.log('🔄 Auth state changed:', user ? 'Logged in' : 'No user');
-            setAuthState({ loading: false, user: user || 'not logged in' });
-            setIsFirebaseReady(true);
-            console.log('✅ Firebase initialization complete');
-          },
-          (error) => {
-            console.error('❌ Auth state error:', error);
-            setAuthState({ loading: false, user: 'not logged in' });
-            setIsFirebaseReady(true);
-          }
-        );
-
-        const timeout = setTimeout(() => {
-          console.warn('⚠️ Force completing auth loading after timeout');
-          setAuthState({ loading: false, user: 'not logged in' });
-          setIsFirebaseReady(true);
-        }, 5000);
-
-        return () => {
-          unsubscribe();
-          clearTimeout(timeout);
-        };
+        console.log('📱 App initialization started');
+        
+        // Add any initialization logic here
+        // No Firebase initialization here - we do it in the service files
+        
+        // Simulate a delay to ensure everything is loaded
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        console.log('✅ App initialization complete');
       } catch (error) {
-        console.error('❌ Firebase initialization failed:', error);
-        setAuthState({ loading: false, user: 'not logged in' });
-        setIsFirebaseReady(true);
+        console.error('❌ Error during app initialization:', error);
+      } finally {
+        // Mark the app as ready and hide splash screen
+        setIsReady(true);
+        try {
+          await SplashScreen.hideAsync();
+        } catch (e) {
+          console.warn('Error hiding splash screen:', e);
+        }
       }
-    };
+    }
 
-    initializeFirebase();
+    prepareApp();
   }, []);
 
-  console.log('🔄 App.js render - Firebase ready:', isFirebaseReady, 'Auth state:', authState);
-
-  if (!isFirebaseReady || authState.loading) {
+  if (!isReady) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0066cc" />
@@ -76,8 +63,10 @@ export default function App() {
           <ErrorProvider>
             <AuthProvider>
               <SubscriptionProvider>
-                <AppNavigator authState={authState} />
-                <StatusBar style="auto" />
+                <View style={{flex: 1}}>
+                  <AppNavigator />
+                  <StatusBar style="auto" />
+                </View>
               </SubscriptionProvider>
             </AuthProvider>
           </ErrorProvider>

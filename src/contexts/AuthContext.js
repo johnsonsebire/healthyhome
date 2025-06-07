@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { 
-  authInstance as auth, 
+  auth,
   db, 
   onAuthStateChanged, 
   signInWithEmailAndPassword, 
@@ -30,7 +30,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     console.log('🔍 AuthContext: Setting up auth state change listener');
 
-    const unsubscribe = onAuthStateChanged(async (userState) => {
+    const unsubscribe = onAuthStateChanged(auth, async (userState) => {
       console.log('🔄 Auth state changed:', userState ? `User logged in (${userState.email})` : 'No user');
       
       setUser(userState);
@@ -80,7 +80,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       console.log('🔐 Attempting login for:', email);
-      const result = await signInWithEmailAndPassword(email, password);
+      const result = await signInWithEmailAndPassword(auth, email, password);
       console.log('✅ Login successful');
       return result;
     } catch (error) {
@@ -92,7 +92,7 @@ export const AuthProvider = ({ children }) => {
   const register = async (email, password, userData) => {
     try {
       console.log('📝 Attempting registration for:', email);
-      const result = await createUserWithEmailAndPassword(email, password);
+      const result = await createUserWithEmailAndPassword(auth, email, password);
       
       console.log('💾 Creating user profile in Firestore');
       await setDoc(doc(db, 'users', result.user.uid), {
@@ -113,7 +113,7 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       console.log('🚪 Attempting logout');
-      await signOut();
+      await signOut(auth);
       console.log('✅ Logout successful');
     } catch (error) {
       console.error('❌ Logout failed:', error.message);

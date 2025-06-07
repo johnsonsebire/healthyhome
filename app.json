@@ -21,15 +21,25 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.manifestghana.FamilyMedicalApp"
+      "package": "com.manifestghana.FamilyMedicalApp",
+      "permissions": []
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "plugins": [
+      "expo-build-properties"
+    ],
     "extra": {
       "eas": {
         "projectId": "e9691afb-4229-4dff-ad9a-0eeb861b86cb"
-      }
+      },
+      "firebaseApiKey": "AIzaSyC2UB6QQeOW_du-5bGXbJC7N2dBP6hCqUo",
+      "firebaseAuthDomain": "familyhealthapp-e5fd3.firebaseapp.com",
+      "firebaseProjectId": "familyhealthapp-e5fd3",
+      "firebaseStorageBucket": "familyhealthapp-e5fd3.firebasestorage.app",
+      "firebaseMessagingSenderId": "320688524984",
+      "firebaseAppId": "1:320688524984:web:be8dadb6bac8de118e6e4d"
     }
   }
 }

@@ -1,10 +1,20 @@
 // Firebase Test Script
 // Run this to verify Firebase is properly configured
 import { auth, db } from './firebase';
+import Constants from 'expo-constants';
 
 export const testFirebaseConnection = async () => {
   try {
     console.log('🧪 Testing Firebase connection...');
+    
+    // Test 0: Check environment variables
+    console.log('🔍 Checking Firebase environment variables:');
+    console.log('- Constants.expoConfig.extra:', Constants.expoConfig?.extra ? 'Available' : 'Not available');
+    if (Constants.expoConfig?.extra?.firebaseApiKey) {
+      console.log('✅ Firebase config found in Constants');
+    } else {
+      console.log('⚠️ No Firebase config in Constants');
+    }
     
     // Test 1: Check if auth is initialized
     if (auth) {

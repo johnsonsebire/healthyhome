@@ -1,50 +1,41 @@
 /**
  * Firebase configuration and initialization
  */
-import { getApps } from 'firebase/app';
+import { initializeApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import { updateProfile } from 'firebase/auth';
-import auth, {
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-} from './firebaseAuth';
+import firebaseConfig from './firebaseConfig';
 
-console.log('🔧 Firebase Service: Initializing remaining Firebase services');
+console.log('🔧 Firebase Service: Initializing Firebase services');
 
-// Get the initialized app from firebaseAuth
-const app = getApps()[0];
-if (!app) {
-  throw new Error('Firebase app not initialized');
-}
-
-// Initialize other Firebase services
-let db, storage;
+// Initialize Firebase
+let app;
 try {
-  db = getFirestore(app);
-  storage = getStorage(app);
-  console.log('✅ Firestore and Storage initialized successfully');
+  app = initializeApp(firebaseConfig);
+  console.log('✅ Firebase app initialized successfully');
 } catch (error) {
-  console.error('❌ Error initializing Firestore/Storage:', error);
+  console.error('❌ Error initializing Firebase app:', error);
   throw error;
 }
 
-// Export auth instance directly
-export const authInstance = auth;
+// Initialize Firebase services
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
+console.log('✅ Firebase Auth, Firestore and Storage initialized successfully');
 
 // Export initialized services
-export { db, storage };
+export { auth, db, storage };
 
-// Export auth functions
+// Export Firebase Auth functions
 export {
-  onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
-  updateProfile,
-};
+  onAuthStateChanged,
+  updateProfile
+} from 'firebase/auth';
 
 // Export Firestore functions
 export {
@@ -60,7 +51,7 @@ export {
   where,
   orderBy,
   limit,
-  onSnapshot,
+  onSnapshot
 } from 'firebase/firestore';
 
 // Export Storage functions
@@ -68,5 +59,5 @@ export {
   ref,
   uploadBytes,
   getDownloadURL,
-  deleteObject,
+  deleteObject
 } from 'firebase/storage';
