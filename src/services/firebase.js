@@ -4,7 +4,7 @@
  */
 
 // Import Firebase services from the main config
-import { auth, db, storage } from './firebaseConfig';
+import { auth, db, storage } from '../../firebaseConfig';
 
 // Export Firebase services
 export { auth, db, storage };

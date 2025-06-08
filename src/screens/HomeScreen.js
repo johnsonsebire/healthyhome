@@ -9,31 +9,14 @@ import {
   Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import { db } from '../../firebaseConfig';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { useError, ERROR_TYPES, ERROR_SEVERITY } from '../contexts/ErrorContext';
 import offlineStorageService from '../services/offlineStorage';
 import networkService from '../services/networkService';
 import { LoadingSpinner } from '../components/LoadingSpinner';
-
-// Defensive imports for Firebase
-let collection, query, where, orderBy, limit, getDocs, db, testFirebaseConnection;
-
-try {
-  const firebaseImports = require('../services/firebase');
-  collection = firebaseImports.collection;
-  query = firebaseImports.query;
-  where = firebaseImports.where;
-  orderBy = firebaseImports.orderBy;
-  limit = firebaseImports.limit;
-  getDocs = firebaseImports.getDocs;
-  db = firebaseImports.db;
-  
-  const testImports = require('../services/firebaseTest');
-  testFirebaseConnection = testImports.testFirebaseConnection;
-} catch (error) {
-  console.error('❌ Error importing Firebase services in HomeScreen:', error);
-}
 
 const HomeScreen = ({ navigation }) => {
   const { user, userProfile } = useAuth();
@@ -43,19 +26,6 @@ const HomeScreen = ({ navigation }) => {
   const [upcomingAppointments, setUpcomingAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(true);
-
-  useEffect(() => {
-    // Test Firebase connection on component mount (only if available)
-    if (testFirebaseConnection) {
-      testFirebaseConnection()
-        .then(result => {
-          console.log('Firebase connection test result:', result);
-        })
-        .catch(error => {
-          console.error('Firebase connection test failed:', error);
-        });
-    }
-  }, []);
 
   useEffect(() => {
     if (user) {
@@ -101,13 +71,6 @@ const HomeScreen = ({ navigation }) => {
           if (cachedRecords && cachedRecords.data) {
             return cachedRecords.data.slice(0, 3);
           }
-        }
-
-        // Check if Firebase services are available
-        if (!db || !collection || !query || !where || !orderBy || !limit || !getDocs) {
-          console.warn('Firebase services not available, using cached data');
-          const cachedRecords = await offlineStorageService.getCachedMedicalRecords();
-          return cachedRecords?.data?.slice(0, 3) || [];
         }
 
         // Load from Firebase
@@ -156,13 +119,6 @@ const HomeScreen = ({ navigation }) => {
               .filter(apt => new Date(apt.date) >= new Date())
               .slice(0, 3);
           }
-        }
-
-        // Check if Firebase services are available
-        if (!db || !collection || !query || !where || !orderBy || !limit || !getDocs) {
-          console.warn('Firebase services not available, using cached data');
-          const cachedAppointments = await offlineStorageService.getCachedAppointments();
-          return cachedAppointments?.data?.filter(apt => new Date(apt.date) >= new Date()).slice(0, 3) || [];
         }
 
         // Load from Firebase

@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { db } from '../../firebaseConfig';
 import { useAuth } from '../contexts/AuthContext';
 import { useError, ERROR_TYPES, ERROR_SEVERITY } from '../contexts/ErrorContext';
 import offlineStorageService from '../services/offlineStorage';

@@ -26,13 +26,18 @@ export default function App() {
         
         // Test Firebase initialization
         try {
-          // Dynamic import to catch initialization errors
-          const { testFirebaseConnection } = await import('./src/services/firebaseTest');
-          const firebaseReady = await testFirebaseConnection();
+          // Import Firebase config to ensure it initializes properly
+          const { auth, db, storage } = await import('./firebaseConfig');
           
-          if (!firebaseReady) {
-            throw new Error('Firebase connection test failed');
+          if (!auth || !db || !storage) {
+            throw new Error('Firebase services not properly initialized');
           }
+          
+          console.log('✅ Firebase services verified:', {
+            hasAuth: !!auth,
+            hasFirestore: !!db,
+            hasStorage: !!storage
+          });
         } catch (firebaseError) {
           console.error('❌ Firebase initialization error:', firebaseError);
           setInitError('Firebase initialization failed. Please check your configuration.');

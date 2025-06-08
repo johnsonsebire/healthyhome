@@ -139,35 +139,35 @@ class NetworkService {
   // Sync operations (these would integrate with your Firebase service)
   async syncCreateRecord(data) {
     const { addDoc, collection } = await import('firebase/firestore');
-    const { db } = await import('./firebase');
+    const { db } = await import('../../firebaseConfig');
     
     return addDoc(collection(db, 'medicalRecords'), data);
   }
 
   async syncUpdateRecord(data) {
     const { updateDoc, doc } = await import('firebase/firestore');
-    const { db } = await import('./firebase');
+    const { db } = await import('../../firebaseConfig');
     
     return updateDoc(doc(db, 'medicalRecords', data.id), data.updates);
   }
 
   async syncDeleteRecord(data) {
     const { deleteDoc, doc } = await import('firebase/firestore');
-    const { db } = await import('./firebase');
+    const { db } = await import('../../firebaseConfig');
     
     return deleteDoc(doc(db, 'medicalRecords', data.id));
   }
 
   async syncCreateFamilyMember(data) {
     const { addDoc, collection } = await import('firebase/firestore');
-    const { db } = await import('./firebase');
+    const { db } = await import('../../firebaseConfig');
     
     return addDoc(collection(db, 'familyMembers'), data);
   }
 
   async syncUpdateFamilyMember(data) {
     const { updateDoc, doc } = await import('firebase/firestore');
-    const { db } = await import('./firebase');
+    const { db } = await import('../../firebaseConfig');
     
     return updateDoc(doc(db, 'familyMembers', data.id), data.updates);
   }

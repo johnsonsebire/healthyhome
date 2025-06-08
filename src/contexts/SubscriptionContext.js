@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { db } from '../../firebaseConfig';
 import { useAuth } from './AuthContext';
 
 const SubscriptionContext = createContext();

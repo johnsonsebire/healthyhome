@@ -16,7 +16,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { SubscriptionContext } from '../contexts/SubscriptionContext';
 import { useError, ERROR_TYPES, ERROR_SEVERITY } from '../contexts/ErrorContext';
 import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, where } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { db } from '../../firebaseConfig';
 import * as ImagePicker from 'expo-image-picker';
 import offlineStorageService from '../services/offlineStorage';
 import networkService from '../services/networkService';
