@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useError, ERROR_TYPES, ERROR_SEVERITY } from '../contexts/ErrorContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { runFirebaseDiagnostics, formatDiagnosticResults } from '../utils/firebaseDiagnostics';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -42,6 +43,36 @@ const LoginScreen = ({ navigation }) => {
     );
 
     // Navigation will be handled by AuthContext on successful login
+  };
+
+  const handleFirebaseDiagnostics = async () => {
+    try {
+      Alert.alert('🔬 Running Diagnostics', 'Testing Firebase configuration...');
+      
+      const results = await runFirebaseDiagnostics();
+      
+      console.log('🔬 Firebase Diagnostic Results:', formatDiagnosticResults(results));
+      
+      const authTest = results.tests.find(t => t.name === 'Anonymous Authentication Test');
+      const hasAuthError = authTest && authTest.status === 'error' && authTest.errorCode === 'auth/configuration-not-found';
+      
+      let message = `Tests: ${results.summary.success}/${results.summary.total} passed\n\n`;
+      
+      if (hasAuthError) {
+        message += '❌ Authentication Not Enabled\n\n';
+        message += 'SOLUTION:\n';
+        message += '1. Go to Firebase Console\n';
+        message += '2. Enable Email/Password Auth\n';
+        message += '3. Restart the app';
+      } else if (results.summary.success === results.summary.total) {
+        message += '✅ All tests passed!\nYou should be able to login now.';
+      }
+      
+      Alert.alert('🔬 Firebase Diagnostics', message);
+    } catch (error) {
+      Alert.alert('❌ Diagnostic Error', error.message);
+      console.error('Firebase diagnostics failed:', error);
+    }
   };
 
   return (
@@ -111,6 +142,16 @@ const LoginScreen = ({ navigation }) => {
           >
             <Text style={styles.registerText}>
               Don't have an account? <Text style={styles.registerTextBold}>Sign Up</Text>
+            </Text>
+          </TouchableOpacity>
+
+          {/* Firebase Diagnostics Button */}
+          <TouchableOpacity
+            style={styles.diagnosticButton}
+            onPress={handleFirebaseDiagnostics}
+          >
+            <Text style={styles.diagnosticButtonText}>
+              🔬 Test Firebase Connection
             </Text>
           </TouchableOpacity>
         </View>
@@ -197,6 +238,20 @@ const styles = StyleSheet.create({
   registerTextBold: {
     color: '#6366f1',
     fontWeight: '600',
+  },
+  diagnosticButton: {
+    marginTop: 20,
+    padding: 12,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  diagnosticButtonText: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontWeight: '500',
   },
 });
 

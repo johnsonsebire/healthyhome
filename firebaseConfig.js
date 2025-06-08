@@ -1,9 +1,10 @@
 import { initializeApp } from 'firebase/app';
 
 // Optionally import the services that you want to use
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
+import { initializeAuth, getReactNativePersistence, connectAuthEmulator } from 'firebase/auth';
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { getStorage, connectStorageEmulator } from 'firebase/storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Initialize Firebase
 const firebaseConfig = {
@@ -16,15 +17,35 @@ const firebaseConfig = {
   measurementId: 'G-K7MK2VGKL2',
 };
 
+console.log('🔥 Initializing Firebase with config:', {
+  authDomain: firebaseConfig.authDomain,
+  projectId: firebaseConfig.projectId,
+  apiKeyPresent: !!firebaseConfig.apiKey
+});
+
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firebase Authentication and get a reference to the service
-export const auth = getAuth(app);
+console.log('🔥 Firebase app initialized, setting up services...');
+
+// Initialize Firebase Authentication with AsyncStorage persistence
+console.log('⚙️ Configuring Firebase Auth with AsyncStorage persistence...');
+export const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(AsyncStorage)
+});
+console.log('✅ Firebase Auth initialized with AsyncStorage persistence');
 
 // Initialize Cloud Firestore and get a reference to the service
 export const db = getFirestore(app);
 
 // Initialize Cloud Storage and get a reference to the service
 export const storage = getStorage(app);
+
+console.log('✅ Firebase services initialized:', {
+  hasAuth: !!auth,
+  hasFirestore: !!db,
+  hasStorage: !!storage,
+  authDomain: auth.config?.authDomain,
+  projectId: db.app.options.projectId
+});
 
 export default app;

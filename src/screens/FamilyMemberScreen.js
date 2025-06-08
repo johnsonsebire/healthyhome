@@ -319,7 +319,7 @@ const FamilyMemberScreen = () => {
       )}
 
       {/* Loading Overlay */}
-      {isLoading && <LoadingSpinner />}
+      {isLoading === true && <LoadingSpinner />}
 
       <View style={styles.header}>
         <Text style={styles.title}>Family Members</Text>
@@ -334,45 +334,47 @@ const FamilyMemberScreen = () => {
           <RefreshControl refreshing={loading} onRefresh={onRefresh} />
         }
       >
-        {familyMembers.map((member) => (
-          <View key={member.id} style={styles.memberCard}>
-            <View style={styles.memberInfo}>
-              {member.photo ? (
-                <Image source={{ uri: member.photo }} style={styles.memberPhoto} />
-              ) : (
-                <View style={styles.memberPhotoPlaceholder}>
-                  <Ionicons name="person" size={30} color="#666" />
+        {familyMembers && familyMembers.length > 0 && familyMembers.map((member) => (
+          member && member.id ? (
+            <View key={member.id} style={styles.memberCard}>
+              <View style={styles.memberInfo}>
+                {member.photo ? (
+                  <Image source={{ uri: member.photo }} style={styles.memberPhoto} />
+                ) : (
+                  <View style={styles.memberPhotoPlaceholder}>
+                    <Ionicons name="person" size={30} color="#666" />
+                  </View>
+                )}
+                <View style={styles.memberDetails}>
+                  <Text style={styles.memberName}>{member.name || 'Unknown'}</Text>
+                  <Text style={styles.memberRelationship}>{member.relationship || 'Unknown'}</Text>
+                  {member.dateOfBirth && (
+                    <Text style={styles.memberInfo}>DOB: {member.dateOfBirth}</Text>
+                  )}
+                  {member.bloodType && (
+                    <Text style={styles.memberInfo}>Blood Type: {member.bloodType}</Text>
+                  )}
                 </View>
-              )}
-              <View style={styles.memberDetails}>
-                <Text style={styles.memberName}>{member.name}</Text>
-                <Text style={styles.memberRelationship}>{member.relationship}</Text>
-                {member.dateOfBirth && (
-                  <Text style={styles.memberInfo}>DOB: {member.dateOfBirth}</Text>
-                )}
-                {member.bloodType && (
-                  <Text style={styles.memberInfo}>Blood Type: {member.bloodType}</Text>
-                )}
+              </View>
+              <View style={styles.memberActions}>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => handleEditMember(member)}
+                >
+                  <Ionicons name="pencil" size={20} color="#007AFF" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => handleDeleteMember(member.id)}
+                >
+                  <Ionicons name="trash" size={20} color="#FF3B30" />
+                </TouchableOpacity>
               </View>
             </View>
-            <View style={styles.memberActions}>
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => handleEditMember(member)}
-              >
-                <Ionicons name="pencil" size={20} color="#007AFF" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => handleDeleteMember(member.id)}
-              >
-                <Ionicons name="trash" size={20} color="#FF3B30" />
-              </TouchableOpacity>
-            </View>
-          </View>
+          ) : null
         ))}
 
-        {familyMembers.length === 0 && (
+        {(!familyMembers || familyMembers.length === 0) && (
           <View style={styles.emptyState}>
             <Ionicons name="people" size={64} color="#DDD" />
             <Text style={styles.emptyStateText}>No family members added yet</Text>

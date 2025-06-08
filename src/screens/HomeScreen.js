@@ -17,6 +17,7 @@ import { useError, ERROR_TYPES, ERROR_SEVERITY } from '../contexts/ErrorContext'
 import offlineStorageService from '../services/offlineStorage';
 import networkService from '../services/networkService';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { runFirebaseDiagnostics, formatDiagnosticResults } from '../utils/firebaseDiagnostics';
 
 const HomeScreen = ({ navigation }) => {
   const { user, userProfile } = useAuth();
@@ -210,6 +211,55 @@ const HomeScreen = ({ navigation }) => {
     </TouchableOpacity>
   );
 
+  // Add Firebase test function
+  const handleFirebaseTest = async () => {
+    try {
+      Alert.alert('🔬 Running Diagnostics', 'Testing Firebase configuration...');
+      
+      const results = await runFirebaseDiagnostics();
+      const formattedResults = formatDiagnosticResults(results);
+      
+      console.log('🔬 Complete Diagnostic Results:', formattedResults);
+      
+      // Show user-friendly summary
+      const errorTests = results.tests.filter(t => t.status === 'error');
+      const authConfigTest = results.tests.find(t => t.name === 'Anonymous Authentication Test');
+      
+      let message = `Tests: ${results.summary.success}/${results.summary.total} passed\n\n`;
+      
+      if (authConfigTest && authConfigTest.status === 'error' && authConfigTest.errorCode === 'auth/configuration-not-found') {
+        message += '🚨 SOLUTION NEEDED:\n';
+        message += '1. Go to Firebase Console\n';
+        message += '2. Enable Email/Password Auth\n';
+        message += '3. Restart the app\n\n';
+      }
+      
+      message += 'Check console for detailed results.';
+      
+      Alert.alert(
+        '🔬 Firebase Diagnostics',
+        message,
+        [
+          { 
+            text: 'Open Setup Guide', 
+            onPress: () => Alert.alert(
+              '📖 Setup Steps',
+              '1. Go to console.firebase.google.com\n' +
+              '2. Select: familyhealthapp-e5fd3\n' +
+              '3. Go to Authentication > Sign-in method\n' +
+              '4. Enable Email/Password\n' +
+              '5. Save and restart app'
+            )
+          },
+          { text: 'OK' }
+        ]
+      );
+    } catch (error) {
+      Alert.alert('❌ Diagnostic Error', error.message);
+      console.error('Diagnostic failed:', error);
+    }
+  };
+
   return (
     <ScrollView 
       style={styles.container}
@@ -240,6 +290,23 @@ const HomeScreen = ({ navigation }) => {
       {/* Quick Actions */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Quick Actions</Text>
+        
+        {/* Firebase Test Button - Remove this after debugging */}
+        <TouchableOpacity 
+          style={[styles.quickActionCard, { backgroundColor: '#fef3c7', borderLeftColor: '#f59e0b' }]}
+          onPress={handleFirebaseTest}
+        >
+          <View style={styles.quickActionContent}>
+            <View style={[styles.quickActionIcon, { backgroundColor: '#f59e0b20' }]}>
+              <Ionicons name="bug" size={24} color="#f59e0b" />
+            </View>
+            <View style={styles.quickActionText}>
+              <Text style={styles.quickActionTitle}>Test Firebase</Text>
+              <Text style={styles.quickActionSubtitle}>Debug connection</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+
         <View style={styles.quickActions}>
           <QuickActionCard
             icon="add-circle"

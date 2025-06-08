@@ -93,6 +93,13 @@ export const AuthProvider = ({ children }) => {
   const register = async (email, password, userData) => {
     try {
       console.log('📝 Attempting registration for:', email);
+      console.log('🔥 Firebase Auth object:', !!auth);
+      console.log('🔥 Firebase Auth config:', {
+        apiKey: auth.config?.apiKey ? 'Present' : 'Missing',
+        authDomain: auth.config?.authDomain,
+        projectId: auth.config?.projectId
+      });
+      
       const result = await createUserWithEmailAndPassword(auth, email, password);
       
       console.log('💾 Creating user profile in Firestore');
@@ -107,6 +114,8 @@ export const AuthProvider = ({ children }) => {
       return result;
     } catch (error) {
       console.error('❌ Registration failed:', error.message);
+      console.error('❌ Error code:', error.code);
+      console.error('❌ Full error:', error);
       throw error;
     }
   };
