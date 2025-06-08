@@ -40,21 +40,28 @@ export const validateForm = (data, rules) => {
   
   Object.keys(rules).forEach(field => {
     const value = data[field];
-    const fieldRules = rules[field];
+    const fieldRules = Array.isArray(rules[field]) ? rules[field] : [rules[field]];
     
     fieldRules.forEach(rule => {
-      if (rule.type === 'required' && !validateRequired(value)) {
-        errors[field] = rule.message || `${field} is required`;
-      } else if (rule.type === 'email' && value && !validateEmail(value)) {
+      // Skip validation if field already has error
+      if (errors[field]) return;
+      
+      if (rule.required && !validateRequired(value)) {
+        errors[field] = rule.message || `${field.charAt(0).toUpperCase() + field.slice(1)} is required`;
+      } else if (rule.email && value && !validateEmail(value)) {
         errors[field] = rule.message || 'Invalid email format';
-      } else if (rule.type === 'password' && value && !validatePassword(value)) {
+      } else if (rule.password && value && !validatePassword(value)) {
         errors[field] = rule.message || 'Password must be at least 8 characters with uppercase, lowercase, and number';
-      } else if (rule.type === 'phone' && value && !validatePhone(value)) {
+      } else if (rule.phone && value && !validatePhone(value)) {
         errors[field] = rule.message || 'Invalid phone number format';
-      } else if (rule.type === 'minLength' && value && !validateMinLength(value, rule.value)) {
-        errors[field] = rule.message || `Minimum length is ${rule.value}`;
-      } else if (rule.type === 'maxLength' && value && !validateMaxLength(value, rule.value)) {
-        errors[field] = rule.message || `Maximum length is ${rule.value}`;
+      } else if (rule.minLength && value && !validateMinLength(value, rule.minLength)) {
+        errors[field] = rule.message || `Minimum length is ${rule.minLength} characters`;
+      } else if (rule.maxLength && value && !validateMaxLength(value, rule.maxLength)) {
+        errors[field] = rule.message || `Maximum length is ${rule.maxLength} characters`;
+      } else if (rule.date && value && !validateDate(value)) {
+        errors[field] = rule.message || 'Invalid date format';
+      } else if (rule.match && value !== data[rule.match]) {
+        errors[field] = rule.message || 'Fields do not match';
       }
     });
   });
@@ -63,4 +70,14 @@ export const validateForm = (data, rules) => {
     isValid: Object.keys(errors).length === 0,
     errors
   };
+};
+
+// Helper to get field-specific error message
+export const getFieldError = (fieldName, validationErrors) => {
+  return validationErrors[fieldName] || null;
+};
+
+// Helper to check if field has error
+export const hasFieldError = (fieldName, validationErrors) => {
+  return Boolean(validationErrors[fieldName]);
 };

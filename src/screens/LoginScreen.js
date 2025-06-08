@@ -14,6 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useError, ERROR_TYPES, ERROR_SEVERITY } from '../contexts/ErrorContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import ValidationError from '../components/ValidationError';
+import { validateForm, getFieldError, hasFieldError } from '../utils/validation';
 // COMMENTED OUT: Firebase diagnostics import - no longer needed as Firebase is working correctly
 // import { runFirebaseDiagnostics, formatDiagnosticResults } from '../utils/firebaseDiagnostics';
 
@@ -22,15 +24,28 @@ const LoginScreen = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [validationErrors, setValidationErrors] = useState({});
 
   const { login } = useAuth();
   const { withErrorHandling, isLoading } = useError();
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+    // Validate form data
+    const validationRules = {
+      email: ['required', 'email'],
+      password: ['required', { minLength: 6 }]
+    };
+    
+    const formData = { email, password };
+    const errors = validateForm(formData, validationRules);
+    
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
       return;
     }
+    
+    // Clear validation errors if form is valid
+    setValidationErrors({});
 
     const result = await withErrorHandling(
       async () => {
@@ -99,7 +114,7 @@ const LoginScreen = ({ navigation }) => {
           <View style={styles.inputContainer}>
             <Ionicons name="mail-outline" size={20} color="#6b7280" style={styles.inputIcon} />
             <TextInput
-              style={styles.input}
+              style={[styles.input, hasFieldError(validationErrors, 'email') && styles.inputError]}
               placeholder="Email"
               value={email}
               onChangeText={setEmail}
@@ -108,6 +123,9 @@ const LoginScreen = ({ navigation }) => {
               autoComplete="email"
             />
           </View>
+          {hasFieldError(validationErrors, 'email') && (
+            <ValidationError message={getFieldError(validationErrors, 'email')} />
+          )}
 
           <View style={styles.inputContainer}>
             <Ionicons name="lock-closed-outline" size={20} color="#6b7280" style={styles.inputIcon} />

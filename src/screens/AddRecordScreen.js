@@ -25,7 +25,8 @@ import { useError, ERROR_TYPES, ERROR_SEVERITY } from '../contexts/ErrorContext'
 import offlineStorageService from '../services/offlineStorage';
 import networkService from '../services/networkService';
 import { LoadingSpinner } from '../components/LoadingSpinner';
-import { validateForm } from '../utils/validation';
+import ValidationError from '../components/ValidationError';
+import { validateForm, getFieldError, hasFieldError } from '../utils/validation';
 
 const RECORD_TYPES = [
   { id: 'prescription', name: 'Prescription', icon: 'medical', color: '#10b981' },
@@ -202,14 +203,18 @@ const AddRecordScreen = ({ navigation }) => {
   const handleSubmit = async () => {
     // Validate form
     const validation = validateForm(formData, {
-      type: { required: true },
-      title: { required: true, minLength: 3 },
-      familyMemberId: { required: true }
+      type: { required: true, message: 'Please select a record type' },
+      title: { required: true, minLength: 3, message: 'Title must be at least 3 characters' },
+      familyMemberId: { required: true, message: 'Please select a family member' },
+      date: { required: true, date: true, message: 'Please enter a valid date' }
     });
 
     if (!validation.isValid) {
       setValidationErrors(validation.errors);
-      Alert.alert('Validation Error', Object.values(validation.errors)[0]);
+      
+      // Show first validation error in alert
+      const firstError = Object.values(validation.errors)[0];
+      Alert.alert('Validation Error', firstError);
       return;
     }
 
@@ -397,7 +402,10 @@ const AddRecordScreen = ({ navigation }) => {
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Record Type *</Text>
           <TouchableOpacity
-            style={styles.selector}
+            style={[
+              styles.selector,
+              hasFieldError('type', validationErrors) && styles.inputError
+            ]}
             onPress={() => setShowTypePicker(true)}
           >
             {selectedType ? (
@@ -412,13 +420,17 @@ const AddRecordScreen = ({ navigation }) => {
             )}
             <Ionicons name="chevron-down" size={20} color="#6b7280" />
           </TouchableOpacity>
+          <ValidationError error={getFieldError('type', validationErrors)} />
         </View>
 
         {/* Family Member */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Family Member *</Text>
           <TouchableOpacity
-            style={styles.selector}
+            style={[
+              styles.selector,
+              hasFieldError('familyMemberId', validationErrors) && styles.inputError
+            ]}
             onPress={() => setShowMemberPicker(true)}
           >
             {selectedMember ? (
@@ -431,17 +443,22 @@ const AddRecordScreen = ({ navigation }) => {
             )}
             <Ionicons name="chevron-down" size={20} color="#6b7280" />
           </TouchableOpacity>
+          <ValidationError error={getFieldError('familyMemberId', validationErrors)} />
         </View>
 
         {/* Title */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Title *</Text>
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input,
+              hasFieldError('title', validationErrors) && styles.inputError
+            ]}
             placeholder="Enter record title"
             value={formData.title}
             onChangeText={(value) => updateFormData('title', value)}
           />
+          <ValidationError error={getFieldError('title', validationErrors)} />
         </View>
 
         {/* Description */}
@@ -470,13 +487,17 @@ const AddRecordScreen = ({ navigation }) => {
 
         {/* Date */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Date</Text>
+          <Text style={styles.label}>Date *</Text>
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input,
+              hasFieldError('date', validationErrors) && styles.inputError
+            ]}
             placeholder="YYYY-MM-DD"
             value={formData.date}
             onChangeText={(value) => updateFormData('date', value)}
           />
+          <ValidationError error={getFieldError('date', validationErrors)} />
         </View>
 
         {/* Notes */}
@@ -608,6 +629,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e5e7eb',
     color: '#1f2937',
+  },
+  inputError: {
+    borderColor: '#ef4444',
+    borderWidth: 2,
   },
   textArea: {
     height: 80,

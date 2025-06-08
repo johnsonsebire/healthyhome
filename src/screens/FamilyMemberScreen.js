@@ -10,7 +10,9 @@ import {
   TextInput,
   Modal,
   RefreshControl,
+  Platform,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
@@ -21,9 +23,11 @@ import * as ImagePicker from 'expo-image-picker';
 import offlineStorageService from '../services/offlineStorage';
 import networkService from '../services/networkService';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import ValidationError from '../components/ValidationError';
+import { validateForm, getFieldError, hasFieldError } from '../utils/validation';
 
 const FamilyMemberScreen = () => {
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const { subscription, checkUsageLimit } = useSubscription();
   const { withErrorHandling, isLoading } = useError();
   const [familyMembers, setFamilyMembers] = useState([]);
@@ -31,6 +35,9 @@ const FamilyMemberScreen = () => {
   const [isOnline, setIsOnline] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [validationErrors, setValidationErrors] = useState({});
   const [formData, setFormData] = useState({
     name: '',
     relationship: '',
@@ -42,7 +49,7 @@ const FamilyMemberScreen = () => {
   });
 
   const relationships = [
-    'Spouse', 'Child', 'Parent', 'Sibling', 'Grandparent', 'Grandchild', 'Other'
+    'Self', 'Spouse', 'Child', 'Parent', 'Sibling', 'Grandparent', 'Grandchild', 'Other'
   ];
 
   const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
@@ -111,6 +118,27 @@ const FamilyMemberScreen = () => {
   };
 
   const handleAddMember = async () => {
+    // Validate form data
+    const validation = validateForm(formData, {
+      name: { required: true, minLength: 2, message: 'Name must be at least 2 characters' },
+      relationship: { required: true, message: 'Please select a relationship' },
+      emergencyContact: { 
+        phone: true, 
+        message: 'Please enter a valid phone number (if provided)' 
+      }
+    });
+
+    if (!validation.isValid) {
+      setValidationErrors(validation.errors);
+      
+      // Show first validation error in alert
+      const firstError = Object.values(validation.errors)[0];
+      Alert.alert('Validation Error', firstError);
+      return;
+    }
+
+    setValidationErrors({});
+
     const result = await withErrorHandling(
       async () => {
         // Check family member limit based on subscription
@@ -120,12 +148,7 @@ const FamilyMemberScreen = () => {
             'Limit Reached',
             'Upgrade your subscription to add more family members'
           );
-          return;
-        }
-
-        if (!formData.name || !formData.relationship) {
-          Alert.alert('Error', 'Please fill in required fields');
-          return;
+          throw new Error('Family member limit reached');
         }
 
         const memberData = {
@@ -162,7 +185,7 @@ const FamilyMemberScreen = () => {
             'Saved Offline', 
             'Family member saved locally and will sync when you\'re back online.'
           );
-          return;
+          return { offline: true };
         }
 
         // Save to Firebase
@@ -174,6 +197,7 @@ const FamilyMemberScreen = () => {
 
         // Update cache
         await loadFamilyMembers();
+        return { online: true };
       },
       {
         errorType: ERROR_TYPES.STORAGE,
@@ -182,7 +206,10 @@ const FamilyMemberScreen = () => {
       }
     );
 
-    if (result.success) {
+    // Handle both old result format and new detailed result format
+    const isSuccess = result.success || (result.data && result.data.success);
+    
+    if (isSuccess) {
       setShowAddModal(false);
       setEditingMember(null);
       setFormData({
@@ -194,7 +221,9 @@ const FamilyMemberScreen = () => {
         emergencyContact: '',
         photo: null,
       });
-      if (networkService.isOnline()) {
+      
+      // Reload family members if online or if it was an offline save that needs UI update
+      if (networkService.isOnline() || (result.data && result.data.offline)) {
         loadFamilyMembers();
       }
     }
@@ -290,6 +319,60 @@ const FamilyMemberScreen = () => {
     }
   };
 
+  const handleRelationshipSelect = (relationship) => {
+    const updatedFormData = { ...formData, relationship };
+    
+    // Auto-populate name when "Self" is selected
+    if (relationship === 'Self' && userProfile?.displayName && !formData.name) {
+      updatedFormData.name = userProfile.displayName;
+    }
+    
+    setFormData(updatedFormData);
+  };
+
+  const formatDate = (date) => {
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+  };
+
+  const handleDateSelect = () => {
+    // Parse existing date or use current date
+    let initialDate = new Date();
+    if (formData.dateOfBirth) {
+      const parsed = new Date(formData.dateOfBirth);
+      if (!isNaN(parsed)) {
+        initialDate = parsed;
+      }
+    }
+    setSelectedDate(initialDate);
+    setShowDatePicker(true);
+  };
+
+  const onDateChange = (event, date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    
+    if (date) {
+      setSelectedDate(date);
+      setFormData({ 
+        ...formData, 
+        dateOfBirth: formatDate(date)
+      });
+      
+      if (Platform.OS === 'ios') {
+        // iOS picker stays open, we'll close it with a "Done" button
+      }
+    }
+  };
+
+  const handleDatePickerDone = () => {
+    setShowDatePicker(false);
+  };
+
   const getFamilyMemberLimit = () => {
     const limits = { basic: 3, standard: 10, premium: 50 };
     return limits[subscription?.plan] || 3;
@@ -379,7 +462,7 @@ const FamilyMemberScreen = () => {
             <Ionicons name="people" size={64} color="#DDD" />
             <Text style={styles.emptyStateText}>No family members added yet</Text>
             <Text style={styles.emptyStateSubtext}>
-              Add family members to manage their medical records
+              Start by adding yourself and your family members to manage medical records
             </Text>
           </View>
         )}
@@ -403,7 +486,12 @@ const FamilyMemberScreen = () => {
               <Text style={styles.cancelButton}>Cancel</Text>
             </TouchableOpacity>
             <Text style={styles.modalTitle}>
-              {editingMember ? 'Edit Member' : 'Add Family Member'}
+              {editingMember 
+                ? `Edit ${editingMember.name || 'Member'}` 
+                : formData.relationship === 'Self' 
+                  ? 'Add Your Profile'
+                  : 'Add Family Member'
+              }
             </Text>
             <TouchableOpacity onPress={handleAddMember}>
               <Text style={styles.saveButton}>Save</Text>
@@ -427,11 +515,19 @@ const FamilyMemberScreen = () => {
             <View style={styles.formGroup}>
               <Text style={styles.label}>Name *</Text>
               <TextInput
-                style={styles.input}
+                style={[
+                  styles.input,
+                  hasFieldError('name', validationErrors) && styles.inputError
+                ]}
                 value={formData.name}
                 onChangeText={(text) => setFormData({ ...formData, name: text })}
-                placeholder="Enter full name"
+                placeholder={
+                  formData.relationship === 'Self' 
+                    ? 'Your full name' 
+                    : 'Enter full name'
+                }
               />
+              <ValidationError error={getFieldError('name', validationErrors)} />
             </View>
 
             <View style={styles.formGroup}>
@@ -443,9 +539,11 @@ const FamilyMemberScreen = () => {
                       key={relation}
                       style={[
                         styles.relationshipButton,
+                        relation === 'Self' && styles.relationshipButtonSelf,
                         formData.relationship === relation && styles.relationshipButtonActive,
+                        hasFieldError('relationship', validationErrors) && styles.relationshipButtonError,
                       ]}
-                      onPress={() => setFormData({ ...formData, relationship: relation })}
+                      onPress={() => handleRelationshipSelect(relation)}
                     >
                       <Text
                         style={[
@@ -453,22 +551,29 @@ const FamilyMemberScreen = () => {
                           formData.relationship === relation && styles.relationshipButtonTextActive,
                         ]}
                       >
-                        {relation}
+                        {relation === 'Self' ? '👤 Self' : relation}
                       </Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               </ScrollView>
+              <ValidationError error={getFieldError('relationship', validationErrors)} />
             </View>
 
             <View style={styles.formGroup}>
               <Text style={styles.label}>Date of Birth</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.dateOfBirth}
-                onChangeText={(text) => setFormData({ ...formData, dateOfBirth: text })}
-                placeholder="MM/DD/YYYY"
-              />
+              <TouchableOpacity
+                style={styles.dateInput}
+                onPress={handleDateSelect}
+              >
+                <Text style={[
+                  styles.dateInputText,
+                  !formData.dateOfBirth && styles.dateInputPlaceholder
+                ]}>
+                  {formData.dateOfBirth || 'Select date of birth'}
+                </Text>
+                <Ionicons name="calendar" size={20} color="#666" />
+              </TouchableOpacity>
             </View>
 
             <View style={styles.formGroup}>
@@ -513,16 +618,54 @@ const FamilyMemberScreen = () => {
             <View style={styles.formGroup}>
               <Text style={styles.label}>Emergency Contact</Text>
               <TextInput
-                style={styles.input}
+                style={[
+                  styles.input,
+                  hasFieldError('emergencyContact', validationErrors) && styles.inputError
+                ]}
                 value={formData.emergencyContact}
                 onChangeText={(text) => setFormData({ ...formData, emergencyContact: text })}
                 placeholder="Phone number"
                 keyboardType="phone-pad"
               />
+              <ValidationError error={getFieldError('emergencyContact', validationErrors)} />
             </View>
           </ScrollView>
         </View>
       </Modal>
+
+      {/* Date Picker */}
+      {showDatePicker && (
+        <Modal
+          transparent={true}
+          animationType="slide"
+          visible={showDatePicker}
+          onRequestClose={() => setShowDatePicker(false)}
+        >
+          <View style={styles.datePickerModal}>
+            <View style={styles.datePickerContainer}>
+              {Platform.OS === 'ios' && (
+                <View style={styles.datePickerHeader}>
+                  <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                    <Text style={styles.datePickerCancel}>Cancel</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.datePickerTitle}>Select Date of Birth</Text>
+                  <TouchableOpacity onPress={handleDatePickerDone}>
+                    <Text style={styles.datePickerDone}>Done</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              <DateTimePicker
+                value={selectedDate}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={onDateChange}
+                maximumDate={new Date()}
+                minimumDate={new Date(1900, 0, 1)}
+              />
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 };
@@ -730,6 +873,66 @@ const styles = StyleSheet.create({
     height: 80,
     textAlignVertical: 'top',
   },
+  inputError: {
+    borderColor: '#ef4444',
+    borderWidth: 1.5,
+  },
+  relationshipButtonError: {
+    borderColor: '#ef4444',
+    borderWidth: 1.5,
+  },
+  dateInput: {
+    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 48,
+  },
+  dateInputText: {
+    fontSize: 16,
+    color: '#333',
+    flex: 1,
+  },
+  dateInputPlaceholder: {
+    color: '#999',
+  },
+  datePickerModal: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  datePickerContainer: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 34,
+  },
+  datePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  datePickerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+  },
+  datePickerCancel: {
+    fontSize: 16,
+    color: '#007AFF',
+  },
+  datePickerDone: {
+    fontSize: 16,
+    color: '#007AFF',
+    fontWeight: '600',
+  },
   relationshipButtons: {
     flexDirection: 'row',
     gap: 8,
@@ -745,6 +948,10 @@ const styles = StyleSheet.create({
   relationshipButtonActive: {
     backgroundColor: '#007AFF',
     borderColor: '#007AFF',
+  },
+  relationshipButtonSelf: {
+    borderColor: '#34D399',
+    backgroundColor: '#F0FDF4',
   },
   relationshipButtonText: {
     fontSize: 14,
