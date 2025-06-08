@@ -38,17 +38,21 @@ const RegisterScreen = ({ navigation }) => {
 
     // Validate form data
     const validationRules = {
-      firstName: ['required', { minLength: 2 }],
-      lastName: ['required', { minLength: 2 }],
-      email: ['required', 'email'],
-      password: ['required', { minLength: 6 }],
-      confirmPassword: ['required', { match: password }]
+      firstName: { required: true, minLength: 2, message: 'First name must be at least 2 characters' },
+      lastName: { required: true, minLength: 2, message: 'Last name must be at least 2 characters' },
+      email: { required: true, email: true, message: 'Please enter a valid email' },
+      password: { required: true, minLength: 6, message: 'Password must be at least 6 characters' },
+      confirmPassword: { required: true, match: 'password', message: 'Passwords do not match' }
     };
     
-    const errors = validateForm(formData, validationRules);
+    const validation = validateForm(formData, validationRules);
     
-    if (Object.keys(errors).length > 0) {
-      setValidationErrors(errors);
+    if (!validation.isValid) {
+      setValidationErrors(validation.errors);
+      
+      // Show first validation error in alert
+      const firstError = Object.values(validation.errors)[0];
+      Alert.alert('Validation Error', firstError);
       return;
     }
     
@@ -97,7 +101,7 @@ const RegisterScreen = ({ navigation }) => {
             <View style={[styles.inputContainer, { flex: 1, marginRight: 8 }]}>
               <Ionicons name="person-outline" size={20} color="#6b7280" style={styles.inputIcon} />
               <TextInput
-                style={[styles.input, hasFieldError(validationErrors, 'firstName') && styles.inputError]}
+                style={[styles.input, hasFieldError('firstName', validationErrors) && styles.inputError]}
                 placeholder="First Name"
                 value={formData.firstName}
                 onChangeText={(value) => updateFormData('firstName', value)}
@@ -107,7 +111,7 @@ const RegisterScreen = ({ navigation }) => {
             <View style={[styles.inputContainer, { flex: 1, marginLeft: 8 }]}>
               <Ionicons name="person-outline" size={20} color="#6b7280" style={styles.inputIcon} />
               <TextInput
-                style={[styles.input, hasFieldError(validationErrors, 'lastName') && styles.inputError]}
+                style={[styles.input, hasFieldError('lastName', validationErrors) && styles.inputError]}
                 placeholder="Last Name"
                 value={formData.lastName}
                 onChangeText={(value) => updateFormData('lastName', value)}
@@ -115,17 +119,17 @@ const RegisterScreen = ({ navigation }) => {
               />
             </View>
           </View>
-          {hasFieldError(validationErrors, 'firstName') && (
-            <ValidationError message={getFieldError(validationErrors, 'firstName')} />
+          {hasFieldError('firstName', validationErrors) && (
+            <ValidationError error={getFieldError('firstName', validationErrors)} />
           )}
-          {hasFieldError(validationErrors, 'lastName') && (
-            <ValidationError message={getFieldError(validationErrors, 'lastName')} />
+          {hasFieldError('lastName', validationErrors) && (
+            <ValidationError error={getFieldError('lastName', validationErrors)} />
           )}
 
           <View style={styles.inputContainer}>
             <Ionicons name="mail-outline" size={20} color="#6b7280" style={styles.inputIcon} />
             <TextInput
-              style={[styles.input, hasFieldError(validationErrors, 'email') && styles.inputError]}
+              style={[styles.input, hasFieldError('email', validationErrors) && styles.inputError]}
               placeholder="Email"
               value={formData.email}
               onChangeText={(value) => updateFormData('email', value)}
@@ -134,14 +138,14 @@ const RegisterScreen = ({ navigation }) => {
               autoComplete="email"
             />
           </View>
-          {hasFieldError(validationErrors, 'email') && (
-            <ValidationError message={getFieldError(validationErrors, 'email')} />
+          {hasFieldError('email', validationErrors) && (
+            <ValidationError error={getFieldError('email', validationErrors)} />
           )}
 
           <View style={styles.inputContainer}>
             <Ionicons name="lock-closed-outline" size={20} color="#6b7280" style={styles.inputIcon} />
             <TextInput
-              style={[styles.input, hasFieldError(validationErrors, 'password') && styles.inputError]}
+              style={[styles.input, hasFieldError('password', validationErrors) && styles.inputError]}
               placeholder="Password"
               value={formData.password}
               onChangeText={(value) => updateFormData('password', value)}
@@ -159,14 +163,14 @@ const RegisterScreen = ({ navigation }) => {
               />
             </TouchableOpacity>
           </View>
-          {hasFieldError(validationErrors, 'password') && (
-            <ValidationError message={getFieldError(validationErrors, 'password')} />
+          {hasFieldError('password', validationErrors) && (
+            <ValidationError error={getFieldError('password', validationErrors)} />
           )}
 
           <View style={styles.inputContainer}>
             <Ionicons name="lock-closed-outline" size={20} color="#6b7280" style={styles.inputIcon} />
             <TextInput
-              style={[styles.input, hasFieldError(validationErrors, 'confirmPassword') && styles.inputError]}
+              style={[styles.input, hasFieldError('confirmPassword', validationErrors) && styles.inputError]}
               placeholder="Confirm Password"
               value={formData.confirmPassword}
               onChangeText={(value) => updateFormData('confirmPassword', value)}
@@ -183,8 +187,8 @@ const RegisterScreen = ({ navigation }) => {
               />
             </TouchableOpacity>
           </View>
-          {hasFieldError(validationErrors, 'confirmPassword') && (
-            <ValidationError message={getFieldError(validationErrors, 'confirmPassword')} />
+          {hasFieldError('confirmPassword', validationErrors) && (
+            <ValidationError error={getFieldError('confirmPassword', validationErrors)} />
           )}
 
           <TouchableOpacity
