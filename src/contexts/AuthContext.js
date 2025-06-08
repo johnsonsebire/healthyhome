@@ -1,15 +1,22 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { 
-  auth,
-  db, 
-  onAuthStateChanged, 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  signOut,
-  doc,
-  setDoc,
-  getDoc
-} from '../services/firebase';
+
+// Defensive import - handle cases where Firebase might not be initialized
+let auth, db, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, doc, setDoc, getDoc;
+
+try {
+  const firebaseImports = require('../services/firebase');
+  auth = firebaseImports.auth;
+  db = firebaseImports.db;
+  onAuthStateChanged = firebaseImports.onAuthStateChanged;
+  signInWithEmailAndPassword = firebaseImports.signInWithEmailAndPassword;
+  createUserWithEmailAndPassword = firebaseImports.createUserWithEmailAndPassword;
+  signOut = firebaseImports.signOut;
+  doc = firebaseImports.doc;
+  setDoc = firebaseImports.setDoc;
+  getDoc = firebaseImports.getDoc;
+} catch (error) {
+  console.error('❌ Error importing Firebase services in AuthContext:', error);
+}
 
 const AuthContext = createContext();
 
@@ -28,6 +35,14 @@ export const AuthProvider = ({ children }) => {
   const [authError, setAuthError] = useState(null);
 
   useEffect(() => {
+    // Safety check: ensure Firebase is properly initialized
+    if (!auth || !db || !onAuthStateChanged) {
+      console.error('❌ Firebase services not available in AuthContext');
+      setAuthError('Firebase initialization failed');
+      setLoading(false);
+      return;
+    }
+
     console.log('🔍 AuthContext: Setting up auth state change listener');
 
     const unsubscribe = onAuthStateChanged(auth, async (userState) => {
@@ -78,6 +93,10 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = async (email, password) => {
+    if (!auth || !signInWithEmailAndPassword) {
+      throw new Error('Firebase Auth not available');
+    }
+    
     try {
       console.log('🔐 Attempting login for:', email);
       const result = await signInWithEmailAndPassword(auth, email, password);
@@ -90,6 +109,10 @@ export const AuthProvider = ({ children }) => {
   };
 
   const register = async (email, password, userData) => {
+    if (!auth || !createUserWithEmailAndPassword || !db || !setDoc || !doc) {
+      throw new Error('Firebase services not available');
+    }
+    
     try {
       console.log('📝 Attempting registration for:', email);
       const result = await createUserWithEmailAndPassword(auth, email, password);
@@ -111,6 +134,10 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
+    if (!auth || !signOut) {
+      throw new Error('Firebase Auth not available');
+    }
+    
     try {
       console.log('🚪 Attempting logout');
       await signOut(auth);

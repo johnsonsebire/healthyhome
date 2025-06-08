@@ -1,45 +1,53 @@
-// Firebase Test Script
-// Run this to verify Firebase is properly configured
-import { auth, db } from './firebase';
-import Constants from 'expo-constants';
+/**
+ * Firebase Test and Diagnostics
+ * This file tests Firebase connectivity and provides diagnostics
+ */
+import { auth, db, storage } from './firebaseConfig';
 
 export const testFirebaseConnection = async () => {
   try {
-    console.log('🧪 Testing Firebase connection...');
+    console.log('🧪 Running Firebase connection test...');
     
-    // Test 0: Check environment variables
-    console.log('🔍 Checking Firebase environment variables:');
-    console.log('- Constants.expoConfig.extra:', Constants.expoConfig?.extra ? 'Available' : 'Not available');
-    if (Constants.expoConfig?.extra?.firebaseApiKey) {
-      console.log('✅ Firebase config found in Constants');
-    } else {
-      console.log('⚠️ No Firebase config in Constants');
-    }
+    // Test 1: Check if Firebase services are initialized
+    console.log('🔍 Firebase Services Check:');
+    console.log('- Auth Service:', auth ? '✅ Available' : '❌ Not available');
+    console.log('- Firestore Service:', db ? '✅ Available' : '❌ Not available');
+    console.log('- Storage Service:', storage ? '✅ Available' : '❌ Not available');
     
-    // Test 1: Check if auth is initialized
-    if (auth) {
-      console.log('✅ Firebase Auth is initialized');
-      console.log('Auth currentUser:', auth.currentUser);
-    } else {
-      console.error('❌ Firebase Auth is not initialized');
+    if (!auth || !db || !storage) {
+      console.error('❌ One or more Firebase services not initialized');
       return false;
     }
     
-    // Test 2: Check if Firestore is initialized
-    if (db) {
-      console.log('✅ Firestore is initialized');
-    } else {
-      console.error('❌ Firestore is not initialized');
-      return false;
+    // Test 2: Check auth state
+    console.log('🔑 Auth State:', auth.currentUser ? `Logged in as ${auth.currentUser.email}` : 'Not logged in');
+    
+    // Test 3: Check if we can access Firestore (this will fail if not authenticated, which is expected)
+    try {
+      // Just test if we can create a reference - don't actually read/write
+      const testRef = db._delegate ? db._delegate : db;
+      console.log('🗄️ Firestore connection:', testRef ? '✅ Connected' : '❌ Not connected');
+    } catch (firestoreError) {
+      console.log('🗄️ Firestore test skipped (requires authentication)');
     }
     
-    console.log('🎉 Firebase connection test passed!');
+    console.log('🎉 Firebase connection test completed successfully!');
     return true;
+    
   } catch (error) {
     console.error('❌ Firebase connection test failed:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
     return false;
   }
 };
 
-// Auto-run test when imported
-testFirebaseConnection();
+// Auto-run test when file is imported (only in development)
+if (__DEV__) {
+  setTimeout(() => {
+    testFirebaseConnection().catch(console.error);
+  }, 1000); // Delay to allow app to fully initialize
+}

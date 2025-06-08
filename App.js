@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { Provider as PaperProvider } from 'react-native-paper';
@@ -16,6 +16,7 @@ SplashScreen.preventAutoHideAsync().catch((error) => {
 
 export default function App() {
   const [isReady, setIsReady] = useState(false);
+  const [initError, setInitError] = useState(null);
 
   useEffect(() => {
     // Function to prepare the app
@@ -23,15 +24,28 @@ export default function App() {
       try {
         console.log('📱 App initialization started');
         
-        // Add any initialization logic here
-        // No Firebase initialization here - we do it in the service files
+        // Test Firebase initialization
+        try {
+          // Dynamic import to catch initialization errors
+          const { testFirebaseConnection } = await import('./src/services/firebaseTest');
+          const firebaseReady = await testFirebaseConnection();
+          
+          if (!firebaseReady) {
+            throw new Error('Firebase connection test failed');
+          }
+        } catch (firebaseError) {
+          console.error('❌ Firebase initialization error:', firebaseError);
+          setInitError('Firebase initialization failed. Please check your configuration.');
+          return;
+        }
         
         // Simulate a delay to ensure everything is loaded
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         console.log('✅ App initialization complete');
       } catch (error) {
         console.error('❌ Error during app initialization:', error);
+        setInitError(`App initialization failed: ${error.message}`);
       } finally {
         // Mark the app as ready and hide splash screen
         setIsReady(true);
@@ -45,6 +59,19 @@ export default function App() {
 
     prepareApp();
   }, []);
+
+  // Show error screen if initialization failed
+  if (initError) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorTitle}>Initialization Error</Text>
+        <Text style={styles.errorText}>{initError}</Text>
+        <Text style={styles.errorHint}>
+          Please check your internet connection and restart the app.
+        </Text>
+      </View>
+    );
+  }
 
   if (!isReady) {
     return (
@@ -93,5 +120,30 @@ const styles = StyleSheet.create({
     marginTop: 5,
     fontSize: 14,
     color: '#666',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 20,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#dc2626',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#374151',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  errorHint: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
   },
 });
