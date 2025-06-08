@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -10,13 +10,13 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
-import { SubscriptionContext } from '../contexts/SubscriptionContext';
+import { useSubscription } from '../contexts/SubscriptionContext';
 import { useError, ERROR_TYPES, ERROR_SEVERITY } from '../contexts/ErrorContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 
 const SubscriptionScreen = () => {
   const { user } = useAuth();
-  const { subscription, updateSubscription } = useContext(SubscriptionContext);
+  const { subscription, updateSubscription } = useSubscription();
   const { withErrorHandling, isLoading } = useError();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);

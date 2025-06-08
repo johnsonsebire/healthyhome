@@ -16,7 +16,7 @@ import { useError, ERROR_TYPES, ERROR_SEVERITY } from '../contexts/ErrorContext'
 import offlineStorageService from '../services/offlineStorage';
 import networkService from '../services/networkService';
 import { LoadingSpinner } from '../components/LoadingSpinner';
-import { EmptyState } from '../components/EmptyState';
+import EmptyState from '../components/EmptyState';
 
 const ScheduleScreen = ({ navigation }) => {
   const { user } = useAuth();
@@ -146,9 +146,9 @@ const ScheduleScreen = ({ navigation }) => {
       icon="calendar-outline"
       title="No appointments scheduled"
       subtitle="Schedule your first appointment to get started"
-      action={{
-        label: 'Schedule Appointment',
-        onPress: () => {/* Navigate to add appointment */}
+      buttonText="Schedule Appointment"
+      onButtonPress={() => {
+        Alert.alert('Coming Soon', 'Appointment scheduling will be available soon');
       }}
     />
   );
@@ -203,7 +203,9 @@ const ScheduleScreen = ({ navigation }) => {
       {/* Floating Action Button */}
       <TouchableOpacity
         style={styles.fab}
-        onPress={() => {/* Navigate to add appointment */}}
+        onPress={() => {
+          Alert.alert('Coming Soon', 'Appointment scheduling will be available soon');
+        }}
       >
         <Ionicons name="add" size={24} color="#ffffff" />
       </TouchableOpacity>

@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
-import { SubscriptionContext } from '../contexts/SubscriptionContext';
+import { useSubscription } from '../contexts/SubscriptionContext';
 import { useError, ERROR_TYPES, ERROR_SEVERITY } from '../contexts/ErrorContext';
 import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, where } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
@@ -24,7 +24,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 
 const FamilyMemberScreen = () => {
   const { user } = useAuth();
-  const { subscription, checkUsageLimit } = useContext(SubscriptionContext);
+  const { subscription, checkUsageLimit } = useSubscription();
   const { withErrorHandling, isLoading } = useError();
   const [familyMembers, setFamilyMembers] = useState([]);
   const [loading, setLoading] = useState(true);

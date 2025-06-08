@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
-import { SubscriptionContext } from '../contexts/SubscriptionContext';
+import { useSubscription } from '../contexts/SubscriptionContext';
 import { useError } from '../contexts/ErrorContext';
 import dataExportService from '../services/dataExport';
 import offlineStorageService from '../services/offlineStorage';
@@ -18,7 +18,7 @@ import { APP_CONFIG } from '../constants';
 
 const SettingsScreen = ({ navigation }) => {
   const { user, userProfile, logout } = useAuth();
-  const { subscription } = useContext(SubscriptionContext);
+  const { subscription, currentPlan, plans } = useSubscription();
   const { addError, withErrorHandling } = useError();
   
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -171,16 +171,16 @@ const SettingsScreen = ({ navigation }) => {
       <View style={styles.profileSection}>
         <View style={styles.profileAvatar}>
           <Text style={styles.profileInitials}>
-            {userProfile?.firstName?.charAt(0)}{userProfile?.lastName?.charAt(0)}
+            {userProfile?.firstName?.charAt(0) || 'U'}{userProfile?.lastName?.charAt(0) || 'S'}
           </Text>
         </View>
         <Text style={styles.profileName}>
-          {userProfile?.firstName} {userProfile?.lastName}
+          {userProfile?.firstName || 'User'} {userProfile?.lastName || 'Name'}
         </Text>
         <Text style={styles.profileEmail}>{user?.email}</Text>
         <View style={styles.subscriptionBadge}>
           <Text style={styles.subscriptionText}>
-            {plans[currentPlan]?.name} Plan
+            {plans && plans[currentPlan] ? plans[currentPlan].name : 'Basic'} Plan
           </Text>
         </View>
       </View>
@@ -203,7 +203,7 @@ const SettingsScreen = ({ navigation }) => {
         <SettingItem
           icon="card-outline"
           title="Subscription"
-          subtitle={`Current plan: ${plans[currentPlan]?.name}`}
+          subtitle={`Current plan: ${plans && plans[currentPlan] ? plans[currentPlan].name : 'Basic'}`}
           onPress={() => navigation.navigate('Subscription')}
           color="#8b5cf6"
         />

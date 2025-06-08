@@ -96,23 +96,52 @@ export const SubscriptionProvider = ({ children }) => {
     }
   };
 
-  const canAddFamilyMember = () => {
+  const checkUsageLimit = (type, currentCount) => {
     const plan = SUBSCRIPTION_PLANS[currentPlan];
-    return plan.features.familyMembers === -1 || 
-           usageStats.familyMembers < plan.features.familyMembers;
+    if (type === 'familyMembers') {
+      return plan.features.familyMembers === -1 || currentCount < plan.features.familyMembers;
+    }
+    return true;
+  };
+
+  const updateSubscription = async (newSubscription) => {
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        subscriptionPlan: newSubscription.plan,
+        subscriptionStatus: newSubscription.status,
+        subscriptionStartDate: newSubscription.startDate,
+        subscriptionEndDate: newSubscription.endDate,
+        updatedAt: new Date()
+      });
+      setCurrentPlan(newSubscription.plan);
+      setSubscriptionStatus(newSubscription.status);
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const canAddFamilyMember = (currentCount) => {
+    const plan = SUBSCRIPTION_PLANS[currentPlan];
+    return plan.features.familyMembers === -1 || currentCount < plan.features.familyMembers;
   };
 
   const canUploadFile = (fileSize) => {
     const plan = SUBSCRIPTION_PLANS[currentPlan];
-    const maxStorage = plan.features.storage * 1024 * 1024; // Convert MB to bytes
-    return (usageStats.storageUsed + fileSize) <= maxStorage;
+    const maxStorageBytes = plan.features.storage * 1024 * 1024; // Convert MB to bytes
+    return (usageStats.storageUsed + fileSize) <= maxStorageBytes;
   };
 
   const value = {
     currentPlan,
     subscriptionStatus,
     usageStats,
+    subscription: {
+      plan: currentPlan,
+      status: subscriptionStatus
+    },
     upgradePlan,
+    updateSubscription,
+    checkUsageLimit,
     canAddFamilyMember,
     canUploadFile,
     plans: SUBSCRIPTION_PLANS

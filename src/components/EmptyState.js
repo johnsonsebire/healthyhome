@@ -8,8 +8,12 @@ const EmptyState = ({
   subtitle = 'Add your first item to get started',
   buttonText,
   onButtonPress,
+  action,
   style 
 }) => {
+  // Support both old API (buttonText/onButtonPress) and new API (action)
+  const actionButton = action || (buttonText && onButtonPress ? { label: buttonText, onPress: onButtonPress } : null);
+
   return (
     <View style={[styles.container, style]}>
       <View style={styles.iconContainer}>
@@ -17,9 +21,9 @@ const EmptyState = ({
       </View>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.subtitle}>{subtitle}</Text>
-      {buttonText && onButtonPress && (
-        <TouchableOpacity style={styles.button} onPress={onButtonPress}>
-          <Text style={styles.buttonText}>{buttonText}</Text>
+      {actionButton && (
+        <TouchableOpacity style={styles.button} onPress={actionButton.onPress}>
+          <Text style={styles.buttonText}>{actionButton.label}</Text>
         </TouchableOpacity>
       )}
     </View>

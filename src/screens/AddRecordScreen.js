@@ -9,6 +9,9 @@ import {
   Alert,
   Image,
   Modal,
+  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -368,8 +371,28 @@ const AddRecordScreen = ({ navigation }) => {
   const selectedMember = familyMembers.find(m => m.id === formData.familyMemberId);
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.form}>
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView 
+        style={styles.keyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        {/* Loading Overlay */}
+        {isLoading && <LoadingSpinner />}
+        
+        {/* Offline Indicator */}
+        {!isOnline && (
+          <View style={styles.offlineIndicator}>
+            <Ionicons name="cloud-offline" size={16} color="#ef4444" />
+            <Text style={styles.offlineText}>Offline - Changes will sync when online</Text>
+          </View>
+        )}
+
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.form}>
         {/* Record Type */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Record Type *</Text>
@@ -524,11 +547,13 @@ const AddRecordScreen = ({ navigation }) => {
             {loading ? 'Adding Record...' : 'Add Record'}
           </Text>
         </TouchableOpacity>
-      </View>
+          </View>
 
-      <TypePickerModal />
-      <MemberPickerModal />
-    </ScrollView>
+          <TypePickerModal />
+          <MemberPickerModal />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
@@ -537,8 +562,33 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
+  keyboardView: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
+  offlineIndicator: {
+    backgroundColor: '#fef2f2',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#fecaca',
+  },
+  offlineText: {
+    fontSize: 14,
+    color: '#dc2626',
+    fontWeight: '500',
+  },
   form: {
     padding: 20,
+    paddingBottom: 40,
   },
   inputGroup: {
     marginBottom: 20,

@@ -17,7 +17,8 @@ import { useError, ERROR_TYPES, ERROR_SEVERITY } from '../contexts/ErrorContext'
 import offlineStorageService from '../services/offlineStorage';
 import networkService from '../services/networkService';
 import { LoadingSpinner } from '../components/LoadingSpinner';
-import { runFirebaseDiagnostics, formatDiagnosticResults } from '../utils/firebaseDiagnostics';
+// COMMENTED OUT: Firebase diagnostics import - no longer needed as Firebase is working correctly
+// import { runFirebaseDiagnostics, formatDiagnosticResults } from '../utils/firebaseDiagnostics';
 
 const HomeScreen = ({ navigation }) => {
   const { user, userProfile } = useAuth();
@@ -211,7 +212,9 @@ const HomeScreen = ({ navigation }) => {
     </TouchableOpacity>
   );
 
-  // Add Firebase test function
+  // COMMENTED OUT: Firebase diagnostics function - no longer needed as Firebase is working correctly
+  // Users can now register and login to their accounts without issues
+  /*
   const handleFirebaseTest = async () => {
     try {
       Alert.alert('🔬 Running Diagnostics', 'Testing Firebase configuration...');
@@ -259,6 +262,7 @@ const HomeScreen = ({ navigation }) => {
       console.error('Diagnostic failed:', error);
     }
   };
+  */
 
   return (
     <ScrollView 
@@ -291,7 +295,8 @@ const HomeScreen = ({ navigation }) => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Quick Actions</Text>
         
-        {/* Firebase Test Button - Remove this after debugging */}
+        {/* COMMENTED OUT: Firebase Test Button - no longer needed as Firebase is working correctly */}
+        {/*
         <TouchableOpacity 
           style={[styles.quickActionCard, { backgroundColor: '#fef3c7', borderLeftColor: '#f59e0b' }]}
           onPress={handleFirebaseTest}
@@ -306,6 +311,7 @@ const HomeScreen = ({ navigation }) => {
             </View>
           </View>
         </TouchableOpacity>
+        */}
 
         <View style={styles.quickActions}>
           <QuickActionCard

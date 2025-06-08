@@ -14,7 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useError, ERROR_TYPES, ERROR_SEVERITY } from '../contexts/ErrorContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
-import { runFirebaseDiagnostics, formatDiagnosticResults } from '../utils/firebaseDiagnostics';
+// COMMENTED OUT: Firebase diagnostics import - no longer needed as Firebase is working correctly
+// import { runFirebaseDiagnostics, formatDiagnosticResults } from '../utils/firebaseDiagnostics';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -45,6 +46,9 @@ const LoginScreen = ({ navigation }) => {
     // Navigation will be handled by AuthContext on successful login
   };
 
+  // COMMENTED OUT: Firebase diagnostics functionality - no longer needed as Firebase is working correctly
+  // Users can now register and login to their accounts without issues
+  /*
   const handleFirebaseDiagnostics = async () => {
     try {
       Alert.alert('🔬 Running Diagnostics', 'Testing Firebase configuration...');
@@ -74,6 +78,7 @@ const LoginScreen = ({ navigation }) => {
       console.error('Firebase diagnostics failed:', error);
     }
   };
+  */
 
   return (
     <KeyboardAvoidingView 
@@ -145,7 +150,8 @@ const LoginScreen = ({ navigation }) => {
             </Text>
           </TouchableOpacity>
 
-          {/* Firebase Diagnostics Button */}
+          {/* COMMENTED OUT: Firebase Diagnostics Button - no longer needed as Firebase is working correctly */}
+          {/*
           <TouchableOpacity
             style={styles.diagnosticButton}
             onPress={handleFirebaseDiagnostics}
@@ -154,6 +160,7 @@ const LoginScreen = ({ navigation }) => {
               🔬 Test Firebase Connection
             </Text>
           </TouchableOpacity>
+          */}
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
