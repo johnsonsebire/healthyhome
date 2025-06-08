@@ -14,6 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useError, ERROR_TYPES, ERROR_SEVERITY } from '../contexts/ErrorContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import ValidationError from '../components/ValidationError';
+import { validateForm, getFieldError, hasFieldError } from '../utils/validation';
 
 const RegisterScreen = ({ navigation }) => {
   const [formData, setFormData] = useState({
@@ -26,6 +28,7 @@ const RegisterScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [validationErrors, setValidationErrors] = useState({});
 
   const { register } = useAuth();
   const { withErrorHandling, isLoading } = useError();
@@ -33,20 +36,24 @@ const RegisterScreen = ({ navigation }) => {
   const handleRegister = async () => {
     const { firstName, lastName, email, password, confirmPassword } = formData;
 
-    if (!firstName || !lastName || !email || !password || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all fields');
+    // Validate form data
+    const validationRules = {
+      firstName: ['required', { minLength: 2 }],
+      lastName: ['required', { minLength: 2 }],
+      email: ['required', 'email'],
+      password: ['required', { minLength: 6 }],
+      confirmPassword: ['required', { match: password }]
+    };
+    
+    const errors = validateForm(formData, validationRules);
+    
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
       return;
     }
-
-    if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
-      return;
-    }
-
-    if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
-      return;
-    }
+    
+    // Clear validation errors if form is valid
+    setValidationErrors({});
 
     const result = await withErrorHandling(
       async () => {
@@ -90,7 +97,7 @@ const RegisterScreen = ({ navigation }) => {
             <View style={[styles.inputContainer, { flex: 1, marginRight: 8 }]}>
               <Ionicons name="person-outline" size={20} color="#6b7280" style={styles.inputIcon} />
               <TextInput
-                style={styles.input}
+                style={[styles.input, hasFieldError(validationErrors, 'firstName') && styles.inputError]}
                 placeholder="First Name"
                 value={formData.firstName}
                 onChangeText={(value) => updateFormData('firstName', value)}
@@ -100,7 +107,7 @@ const RegisterScreen = ({ navigation }) => {
             <View style={[styles.inputContainer, { flex: 1, marginLeft: 8 }]}>
               <Ionicons name="person-outline" size={20} color="#6b7280" style={styles.inputIcon} />
               <TextInput
-                style={styles.input}
+                style={[styles.input, hasFieldError(validationErrors, 'lastName') && styles.inputError]}
                 placeholder="Last Name"
                 value={formData.lastName}
                 onChangeText={(value) => updateFormData('lastName', value)}
@@ -108,11 +115,17 @@ const RegisterScreen = ({ navigation }) => {
               />
             </View>
           </View>
+          {hasFieldError(validationErrors, 'firstName') && (
+            <ValidationError message={getFieldError(validationErrors, 'firstName')} />
+          )}
+          {hasFieldError(validationErrors, 'lastName') && (
+            <ValidationError message={getFieldError(validationErrors, 'lastName')} />
+          )}
 
           <View style={styles.inputContainer}>
             <Ionicons name="mail-outline" size={20} color="#6b7280" style={styles.inputIcon} />
             <TextInput
-              style={styles.input}
+              style={[styles.input, hasFieldError(validationErrors, 'email') && styles.inputError]}
               placeholder="Email"
               value={formData.email}
               onChangeText={(value) => updateFormData('email', value)}
@@ -121,11 +134,14 @@ const RegisterScreen = ({ navigation }) => {
               autoComplete="email"
             />
           </View>
+          {hasFieldError(validationErrors, 'email') && (
+            <ValidationError message={getFieldError(validationErrors, 'email')} />
+          )}
 
           <View style={styles.inputContainer}>
             <Ionicons name="lock-closed-outline" size={20} color="#6b7280" style={styles.inputIcon} />
             <TextInput
-              style={styles.input}
+              style={[styles.input, hasFieldError(validationErrors, 'password') && styles.inputError]}
               placeholder="Password"
               value={formData.password}
               onChangeText={(value) => updateFormData('password', value)}
@@ -143,11 +159,14 @@ const RegisterScreen = ({ navigation }) => {
               />
             </TouchableOpacity>
           </View>
+          {hasFieldError(validationErrors, 'password') && (
+            <ValidationError message={getFieldError(validationErrors, 'password')} />
+          )}
 
           <View style={styles.inputContainer}>
             <Ionicons name="lock-closed-outline" size={20} color="#6b7280" style={styles.inputIcon} />
             <TextInput
-              style={styles.input}
+              style={[styles.input, hasFieldError(validationErrors, 'confirmPassword') && styles.inputError]}
               placeholder="Confirm Password"
               value={formData.confirmPassword}
               onChangeText={(value) => updateFormData('confirmPassword', value)}
@@ -164,6 +183,9 @@ const RegisterScreen = ({ navigation }) => {
               />
             </TouchableOpacity>
           </View>
+          {hasFieldError(validationErrors, 'confirmPassword') && (
+            <ValidationError message={getFieldError(validationErrors, 'confirmPassword')} />
+          )}
 
           <TouchableOpacity
             style={[styles.registerButton, loading && styles.disabledButton]}
@@ -240,6 +262,10 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     fontSize: 16,
     color: '#1f2937',
+  },
+  inputError: {
+    borderColor: '#ef4444',
+    borderWidth: 1.5,
   },
   eyeIcon: {
     padding: 4,

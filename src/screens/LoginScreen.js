@@ -130,7 +130,7 @@ const LoginScreen = ({ navigation }) => {
           <View style={styles.inputContainer}>
             <Ionicons name="lock-closed-outline" size={20} color="#6b7280" style={styles.inputIcon} />
             <TextInput
-              style={styles.input}
+              style={[styles.input, hasFieldError(validationErrors, 'password') && styles.inputError]}
               placeholder="Password"
               value={password}
               onChangeText={setPassword}
@@ -148,6 +148,9 @@ const LoginScreen = ({ navigation }) => {
               />
             </TouchableOpacity>
           </View>
+          {hasFieldError(validationErrors, 'password') && (
+            <ValidationError message={getFieldError(validationErrors, 'password')} />
+          )}
 
           <TouchableOpacity
             style={[styles.loginButton, loading && styles.disabledButton]}
@@ -233,6 +236,10 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     fontSize: 16,
     color: '#1f2937',
+  },
+  inputError: {
+    borderColor: '#ef4444',
+    borderWidth: 1.5,
   },
   eyeIcon: {
     padding: 4,
