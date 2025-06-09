@@ -12,7 +12,7 @@ service cloud.firestore {
     
     // Rule for medicalRecords collection
     match /medicalRecords/{recordId} {
-      // Allow read if user ID matches
+      // Allow read if user ID matches (for both existing and new documents)
       allow read: if request.auth != null && 
                    (resource == null || request.auth.uid == resource.data.userId);
       
@@ -27,7 +27,7 @@ service cloud.firestore {
 
     // Rule for familyMembers collection
     match /familyMembers/{memberId} {
-      // Allow read if user ID matches
+      // Allow read if user ID matches (for both existing and new documents)
       allow read: if request.auth != null && 
                    (resource == null || request.auth.uid == resource.data.userId);
       
@@ -38,6 +38,41 @@ service cloud.firestore {
       // Allow update/delete if user owns the document
       allow update, delete: if request.auth != null && 
                             request.auth.uid == resource.data.userId;
+    }
+
+    // Rule for appointments collection
+    match /appointments/{appointmentId} {
+      // Allow read if user ID matches (for both existing and new documents)
+      allow read: if request.auth != null && 
+                   (resource == null || request.auth.uid == resource.data.userId);
+      
+      // Allow create if user is setting their own userId
+      allow create: if request.auth != null && 
+                     request.auth.uid == request.resource.data.userId;
+      
+      // Allow update/delete if user owns the document
+      allow update, delete: if request.auth != null && 
+                            request.auth.uid == resource.data.userId;
+    }
+
+    // Rule for insurance collection
+    match /insurance/{insuranceId} {
+      // Allow read if user ID matches (for both existing and new documents)
+      allow read: if request.auth != null && 
+                   (resource == null || request.auth.uid == resource.data.userId);
+      
+      // Allow create if user is setting their own userId
+      allow create: if request.auth != null && 
+                     request.auth.uid == request.resource.data.userId;
+      
+      // Allow update/delete if user owns the document
+      allow update, delete: if request.auth != null && 
+                            request.auth.uid == resource.data.userId;
+    }
+
+    // Rule for test documents (used in diagnostics)
+    match /test/{testId} {
+      allow read, write: if request.auth != null;
     }
   }
 }

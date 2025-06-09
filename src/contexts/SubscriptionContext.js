@@ -8,6 +8,7 @@ import networkService from '../services/networkService';
 import offlineStorageService from '../services/offlineStorage';
 import emailService from '../services/emailService';
 import revenueCatService from '../services/revenueCat';
+import unifiedPaymentService, { PAYMENT_PROVIDERS } from '../services/unifiedPaymentService';
 
 const SubscriptionContext = createContext();
 
@@ -84,6 +85,98 @@ export const SubscriptionProvider = ({ children }) => {
   });
   const [revenueCatOfferings, setRevenueCatOfferings] = useState([]);
   const [isRevenueCatInitialized, setIsRevenueCatInitialized] = useState(false);
+  
+  // New payment-related state
+  const [availablePaymentMethods, setAvailablePaymentMethods] = useState([]);
+  const [selectedPaymentProvider, setSelectedPaymentProvider] = useState(null);
+  const [paymentPlans, setPaymentPlans] = useState({});
+  const [pendingPaymentReference, setPendingPaymentReference] = useState(null);
+
+  useEffect(() => {
+    if (user) {
+      try {
+        initializePaymentServices();
+        fetchSubscriptionData();
+      } catch (error) {
+        console.error('Error in subscription effect:', error);
+        // Default to free plan as fallback
+        setCurrentPlan('free');
+      }
+    } else {
+      // No user, default to free
+      setCurrentPlan('free');
+    }
+  }, [user]);
+
+  // Initialize all payment services
+  const initializePaymentServices = async () => {
+    try {
+      await unifiedPaymentService.initialize(user?.uid);
+      
+      // Get available payment methods based on user location
+      const userRegion = getUserRegion(); // You can implement this based on user profile or device locale
+      const methods = unifiedPaymentService.getAvailablePaymentMethods(userRegion);
+      setAvailablePaymentMethods(methods);
+      
+      // Set recommended provider as default
+      const recommendedProvider = unifiedPaymentService.getRecommendedProvider(userRegion);
+      setSelectedPaymentProvider(recommendedProvider);
+      
+      // Load plans for all providers
+      await loadPaymentPlans();
+      
+      console.log('Payment services initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize payment services:', error);
+    }
+  };
+
+  // Load subscription plans from all providers
+  const loadPaymentPlans = async () => {
+    const plans = {};
+    
+    try {
+      // Load RevenueCat plans
+      if (availablePaymentMethods.some(m => m.id === PAYMENT_PROVIDERS.REVENUECAT)) {
+        try {
+          const revenueCatPlans = await unifiedPaymentService.getSubscriptionPlans(PAYMENT_PROVIDERS.REVENUECAT);
+          plans[PAYMENT_PROVIDERS.REVENUECAT] = revenueCatPlans;
+          setRevenueCatOfferings(revenueCatPlans);
+          setIsRevenueCatInitialized(true);
+        } catch (error) {
+          console.warn('Failed to load RevenueCat plans:', error);
+        }
+      }
+      
+      // Load Paystack plans
+      if (availablePaymentMethods.some(m => m.id === PAYMENT_PROVIDERS.PAYSTACK)) {
+        try {
+          const paystackPlans = await unifiedPaymentService.getSubscriptionPlans(PAYMENT_PROVIDERS.PAYSTACK);
+          plans[PAYMENT_PROVIDERS.PAYSTACK] = paystackPlans;
+        } catch (error) {
+          console.warn('Failed to load Paystack plans:', error);
+        }
+      }
+      
+      setPaymentPlans(plans);
+    } catch (error) {
+      console.error('Error loading payment plans:', error);
+    }
+  };
+
+  // Get user region (implement based on your needs)
+  const getUserRegion = () => {
+    // You can implement this by:
+    // 1. Checking user profile data
+    // 2. Using device locale
+    // 3. IP-based detection
+    // 4. Let user select during onboarding
+    
+    // Example implementation:
+    const locale = Constants.default?.platform?.locale || 'en-US';
+    const region = locale.split('-')[1] || 'US';
+    return region;
+  };
 
   useEffect(() => {
     if (user) {
@@ -188,45 +281,43 @@ export const SubscriptionProvider = ({ children }) => {
     }
   };
 
-  const purchaseSubscription = async (packageToPurchase) => {
+  // Enhanced purchase method with provider selection
+  const purchaseSubscription = async (planId, provider = null) => {
     try {
-      if (!isRevenueCatInitialized) {
-        throw new Error('RevenueCat not initialized');
+      const selectedProvider = provider || selectedPaymentProvider;
+      
+      if (!selectedProvider) {
+        throw new Error('No payment provider selected');
       }
 
-      const result = await revenueCatService.purchasePackage(packageToPurchase);
+      console.log(`Purchasing ${planId} via ${selectedProvider}`);
       
+      const result = await unifiedPaymentService.purchaseSubscription(
+        planId, 
+        selectedProvider, 
+        user.email, 
+        user.uid
+      );
+
       if (result.success) {
-        // Update local state
-        const newPlan = revenueCatService.getCurrentPlan();
-        setCurrentPlan(newPlan);
-        setSubscriptionStatus('active');
-        
-        // Update Firebase
-        await updateDoc(doc(db, 'users', user.uid), {
-          subscriptionPlan: newPlan,
-          subscriptionStatus: 'active',
-          revenueCatCustomerId: result.customerInfo.originalAppUserId,
-          updatedAt: new Date()
-        });
-        
-        // Send confirmation email
-        try {
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            await emailService.sendPlanUpgradeEmail({
-              email: user.email,
-              uid: user.uid,
-              firstName: userData.firstName,
-              displayName: userData.displayName || userData.firstName
-            }, SUBSCRIPTION_PLANS[newPlan].name);
-          }
-        } catch (emailError) {
-          console.error('Failed to send confirmation email:', emailError);
+        if (result.requiresVerification) {
+          // For Paystack payments that require verification
+          setPendingPaymentReference(result.reference);
+          return {
+            success: true,
+            requiresVerification: true,
+            reference: result.reference,
+            message: result.message
+          };
+        } else {
+          // For immediate purchases (RevenueCat)
+          await fetchSubscriptionData(); // Refresh subscription data
+          return {
+            success: true,
+            message: result.message,
+            provider: result.provider
+          };
         }
-        
-        return result;
       } else {
         throw new Error(result.error || 'Purchase failed');
       }
@@ -236,31 +327,75 @@ export const SubscriptionProvider = ({ children }) => {
     }
   };
 
-  const restorePurchases = async () => {
+  // Verify Paystack payment
+  const verifyPaystackPayment = async (reference = null) => {
     try {
-      if (!isRevenueCatInitialized) {
-        throw new Error('RevenueCat not initialized');
+      const paymentRef = reference || pendingPaymentReference;
+      
+      if (!paymentRef) {
+        throw new Error('No payment reference to verify');
       }
 
-      const result = await revenueCatService.restorePurchases();
+      const result = await unifiedPaymentService.verifyPaystackPayment(paymentRef, user.uid);
       
       if (result.success) {
-        const currentPlanFromRC = revenueCatService.getCurrentPlan();
-        setCurrentPlan(currentPlanFromRC);
-        
-        // Update Firebase
-        await updateDoc(doc(db, 'users', user.uid), {
-          subscriptionPlan: currentPlanFromRC,
-          subscriptionStatus: 'active',
-          updatedAt: new Date()
-        });
-        
-        return result;
+        setPendingPaymentReference(null);
+        await fetchSubscriptionData(); // Refresh subscription data
+        return {
+          success: true,
+          plan: result.plan,
+          message: result.message
+        };
       } else {
-        throw new Error(result.error || 'Failed to restore purchases');
+        throw new Error(result.message || 'Payment verification failed');
       }
     } catch (error) {
-      console.error('Restore purchases error:', error);
+      console.error('Payment verification error:', error);
+      throw error;
+    }
+  };
+
+  // Get plans for selected provider
+  const getPlansForProvider = (provider = null) => {
+    const targetProvider = provider || selectedPaymentProvider;
+    return paymentPlans[targetProvider] || [];
+  };
+
+  // Switch payment provider
+  const switchPaymentProvider = async (providerId) => {
+    try {
+      setSelectedPaymentProvider(providerId);
+      
+      // Load plans for the new provider if not already loaded
+      if (!paymentPlans[providerId]) {
+        const plans = await unifiedPaymentService.getSubscriptionPlans(providerId);
+        setPaymentPlans(prev => ({ ...prev, [providerId]: plans }));
+      }
+    } catch (error) {
+      console.error('Error switching payment provider:', error);
+    }
+  };
+
+  const restorePurchases = async () => {
+    try {
+      // Use unified payment service for restore
+      const results = await unifiedPaymentService.restorePurchases(user.uid);
+      
+      if (results.length > 0) {
+        await fetchSubscriptionData(); // Refresh subscription data
+        return {
+          success: true,
+          restored: results.length,
+          message: `Restored ${results.length} purchase(s)`
+        };
+      } else {
+        return {
+          success: false,
+          message: 'No purchases to restore'
+        };
+      }
+    } catch (error) {
+      console.error('Restore error:', error);
       throw error;
     }
   };
@@ -368,7 +503,15 @@ export const SubscriptionProvider = ({ children }) => {
     checkUsageLimit,
     canAddFamilyMember,
     canUploadFile,
-    plans: SUBSCRIPTION_PLANS
+    plans: SUBSCRIPTION_PLANS,
+    // New payment provider functionality
+    availablePaymentMethods,
+    selectedPaymentProvider,
+    paymentPlans,
+    pendingPaymentReference,
+    verifyPaystackPayment,
+    getPlansForProvider,
+    switchPaymentProvider
   };
 
   return (

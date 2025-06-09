@@ -8,6 +8,7 @@ import {
   Alert,
   Modal,
   Platform,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Constants from 'expo-constants';
@@ -15,6 +16,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSubscription, SUBSCRIPTION_PLANS } from '../contexts/SubscriptionContext';
 import { useError, ERROR_TYPES, ERROR_SEVERITY } from '../contexts/ErrorContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { PAYMENT_PROVIDERS } from '../services/unifiedPaymentService';
 
 const SubscriptionScreen = ({ route, navigation }) => {
   const { user } = useAuth();
@@ -25,13 +27,23 @@ const SubscriptionScreen = ({ route, navigation }) => {
     revenueCatOfferings, 
     isRevenueCatInitialized,
     purchaseSubscription,
-    restorePurchases 
+    restorePurchases,
+    // New payment provider functionality
+    availablePaymentMethods,
+    selectedPaymentProvider,
+    paymentPlans,
+    pendingPaymentReference,
+    verifyPaystackPayment,
+    getPlansForProvider,
+    switchPaymentProvider
   } = useSubscription();
   const { withErrorHandling, isLoading } = useError();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [selectedPackage, setSelectedPackage] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showProviderSelection, setShowProviderSelection] = useState(false);
+  const [currentSelectedProvider, setCurrentSelectedProvider] = useState(selectedPaymentProvider);
 
   // Get parameters from route if coming from onboarding
   const fromOnboarding = route?.params?.fromOnboarding;
@@ -146,26 +158,18 @@ const SubscriptionScreen = ({ route, navigation }) => {
       return;
     }
 
-    // Find the corresponding RevenueCat package
-    const correspondingPackage = revenueCatOfferings.find(pkg => {
-      // Match based on price or identifier
-      return pkg.product.price === plan.price || 
-             pkg.identifier.toLowerCase().includes(plan.id.toLowerCase());
-    });
-
-    if (!correspondingPackage && plan.id !== 'free') {
-      Alert.alert('Error', 'This subscription option is not available at the moment.');
-      return;
-    }
-
     setSelectedPlan(plan);
-    setSelectedPackage(correspondingPackage);
     
     if (plan.id === 'free') {
       // Handle free plan downgrade
       handleDowngradeToFree();
     } else {
-      setShowPaymentModal(true);
+      // Show provider selection first, then payment modal
+      if (availablePaymentMethods.length > 1) {
+        setShowProviderSelection(true);
+      } else {
+        setShowPaymentModal(true);
+      }
     }
   };
 
@@ -192,44 +196,64 @@ const SubscriptionScreen = ({ route, navigation }) => {
   };
 
   const handlePayment = async () => {
-    if (!selectedPlan || !selectedPackage) {
+    if (!selectedPlan) {
       Alert.alert('Error', 'No plan selected. Please select a plan first.');
       return;
     }
 
-    if (!isRevenueCatInitialized) {
-      Alert.alert('Error', 'Payment system is not ready. Please try again in a moment.');
+    if (!currentSelectedProvider) {
+      Alert.alert('Error', 'No payment provider selected. Please select a payment method first.');
       return;
     }
     
     setLoading(true);
     
     try {
-      const result = await purchaseSubscription(selectedPackage);
+      const result = await purchaseSubscription(selectedPlan.id, currentSelectedProvider);
       
       setLoading(false);
-      setShowPaymentModal(false);
       
       if (result.success) {
-        Alert.alert(
-          'Success!',
-          `You have successfully subscribed to the ${selectedPlan.name} plan.`,
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                // If coming from onboarding, navigate to Home
-                if (fromOnboarding) {
-                  navigation.reset({
-                    index: 0,
-                    routes: [{ name: 'MainTabs' }],
-                  });
+        if (result.requiresVerification) {
+          // For Paystack payments that require verification
+          setShowPaymentModal(false);
+          Alert.alert(
+            'Payment Initiated',
+            result.message + '\n\nPlease complete the payment in your browser and return to verify.',
+            [
+              {
+                text: 'Verify Payment',
+                onPress: () => handlePaymentVerification(result.reference)
+              },
+              {
+                text: 'Later',
+                style: 'cancel'
+              }
+            ]
+          );
+        } else {
+          // For RevenueCat in-app purchases
+          setShowPaymentModal(false);
+          Alert.alert(
+            'Success!',
+            `You have successfully subscribed to the ${selectedPlan.name} plan.`,
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  if (fromOnboarding) {
+                    navigation.reset({
+                      index: 0,
+                      routes: [{ name: 'MainTabs' }],
+                    });
+                  }
                 }
               }
-            }
-          ]
-        );
+            ]
+          );
+        }
       } else if (result.cancelled) {
+        setShowPaymentModal(false);
         Alert.alert('Purchase Cancelled', 'You cancelled the purchase.');
       } else {
         throw new Error(result.error || 'Purchase failed');
@@ -281,6 +305,65 @@ const SubscriptionScreen = ({ route, navigation }) => {
         'Failed to restore purchases. Please try again later.'
       );
     }
+  };
+
+  // Handle Paystack payment verification
+  const handlePaymentVerification = async (reference = null) => {
+    const paymentRef = reference || pendingPaymentReference;
+    
+    if (!paymentRef) {
+      Alert.alert('Error', 'No payment reference found to verify.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const result = await verifyPaystackPayment(paymentRef);
+      
+      setLoading(false);
+      
+      if (result.success) {
+        Alert.alert(
+          'Payment Verified!',
+          `Your ${result.plan} subscription has been activated successfully.`,
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                if (fromOnboarding) {
+                  navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'MainTabs' }],
+                  });
+                }
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert('Verification Failed', 'Payment verification failed. Please try again or contact support.');
+      }
+    } catch (error) {
+      setLoading(false);
+      console.error('Payment verification error:', error);
+      Alert.alert('Error', 'Failed to verify payment. Please try again.');
+    }
+  };
+
+  // Handle payment provider selection
+  const handleProviderSelection = (providerId) => {
+    setCurrentSelectedProvider(providerId);
+    switchPaymentProvider(providerId);
+    setShowProviderSelection(false);
+  };
+
+  // Get formatted currency for display
+  const formatCurrency = (amount, currency = 'USD') => {
+    if (currency === 'NGN') {
+      return `₦${amount.toFixed(2)}`;
+    }
+    return `$${amount.toFixed(2)}`;
   };
 
   const formatStorageSize = (bytes) => {
@@ -416,6 +499,95 @@ const SubscriptionScreen = ({ route, navigation }) => {
         </View>
       </ScrollView>
 
+      {/* Provider Selection Modal */}
+      <Modal
+        visible={showProviderSelection}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowProviderSelection(false)}>
+              <Text style={styles.cancelButton}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Choose Payment Method</Text>
+            <View style={{ width: 60 }} />
+          </View>
+
+          <View style={styles.modalContent}>
+            {selectedPlan && (
+              <View style={styles.paymentSummary}>
+                <Text style={styles.paymentPlanName}>{selectedPlan.name} Plan</Text>
+                <Text style={styles.paymentPrice}>
+                  ${selectedPlan.price}/{selectedPlan.period}
+                </Text>
+              </View>
+            )}
+
+            <Text style={styles.providerSectionTitle}>Select your preferred payment method:</Text>
+            
+            {availablePaymentMethods.map((method) => (
+              <TouchableOpacity
+                key={method.id}
+                style={[
+                  styles.providerOption,
+                  currentSelectedProvider === method.id && styles.providerOptionSelected
+                ]}
+                onPress={() => handleProviderSelection(method.id)}
+              >
+                <View style={styles.providerOptionHeader}>
+                  <View style={styles.providerIconContainer}>
+                    <Ionicons 
+                      name={method.icon} 
+                      size={24} 
+                      color={method.recommended ? '#007AFF' : '#666'} 
+                    />
+                  </View>
+                  <View style={styles.providerInfo}>
+                    <Text style={styles.providerName}>{method.name}</Text>
+                    <Text style={styles.providerDescription}>{method.description}</Text>
+                  </View>
+                  {method.recommended && (
+                    <View style={styles.recommendedBadge}>
+                      <Text style={styles.recommendedText}>Recommended</Text>
+                    </View>
+                  )}
+                </View>
+                
+                <View style={styles.providerFeatures}>
+                  {method.features.map((feature, index) => (
+                    <View key={index} style={styles.providerFeature}>
+                      <Ionicons name="checkmark-circle" size={12} color="#34C759" />
+                      <Text style={styles.providerFeatureText}>{feature}</Text>
+                    </View>
+                  ))}
+                </View>
+              </TouchableOpacity>
+            ))}
+
+            <TouchableOpacity
+              style={[
+                styles.continueButton,
+                !currentSelectedProvider && styles.continueButtonDisabled
+              ]}
+              disabled={!currentSelectedProvider}
+              onPress={() => {
+                setShowProviderSelection(false);
+                setShowPaymentModal(true);
+              }}
+            >
+              <Text style={[
+                styles.continueButtonText,
+                !currentSelectedProvider && styles.continueButtonTextDisabled
+              ]}>
+                Continue with {availablePaymentMethods.find(m => m.id === currentSelectedProvider)?.name || 'Selected Method'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Payment Confirmation Modal */}
       <Modal
         visible={showPaymentModal}
         animationType="slide"
@@ -455,12 +627,44 @@ const SubscriptionScreen = ({ route, navigation }) => {
 
                 <View style={styles.paymentMethodSection}>
                   <Text style={styles.paymentMethodTitle}>Payment Method</Text>
-                  <View style={styles.paymentMethodCard}>
-                    <Ionicons name="card" size={24} color="#007AFF" />
-                    <Text style={styles.paymentMethodText}>
-                      Demo Mode - No actual payment will be processed
-                    </Text>
-                  </View>
+                  <TouchableOpacity 
+                    style={styles.paymentMethodCard}
+                    onPress={() => {
+                      setShowPaymentModal(false);
+                      setShowProviderSelection(true);
+                    }}
+                  >
+                    <Ionicons 
+                      name={availablePaymentMethods.find(m => m.id === currentSelectedProvider)?.icon || 'card'} 
+                      size={24} 
+                      color="#007AFF" 
+                    />
+                    <View style={styles.paymentMethodInfo}>
+                      <Text style={styles.paymentMethodText}>
+                        {availablePaymentMethods.find(m => m.id === currentSelectedProvider)?.name || 'Select Payment Method'}
+                      </Text>
+                      <Text style={styles.paymentMethodSubtext}>
+                        {availablePaymentMethods.find(m => m.id === currentSelectedProvider)?.description || ''}
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color="#666" />
+                  </TouchableOpacity>
+                  
+                  {/* Show pending payment verification if exists */}
+                  {pendingPaymentReference && (
+                    <View style={styles.pendingPaymentSection}>
+                      <Text style={styles.pendingPaymentTitle}>Pending Payment</Text>
+                      <Text style={styles.pendingPaymentText}>
+                        You have a pending payment. Tap to verify.
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.verifyButton}
+                        onPress={() => handlePaymentVerification()}
+                      >
+                        <Text style={styles.verifyButtonText}>Verify Payment</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
 
                 <TouchableOpacity
@@ -755,9 +959,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
   },
+  paymentMethodInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
   paymentMethodText: {
     fontSize: 14,
     color: '#666',
+  },
+  paymentMethodSubtext: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
   },
   confirmButton: {
     paddingVertical: 16,
@@ -809,6 +1022,128 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     marginTop: 8,
+  },
+  providerSectionTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 10,
+  },
+  providerOption: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  providerOptionSelected: {
+    borderWidth: 2,
+    borderColor: '#007AFF',
+  },
+  providerOptionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  providerIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  providerInfo: {
+    flex: 1,
+  },
+  providerName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  providerDescription: {
+    fontSize: 14,
+    color: '#666',
+  },
+  recommendedBadge: {
+    backgroundColor: '#34C759',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    marginLeft: 10,
+  },
+  recommendedText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  providerFeatures: {
+    marginTop: 10,
+  },
+  providerFeature: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  providerFeatureText: {
+    fontSize: 12,
+    color: '#666',
+    marginLeft: 6,
+  },
+  continueButton: {
+    backgroundColor: '#007AFF',
+    borderRadius: 12,
+    paddingVertical: 16,
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  continueButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  continueButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  continueButtonTextDisabled: {
+    color: '#999',
+  },
+  pendingPaymentSection: {
+    backgroundColor: '#FFF3CD',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FFC107',
+  },
+  pendingPaymentTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#856404',
+    marginBottom: 4,
+  },
+  pendingPaymentText: {
+    fontSize: 12,
+    color: '#856404',
+    marginBottom: 8,
+  },
+  verifyButton: {
+    backgroundColor: '#FFC107',
+    borderRadius: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignSelf: 'flex-start',
+  },
+  verifyButtonText: {
+    color: '#856404',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
 
