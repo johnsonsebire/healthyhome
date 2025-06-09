@@ -28,6 +28,13 @@ import networkService from '../services/networkService';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import ValidationError from '../components/ValidationError';
 import { validateForm, getFieldError, hasFieldError } from '../utils/validation';
+import { 
+  COUNTRIES, 
+  getCitiesByCountry, 
+  getRegionsByCountry, 
+  INSURANCE_PROVIDERS,
+  getInsuranceProvidersByCountry 
+} from '../data/locationData';
 
 const RECORD_TYPES = [
   { id: 'prescription', name: 'Prescription', icon: 'medical', color: '#10b981' },
@@ -51,6 +58,24 @@ const EditRecordScreen = ({ route, navigation }) => {
     doctor: initialRecord?.doctor || '',
     date: initialRecord?.date || new Date().toISOString().split('T')[0],
     notes: initialRecord?.notes || '',
+    // Hospital Card specific fields
+    country: initialRecord?.country || '',
+    city: initialRecord?.city || '',
+    region: initialRecord?.region || '',
+    hospital: initialRecord?.hospital || '',
+    cardNumber: initialRecord?.cardNumber || '',
+    // Insurance specific fields
+    provider: initialRecord?.provider || '',
+    membershipNo: initialRecord?.membershipNo || '',
+    dateOfIssue: initialRecord?.dateOfIssue || '',
+    expiryDate: initialRecord?.expiryDate || '',
+    // Medical Bill specific fields
+    billFor: initialRecord?.billFor || '',
+    billAmount: initialRecord?.billAmount || '',
+    payments: initialRecord?.payments || [], // Array of payment records
+    // Payment tracking
+    totalPaid: initialRecord?.totalPaid || 0,
+    paymentStatus: initialRecord?.paymentStatus || 'pending', // pending, partial, paid
   });
   
   const [familyMembers, setFamilyMembers] = useState([]);
@@ -62,6 +87,14 @@ const EditRecordScreen = ({ route, navigation }) => {
   const [showMemberPicker, setShowMemberPicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [datePickerMode, setDatePickerMode] = useState('date'); // 'date', 'dateOfIssue', 'expiryDate'
+  const [showCountryPicker, setShowCountryPicker] = useState(false);
+  const [showCityPicker, setShowCityPicker] = useState(false);
+  const [showRegionPicker, setShowRegionPicker] = useState(false);
+  const [showProviderPicker, setShowProviderPicker] = useState(false);
+  const [availableCities, setAvailableCities] = useState([]);
+  const [availableRegions, setAvailableRegions] = useState([]);
+  const [availableProviders, setAvailableProviders] = useState(INSURANCE_PROVIDERS);
   const [isOnline, setIsOnline] = useState(true);
   const [validationErrors, setValidationErrors] = useState({});
 
@@ -207,6 +240,7 @@ const EditRecordScreen = ({ route, navigation }) => {
       }
     }
     setSelectedDate(initialDate);
+    setDatePickerMode('date');
     setShowDatePicker(true);
   };
 
@@ -217,7 +251,20 @@ const EditRecordScreen = ({ route, navigation }) => {
     
     if (date) {
       setSelectedDate(date);
-      updateFormData('date', formatDate(date));
+      const formattedDate = formatDate(date);
+      
+      // Update the appropriate date field based on the mode
+      switch (datePickerMode) {
+        case 'dateOfIssue':
+          updateFormData('dateOfIssue', formattedDate);
+          break;
+        case 'expiryDate':
+          updateFormData('expiryDate', formattedDate);
+          break;
+        default:
+          updateFormData('date', formattedDate);
+          break;
+      }
     }
   };
 
@@ -364,6 +411,400 @@ const EditRecordScreen = ({ route, navigation }) => {
       Alert.alert('Error', 'Failed to update record. Please try again.');
     }
   };
+
+  // Payment tracking functions
+  const calculatePaymentStatus = () => {
+    if (!formData.billAmount || formData.billAmount <= 0) return 'pending';
+    
+    const billAmount = parseFloat(formData.billAmount);
+    const totalPaid = formData.totalPaid || 0;
+    
+    if (totalPaid >= billAmount) return 'paid';
+    if (totalPaid > 0) return 'partial';
+    return 'pending';
+  };
+
+  const getPaymentStatusText = (status) => {
+    switch (status) {
+      case 'paid': return 'Fully Paid';
+      case 'partial': return 'Partially Paid';
+      default: return 'Pending Payment';
+    }
+  };
+
+  const getPaymentStatusColor = (status) => {
+    switch (status) {
+      case 'paid': return '#10b981';
+      case 'partial': return '#f59e0b';
+      default: return '#ef4444';
+    }
+  };
+
+  const getPaymentStatusIcon = (status) => {
+    switch (status) {
+      case 'paid': return 'checkmark-circle';
+      case 'partial': return 'time';
+      default: return 'close-circle';
+    }
+  };
+
+  // Dynamic field rendering functions
+  const renderDynamicFields = () => {
+    switch (formData.type) {
+      case 'hospital_card':
+        return renderHospitalCardFields();
+      case 'insurance':
+        return renderInsuranceFields();
+      case 'bill':
+        return renderMedicalBillFields();
+      default:
+        return renderDefaultFields();
+    }
+  };
+
+  // Hospital Card specific fields
+  const renderHospitalCardFields = () => (
+    <>
+      {/* Country */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Country *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter country"
+          value={formData.country}
+          onChangeText={(value) => updateFormData('country', value)}
+        />
+      </View>
+
+      {/* City */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>City *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter city"
+          value={formData.city}
+          onChangeText={(value) => updateFormData('city', value)}
+        />
+      </View>
+
+      {/* Region */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Region/State</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter region or state"
+          value={formData.region}
+          onChangeText={(value) => updateFormData('region', value)}
+        />
+      </View>
+
+      {/* Hospital */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Hospital/Clinic Name *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter hospital or clinic name"
+          value={formData.hospital}
+          onChangeText={(value) => updateFormData('hospital', value)}
+        />
+      </View>
+
+      {/* Card Number */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Card Number</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter card number"
+          value={formData.cardNumber}
+          onChangeText={(value) => updateFormData('cardNumber', value)}
+        />
+      </View>
+    </>
+  );
+
+  // Insurance specific fields
+  const renderInsuranceFields = () => (
+    <>
+      {/* Provider */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Insurance Provider *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter insurance provider"
+          value={formData.provider}
+          onChangeText={(value) => updateFormData('provider', value)}
+        />
+      </View>
+
+      {/* Membership Number */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Membership Number *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter membership number"
+          value={formData.membershipNo}
+          onChangeText={(value) => updateFormData('membershipNo', value)}
+        />
+      </View>
+
+      {/* Date of Issue */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Date of Issue</Text>
+        <TouchableOpacity
+          style={styles.dateInput}
+          onPress={() => {
+            setSelectedDate(formData.dateOfIssue ? new Date(formData.dateOfIssue) : new Date());
+            setShowDatePicker(true);
+            setDatePickerMode('dateOfIssue');
+          }}
+        >
+          <Text style={[
+            styles.dateInputText,
+            !formData.dateOfIssue && styles.dateInputPlaceholder
+          ]}>
+            {formData.dateOfIssue || 'Select issue date'}
+          </Text>
+          <Ionicons name="calendar" size={20} color="#666" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Expiry Date */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Expiry Date</Text>
+        <TouchableOpacity
+          style={styles.dateInput}
+          onPress={() => {
+            setSelectedDate(formData.expiryDate ? new Date(formData.expiryDate) : new Date());
+            setShowDatePicker(true);
+            setDatePickerMode('expiryDate');
+          }}
+        >
+          <Text style={[
+            styles.dateInputText,
+            !formData.expiryDate && styles.dateInputPlaceholder
+          ]}>
+            {formData.expiryDate || 'Select expiry date'}
+          </Text>
+          <Ionicons name="calendar" size={20} color="#666" />
+        </TouchableOpacity>
+      </View>
+    </>
+  );
+
+  // Medical Bill specific fields
+  const renderMedicalBillFields = () => (
+    <>
+      {/* Hospital */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Hospital/Clinic *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter hospital or clinic name"
+          value={formData.hospital}
+          onChangeText={(value) => updateFormData('hospital', value)}
+        />
+      </View>
+
+      {/* Bill For */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Bill For *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter what the bill is for"
+          value={formData.billFor}
+          onChangeText={(value) => updateFormData('billFor', value)}
+        />
+      </View>
+
+      {/* Bill Amount */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Bill Amount *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter bill amount"
+          value={formData.billAmount}
+          onChangeText={(value) => updateFormData('billAmount', value)}
+          keyboardType="numeric"
+        />
+      </View>
+
+      {/* Payment Status */}
+      {formData.billAmount && (
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Payment Status</Text>
+          <View style={[
+            styles.statusContainer,
+            getPaymentStatusStyle(calculatePaymentStatus())
+          ]}>
+            <View style={styles.statusBadge}>
+              <Ionicons 
+                name={getPaymentStatusIcon(calculatePaymentStatus())} 
+                size={16} 
+                color={getPaymentStatusColor(calculatePaymentStatus())} 
+              />
+            </View>
+            <Text style={[
+              styles.statusText,
+              { color: getPaymentStatusColor(calculatePaymentStatus()) }
+            ]}>
+              {getPaymentStatusText(calculatePaymentStatus())}
+            </Text>
+          </View>
+          {formData.billAmount && (
+            <View style={styles.paymentSection}>
+              <Text style={styles.paymentSectionTitle}>Payment Details</Text>
+              <View style={styles.paymentAmountContainer}>
+                <Text style={styles.paymentAmountText}>Total Amount:</Text>
+                <Text style={styles.paymentAmountValue}>₦{formData.billAmount}</Text>
+              </View>
+              <View style={styles.paymentAmountContainer}>
+                <Text style={styles.paymentAmountText}>Amount Paid:</Text>
+                <Text style={styles.paymentAmountValue}>₦{formData.totalPaid || 0}</Text>
+              </View>
+              <View style={styles.paymentAmountContainer}>
+                <Text style={styles.paymentAmountText}>Balance:</Text>
+                <Text style={[styles.paymentAmountValue, { color: '#ef4444' }]}>
+                  ₦{Math.max(0, (parseFloat(formData.billAmount) || 0) - (formData.totalPaid || 0))}
+                </Text>
+              </View>
+            </View>
+          )}
+        </View>
+      )}
+    </>
+  );
+
+  // Default fields for prescription/diagnosis
+  const renderDefaultFields = () => (
+    <>
+      {/* Doctor */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Doctor</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter doctor's name"
+          value={formData.doctor}
+          onChangeText={(value) => updateFormData('doctor', value)}
+        />
+      </View>
+    </>
+  );
+
+  const getPaymentStatusStyle = (status) => {
+    switch (status) {
+      case 'paid': return [styles.statusContainer, styles.statusPaid];
+      case 'partial': return [styles.statusContainer, styles.statusPartial];
+      default: return [styles.statusContainer, styles.statusPending];
+    }
+  };
+
+  // Modern attachment component
+  const renderModernAttachments = () => (
+    <View style={styles.attachmentsSection}>
+      <Text style={styles.sectionTitle}>
+        <Ionicons name="attach" size={20} color="#6366f1" /> Attachments
+      </Text>
+      <Text style={styles.sectionSubtitle}>
+        {formData.type === 'insurance' 
+          ? 'Add front and back photos of your insurance card'
+          : 'Add photos or documents related to this record'
+        }
+      </Text>
+      
+      <View style={styles.modernAttachmentButtons}>
+        <TouchableOpacity 
+          style={styles.modernAttachmentButton} 
+          onPress={pickImage}
+        >
+          <View style={styles.attachmentIconContainer}>
+            <Ionicons name="camera" size={24} color="#6366f1" />
+          </View>
+          <Text style={styles.modernAttachmentTitle}>Add Photo</Text>
+          <Text style={styles.modernAttachmentSubtitle}>Camera or Gallery</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.modernAttachmentButton} 
+          onPress={pickDocument}
+        >
+          <View style={styles.attachmentIconContainer}>
+            <Ionicons name="document" size={24} color="#10b981" />
+          </View>
+          <Text style={styles.modernAttachmentTitle}>Add Document</Text>
+          <Text style={styles.modernAttachmentSubtitle}>PDF or Image</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Combined Attachments List */}
+      {(attachments.length > 0 || newAttachments.length > 0) && (
+        <View style={styles.modernAttachmentsList}>
+          <Text style={styles.attachedFilesTitle}>
+            Attached Files ({attachments.length + newAttachments.length})
+          </Text>
+          
+          {/* Existing Attachments */}
+          {attachments.map((attachment, index) => (
+            <View key={`existing-${index}`} style={styles.modernAttachmentItem}>
+              <View style={styles.attachmentPreviewContainer}>
+                {attachment.type === 'image' ? (
+                  <Image source={{ uri: attachment.url }} style={styles.modernAttachmentPreview} />
+                ) : (
+                  <View style={styles.modernDocumentPreview}>
+                    <Ionicons name="document" size={32} color="#6366f1" />
+                  </View>
+                )}
+              </View>
+              <View style={styles.modernAttachmentInfo}>
+                <Text style={styles.modernAttachmentName} numberOfLines={1}>
+                  {attachment.name}
+                </Text>
+                <Text style={styles.modernAttachmentSize}>
+                  {attachment.size ? (attachment.size / 1024).toFixed(1) + ' KB' : 'Unknown size'}
+                </Text>
+                <Text style={styles.modernAttachmentType}>Existing • {attachment.type}</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.modernRemoveButton}
+                onPress={() => removeExistingAttachment(index)}
+              >
+                <Ionicons name="close" size={20} color="#ef4444" />
+              </TouchableOpacity>
+            </View>
+          ))}
+
+          {/* New Attachments */}
+          {newAttachments.map(attachment => (
+            <View key={`new-${attachment.id}`} style={styles.modernAttachmentItem}>
+              <View style={styles.attachmentPreviewContainer}>
+                {attachment.type === 'image' ? (
+                  <Image source={{ uri: attachment.uri }} style={styles.modernAttachmentPreview} />
+                ) : (
+                  <View style={styles.modernDocumentPreview}>
+                    <Ionicons name="document" size={32} color="#10b981" />
+                  </View>
+                )}
+              </View>
+              <View style={styles.modernAttachmentInfo}>
+                <Text style={styles.modernAttachmentName} numberOfLines={1}>
+                  {attachment.name}
+                </Text>
+                <Text style={styles.modernAttachmentSize}>
+                  {attachment.size ? (attachment.size / 1024).toFixed(1) + ' KB' : 'Unknown size'}
+                </Text>
+                <Text style={styles.modernAttachmentType}>New • {attachment.type}</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.modernRemoveButton}
+                onPress={() => removeNewAttachment(attachment.id)}
+              >
+                <Ionicons name="close" size={20} color="#ef4444" />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
 
   const TypePickerModal = () => (
     <Modal
@@ -570,16 +1011,8 @@ const EditRecordScreen = ({ route, navigation }) => {
               />
             </View>
 
-            {/* Doctor */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Doctor</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Doctor's name"
-                value={formData.doctor}
-                onChangeText={(value) => updateFormData('doctor', value)}
-              />
-            </View>
+            {/* Dynamic Fields based on record type */}
+            {renderDynamicFields()}
 
             {/* Date */}
             <View style={styles.inputGroup}>
@@ -615,84 +1048,8 @@ const EditRecordScreen = ({ route, navigation }) => {
               />
             </View>
 
-            {/* Attachments */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Attachments</Text>
-              <View style={styles.attachmentButtons}>
-                <TouchableOpacity style={styles.attachmentButton} onPress={pickImage}>
-                  <Ionicons name="camera" size={20} color="#6366f1" />
-                  <Text style={styles.attachmentButtonText}>Add Photo</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.attachmentButton} onPress={pickDocument}>
-                  <Ionicons name="document" size={20} color="#6366f1" />
-                  <Text style={styles.attachmentButtonText}>Add Document</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Existing Attachments */}
-              {attachments.length > 0 && (
-                <View style={styles.attachmentsList}>
-                  <Text style={styles.attachmentsHeader}>Current Attachments</Text>
-                  {attachments.map((attachment, index) => (
-                    <View key={index} style={styles.attachmentItem}>
-                      {attachment.type === 'image' ? (
-                        <Image source={{ uri: attachment.url }} style={styles.attachmentPreview} />
-                      ) : (
-                        <View style={styles.documentPreview}>
-                          <Ionicons name="document" size={24} color="#6366f1" />
-                        </View>
-                      )}
-                      <View style={styles.attachmentInfo}>
-                        <Text style={styles.attachmentName} numberOfLines={1}>
-                          {attachment.name}
-                        </Text>
-                        <Text style={styles.attachmentSize}>
-                          {attachment.size ? (attachment.size / 1024).toFixed(1) + ' KB' : 'Unknown size'}
-                        </Text>
-                      </View>
-                      <TouchableOpacity
-                        style={styles.removeAttachment}
-                        onPress={() => removeExistingAttachment(index)}
-                      >
-                        <Ionicons name="close-circle" size={24} color="#ef4444" />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </View>
-              )}
-
-              {/* New Attachments */}
-              {newAttachments.length > 0 && (
-                <View style={styles.attachmentsList}>
-                  <Text style={styles.attachmentsHeader}>New Attachments</Text>
-                  {newAttachments.map(attachment => (
-                    <View key={attachment.id} style={styles.attachmentItem}>
-                      {attachment.type === 'image' ? (
-                        <Image source={{ uri: attachment.uri }} style={styles.attachmentPreview} />
-                      ) : (
-                        <View style={styles.documentPreview}>
-                          <Ionicons name="document" size={24} color="#6366f1" />
-                        </View>
-                      )}
-                      <View style={styles.attachmentInfo}>
-                        <Text style={styles.attachmentName} numberOfLines={1}>
-                          {attachment.name}
-                        </Text>
-                        <Text style={styles.attachmentSize}>
-                          {(attachment.size / 1024).toFixed(1)} KB
-                        </Text>
-                      </View>
-                      <TouchableOpacity
-                        style={styles.removeAttachment}
-                        onPress={() => removeNewAttachment(attachment.id)}
-                      >
-                        <Ionicons name="close-circle" size={24} color="#ef4444" />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </View>
+            {/* Modern Attachments */}
+            {renderModernAttachments()}
 
             {/* Submit Button */}
             <TouchableOpacity
@@ -975,6 +1332,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: 'center',
   },
+  modalScrollView: {
+    maxHeight: 300,
+  },
   typeOption: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1019,6 +1379,331 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6b7280',
     fontWeight: '500',
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 8,
+  },
+  statusBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  statusText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  paymentSection: {
+    marginTop: 12,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#f9fafb',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  paymentSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 12,
+  },
+  paymentAmountContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  paymentAmountText: {
+    fontSize: 14,
+    color: '#4b5563',
+  },
+  paymentAmountValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1f2937',
+  },
+  attachmentsSection: {
+    marginTop: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 12,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 16,
+  },
+  modernAttachmentButtons: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 16,
+  },
+  modernAttachmentButton: {
+    flex: 1,
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    paddingVertical: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  attachmentIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  modernAttachmentTitle: {
+    fontSize: 16,
+    color: '#1f2937',
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  modernAttachmentSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  modernAttachmentsList: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  attachedFilesTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 12,
+  },
+  modernAttachmentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  attachmentPreviewContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginRight: 12,
+  },
+  modernAttachmentPreview: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
+  },
+  modernDocumentPreview: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
+    backgroundColor: '#ede9fe',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modernAttachmentInfo: {
+    flex: 1,
+  },
+  modernAttachmentName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1f2937',
+    marginBottom: 2,
+  },
+  modernAttachmentSize: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  modernAttachmentType: {
+    fontSize: 12,
+    color: '#4b5563',
+    marginTop: 2,
+  },
+  modernRemoveButton: {
+    padding: 8,
+  },
+  // Date picker styles
+  dateInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 8,
+    backgroundColor: '#ffffff',
+  },
+  dateInputText: {
+    fontSize: 16,
+    color: '#1f2937',
+  },
+  dateInputPlaceholder: {
+    color: '#9ca3af',
+  },
+  // Attachment section styles
+  attachmentsSection: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 8,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 16,
+  },
+  modernAttachmentButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  modernAttachmentButton: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    paddingVertical: 16,
+    marginRight: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  attachmentIconContainer: {
+    backgroundColor: '#f3f4f6',
+    borderRadius: 50,
+    padding: 8,
+    marginBottom: 8,
+  },
+  modernAttachmentTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1f2937',
+  },
+  modernAttachmentSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  modernAttachmentsList: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  attachedFilesTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 12,
+  },
+  modernAttachmentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  attachmentPreviewContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginRight: 12,
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modernAttachmentPreview: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  modernDocumentPreview: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Status and payment styles
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 8,
+  },
+  statusText: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 8,
+  },
+  statusBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statusPaid: {
+    backgroundColor: '#10b98120',
+    borderColor: '#10b981',
+  },
+  statusPartial: {
+    backgroundColor: '#f59e0b20',
+    borderColor: '#f59e0b',
+  },
+  statusPending: {
+    backgroundColor: '#ef444420',
+    borderColor: '#ef4444',
+  },
+  paymentSection: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  paymentSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 12,
+  },
+  paymentAmountContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  paymentAmountText: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  paymentAmountValue: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1f2937',
   },
 });
 

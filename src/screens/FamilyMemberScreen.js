@@ -28,7 +28,7 @@ import { validateForm, getFieldError, hasFieldError } from '../utils/validation'
 
 const FamilyMemberScreen = () => {
   const { user, userProfile } = useAuth();
-  const { subscription, checkUsageLimit } = useSubscription();
+  const { subscription, checkUsageLimit, canAddFamilyMember, currentPlan, plans } = useSubscription();
   const { withErrorHandling, isLoading } = useError();
   const [familyMembers, setFamilyMembers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -143,7 +143,7 @@ const FamilyMemberScreen = () => {
       async () => {
         // Only check family member limit for NEW members, not when editing existing ones
         if (!editingMember) {
-          const canAdd = checkUsageLimit('familyMembers', familyMembers.length);
+          const canAdd = canAddFamilyMember(familyMembers.length);
           if (!canAdd) {
             Alert.alert(
               'Limit Reached',
@@ -376,8 +376,11 @@ const FamilyMemberScreen = () => {
   };
 
   const getFamilyMemberLimit = () => {
-    const limits = { basic: 3, standard: 10, premium: 50 };
-    return limits[subscription?.plan] || 3;
+    const plan = plans[currentPlan];
+    if (!plan) return 1; // Default to free plan limit
+    
+    const limit = plan.features.familyMembers;
+    return limit === -1 ? '∞' : limit; // Show infinity symbol for unlimited
   };
 
   const onRefresh = () => {
@@ -472,7 +475,17 @@ const FamilyMemberScreen = () => {
 
       <TouchableOpacity
         style={styles.addButton}
-        onPress={() => setShowAddModal(true)}
+        onPress={() => {
+          const canAdd = canAddFamilyMember(familyMembers.length);
+          if (!canAdd) {
+            Alert.alert(
+              'Limit Reached',
+              'Upgrade your subscription to add more family members'
+            );
+            return;
+          }
+          setShowAddModal(true);
+        }}
       >
         <Ionicons name="add" size={24} color="white" />
       </TouchableOpacity>

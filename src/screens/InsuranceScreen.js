@@ -100,6 +100,13 @@ const InsuranceScreen = ({ navigation }) => {
     return dateObj.toLocaleDateString();
   };
 
+  const getUniqueProviders = () => {
+    const providers = insuranceRecords
+      .map(record => record.provider || record.title || 'Unknown Provider')
+      .filter((value, index, self) => self.indexOf(value) === index);
+    return providers;
+  };
+
   const InsuranceCard = ({ record }) => (
     <TouchableOpacity
       style={styles.insuranceCard}
@@ -143,7 +150,7 @@ const InsuranceScreen = ({ navigation }) => {
       subtitle="Add your insurance information to keep track of coverage and claims"
       action={{
         label: 'Add Insurance',
-        onPress: () => navigation.navigate('AddRecord')
+        onPress: () => navigation.navigate('AddRecord', { type: 'insurance' })
       }}
     />
   );
@@ -168,28 +175,23 @@ const InsuranceScreen = ({ navigation }) => {
         {/* Quick Actions */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.quickActions}>
-            <QuickAction
-              icon="add-circle"
-              title="Add Insurance"
-              subtitle="New insurance card"
-              onPress={() => navigation.navigate('AddRecord')}
-              color="#8b5cf6"
-            />
-            <QuickAction
-              icon="document-text"
-              title="File Claim"
-              subtitle="Submit new claim"
-              onPress={() => Alert.alert('Coming Soon', 'This feature will be available soon')}
-              color="#10b981"
-            />
-            <QuickAction
-              icon="call"
-              title="Contact Support"
-              subtitle="Get help with insurance"
-              onPress={() => Alert.alert('Contact Support', 'Feature coming soon')}
-              color="#f59e0b"
-            />
+          <View style={styles.actionsSpacing}>
+            <View style={styles.quickActions}>
+              <QuickAction
+                icon="add-circle"
+                title="Add Insurance Card"
+                subtitle="New insurance card"
+                onPress={() => navigation.navigate('AddRecord', { type: 'insurance' })}
+                color="#8b5cf6"
+              />
+              <QuickAction
+                icon="search"
+                title="Recommend a Provider"
+                subtitle="Find insurance options"
+                onPress={() => Alert.alert('Coming Soon', 'Provider recommendations will be available soon')}
+                color="#10b981"
+              />
+            </View>
           </View>
         </View>
 
@@ -199,47 +201,68 @@ const InsuranceScreen = ({ navigation }) => {
         ) : (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Insurance Records</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('AddRecord')}>
+              <Text style={styles.sectionTitle}>Your Insurance Cards</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('AddRecord', { type: 'insurance' })}>
                 <Text style={styles.addText}>Add New</Text>
               </TouchableOpacity>
             </View>
             {insuranceRecords.map(record => (
               <InsuranceCard key={record.id} record={record} />
             ))}
+            
+            {/* Provider Information Section */}
+            <View style={styles.providerInfoSection}>
+              <Text style={styles.providerInfoTitle}>Insurance Provider Information</Text>
+              {getUniqueProviders().map(provider => (
+                <View key={provider} style={styles.providerCard}>
+                  <View style={styles.providerHeader}>
+                    <Ionicons name="shield-checkmark" size={20} color="#8b5cf6" />
+                    <Text style={styles.providerName}>{provider}</Text>
+                  </View>
+                  <TouchableOpacity 
+                    style={styles.providerLink}
+                    onPress={() => Alert.alert('Provider Info', `Learn more about ${provider} - Coming soon`)}
+                  >
+                    <Text style={styles.providerLinkText}>Read About This Provider</Text>
+                    <Ionicons name="chevron-forward" size={16} color="#6366f1" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
           </View>
         )}
 
         {/* Tips Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Insurance Tips</Text>
-          <View style={styles.tipsContainer}>
-            <View style={styles.tipItem}>
-              <Ionicons name="bulb" size={20} color="#f59e0b" />
-              <Text style={styles.tipText}>
-                Keep digital copies of your insurance cards for easy access
-              </Text>
+          <Text style={styles.sectionTitle}>Insurance Tips</Text>            <View style={styles.tipsSpacing}>
+              <View style={styles.tipsContainer}>
+              <View style={styles.tipItem}>
+                <Ionicons name="bulb" size={20} color="#f59e0b" />
+                <Text style={styles.tipText}>
+                  Keep digital copies of your insurance cards for easy access
+                </Text>
+              </View>
+              <View style={styles.tipItem}>
+                <Ionicons name="shield-checkmark" size={20} color="#10b981" />
+                <Text style={styles.tipText}>
+                  Review your coverage annually to ensure it meets your needs
+                </Text>
+              </View>
+              <View style={styles.tipItem}>
+                <Ionicons name="receipt" size={20} color="#6366f1" />
+                <Text style={styles.tipText}>
+                  Save all medical bills and receipts for insurance claims
+                </Text>
+              </View>
             </View>
-            <View style={styles.tipItem}>
-              <Ionicons name="shield-checkmark" size={20} color="#10b981" />
-              <Text style={styles.tipText}>
-                Review your coverage annually to ensure it meets your needs
-              </Text>
             </View>
-            <View style={styles.tipItem}>
-              <Ionicons name="receipt" size={20} color="#6366f1" />
-              <Text style={styles.tipText}>
-                Save all medical bills and receipts for insurance claims
-              </Text>
-            </View>
-          </View>
         </View>
       </ScrollView>
 
       {/* Floating Action Button */}
       <TouchableOpacity
         style={styles.fab}
-        onPress={() => navigation.navigate('AddRecord')}
+        onPress={() => navigation.navigate('AddRecord', { type: 'insurance' })}
       >
         <Ionicons name="add" size={24} color="#ffffff" />
       </TouchableOpacity>
@@ -394,6 +417,53 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontSize: 14,
     color: '#ef4444',
+    fontWeight: '500',
+  },
+  actionsSpacing: {
+    marginTop: 16,
+  },
+  tipsSpacing: {
+    marginTop: 16,
+  },
+  providerInfoSection: {
+    marginTop: 24,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  providerInfoTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 16,
+  },
+  providerCard: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  providerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  providerName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginLeft: 8,
+  },
+  providerLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  providerLinkText: {
+    fontSize: 14,
+    color: '#6366f1',
     fontWeight: '500',
   },
   fab: {

@@ -28,6 +28,13 @@ import networkService from '../services/networkService';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import ValidationError from '../components/ValidationError';
 import { validateForm, getFieldError, hasFieldError } from '../utils/validation';
+import { 
+  COUNTRIES, 
+  getCitiesByCountry, 
+  getRegionsByCountry, 
+  INSURANCE_PROVIDERS,
+  getInsuranceProvidersByCountry 
+} from '../data/locationData';
 
 const RECORD_TYPES = [
   { id: 'prescription', name: 'Prescription', icon: 'medical', color: '#10b981' },
@@ -37,18 +44,43 @@ const RECORD_TYPES = [
   { id: 'insurance', name: 'Insurance', icon: 'shield-checkmark', color: '#8b5cf6' },
 ];
 
-const AddRecordScreen = ({ navigation }) => {
+const AddRecordScreen = ({ navigation, route }) => {
   const { user } = useAuth();
   const { canUploadFile } = useSubscription();
   const { withErrorHandling, isLoading } = useError();
+  
+  // Get preselected type from route params if any
+  const preselectedType = route?.params?.type || '';
+  
   const [formData, setFormData] = useState({
-    type: '',
+    type: preselectedType,
     title: '',
     description: '',
     familyMemberId: '',
     doctor: '',
     date: new Date().toISOString().split('T')[0],
     notes: '',
+    // Hospital Card specific fields
+    country: '',
+    city: '',
+    region: '',
+    hospital: '',
+    cardNumber: '',
+    customCity: '',
+    customRegion: '',
+    // Insurance specific fields
+    provider: '',
+    membershipNo: '',
+    dateOfIssue: '',
+    expiryDate: '',
+    customProvider: '',
+    // Medical Bill specific fields
+    billFor: '',
+    billAmount: '',
+    payments: [], // Array of payment records
+    // Payment tracking
+    totalPaid: 0,
+    paymentStatus: 'pending', // pending, partial, paid
   });
   const [familyMembers, setFamilyMembers] = useState([]);
   const [attachments, setAttachments] = useState([]);
@@ -57,6 +89,16 @@ const AddRecordScreen = ({ navigation }) => {
   const [showMemberPicker, setShowMemberPicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [datePickerMode, setDatePickerMode] = useState('date'); // 'date', 'dateOfIssue', 'expiryDate'
+  const [showCountryPicker, setShowCountryPicker] = useState(false);
+  const [showCityPicker, setShowCityPicker] = useState(false);
+  const [showRegionPicker, setShowRegionPicker] = useState(false);
+  const [showProviderPicker, setShowProviderPicker] = useState(false);
+  const [customProvider, setCustomProvider] = useState('');
+  const [showCustomProviderInput, setShowCustomProviderInput] = useState(false);
+  const [availableCities, setAvailableCities] = useState([]);
+  const [availableRegions, setAvailableRegions] = useState([]);
+  const [availableProviders, setAvailableProviders] = useState(INSURANCE_PROVIDERS);
   const [isOnline, setIsOnline] = useState(true);
   const [validationErrors, setValidationErrors] = useState({});
 
@@ -116,7 +158,22 @@ const AddRecordScreen = ({ navigation }) => {
   };
 
   const updateFormData = (key, value) => {
-    setFormData(prev => ({ ...prev, [key]: value }));
+    setFormData(prev => {
+      const newData = { ...prev, [key]: value };
+      
+      // Handle cascading dropdowns
+      if (key === 'country') {
+        // Reset city and region when country changes
+        newData.city = '';
+        newData.region = '';
+        // Update available cities and regions
+        setAvailableCities(getCitiesByCountry(value));
+        setAvailableRegions(getRegionsByCountry(value));
+        setAvailableProviders(getInsuranceProvidersByCountry(value));
+      }
+      
+      return newData;
+    });
   };
 
   const pickImage = async () => {
@@ -196,6 +253,7 @@ const AddRecordScreen = ({ navigation }) => {
       }
     }
     setSelectedDate(initialDate);
+    setDatePickerMode('date');
     setShowDatePicker(true);
   };
 
@@ -206,7 +264,20 @@ const AddRecordScreen = ({ navigation }) => {
     
     if (date) {
       setSelectedDate(date);
-      updateFormData('date', formatDate(date));
+      const formattedDate = formatDate(date);
+      
+      // Update the appropriate date field based on the mode
+      switch (datePickerMode) {
+        case 'dateOfIssue':
+          updateFormData('dateOfIssue', formattedDate);
+          break;
+        case 'expiryDate':
+          updateFormData('expiryDate', formattedDate);
+          break;
+        default:
+          updateFormData('date', formattedDate);
+          break;
+      }
     }
   };
 
@@ -236,13 +307,34 @@ const AddRecordScreen = ({ navigation }) => {
   };
 
   const handleSubmit = async () => {
-    // Validate form
-    const validation = validateForm(formData, {
+    // Build validation rules based on record type
+    const validationRules = {
       type: { required: true, message: 'Please select a record type' },
-      title: { required: true, minLength: 3, message: 'Title must be at least 3 characters' },
       familyMemberId: { required: true, message: 'Please select a family member' },
       date: { required: true, date: true, message: 'Please enter a valid date' }
-    });
+    };
+
+    // Only require title for prescription, diagnosis, and medical bill
+    if (formData.type && !['hospital_card', 'insurance'].includes(formData.type)) {
+      validationRules.title = { required: true, minLength: 3, message: 'Title must be at least 3 characters' };
+    }
+
+    // Add specific validation rules based on record type
+    if (formData.type === 'hospital_card') {
+      validationRules.country = { required: true, message: 'Please select a country' };
+      validationRules.city = { required: true, message: 'Please select a city' };
+      validationRules.hospital = { required: true, message: 'Please enter hospital name' };
+    } else if (formData.type === 'insurance') {
+      validationRules.provider = { required: true, message: 'Please select an insurance provider' };
+      validationRules.membershipNo = { required: true, message: 'Please enter membership number' };
+    } else if (formData.type === 'bill') {
+      validationRules.hospital = { required: true, message: 'Please enter hospital name' };
+      validationRules.billFor = { required: true, message: 'Please specify what the bill is for' };
+      validationRules.billAmount = { required: true, message: 'Please enter bill amount' };
+    }
+
+    // Validate form
+    const validation = validateForm(formData, validationRules);
 
     if (!validation.isValid) {
       setValidationErrors(validation.errors);
@@ -331,6 +423,424 @@ const AddRecordScreen = ({ navigation }) => {
       Alert.alert('Error', 'Failed to add record. Please try again.');
     }
   };
+
+  // Helper function to render dynamic form fields based on record type
+  const renderDynamicFields = () => {
+    switch (formData.type) {
+      case 'hospital_card':
+        return renderHospitalCardFields();
+      case 'insurance':
+        return renderInsuranceFields();
+      case 'bill':
+        return renderMedicalBillFields();
+      case 'prescription':
+      case 'diagnosis':
+      default:
+        return renderDefaultFields();
+    }
+  };
+
+  // Hospital Card specific fields
+  const renderHospitalCardFields = () => (
+    <>
+      {/* Country */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Country *</Text>
+        <TouchableOpacity
+          style={styles.selector}
+          onPress={() => setShowCountryPicker(true)}
+        >
+          <Text style={[
+            formData.country ? styles.selectedText : styles.placeholderText
+          ]}>
+            {COUNTRIES.find(c => c.id === formData.country)?.name || 'Select country'}
+          </Text>
+          <Ionicons name="chevron-down" size={20} color="#6b7280" />
+        </TouchableOpacity>
+      </View>
+
+      {/* City */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>City *</Text>
+        <TouchableOpacity
+          style={[styles.selector, !formData.country && styles.selectorDisabled]}
+          onPress={() => formData.country && setShowCityPicker(true)}
+          disabled={!formData.country}
+        >
+          <Text style={[
+            formData.city ? styles.selectedText : styles.placeholderText
+          ]}>
+            {availableCities.find(c => c.id === formData.city)?.name || 
+             (formData.country ? 'Select city' : 'Select country first')}
+          </Text>
+          <Ionicons name="chevron-down" size={20} color="#6b7280" />
+        </TouchableOpacity>
+        {formData.city === 'other' && (
+          <TextInput
+            style={[styles.input, { marginTop: 8 }]}
+            placeholder="Enter city name"
+            value={formData.customCity || ''}
+            onChangeText={(value) => updateFormData('customCity', value)}
+          />
+        )}
+      </View>
+
+      {/* Region */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Region/State</Text>
+        <TouchableOpacity
+          style={[styles.selector, !formData.country && styles.selectorDisabled]}
+          onPress={() => formData.country && setShowRegionPicker(true)}
+          disabled={!formData.country}
+        >
+          <Text style={[
+            formData.region ? styles.selectedText : styles.placeholderText
+          ]}>
+            {availableRegions.find(r => r.id === formData.region)?.name || 
+             (formData.country ? 'Select region' : 'Select country first')}
+          </Text>
+          <Ionicons name="chevron-down" size={20} color="#6b7280" />
+        </TouchableOpacity>
+        {formData.region === 'other' && (
+          <TextInput
+            style={[styles.input, { marginTop: 8 }]}
+            placeholder="Enter region/state name"
+            value={formData.customRegion || ''}
+            onChangeText={(value) => updateFormData('customRegion', value)}
+          />
+        )}
+      </View>
+
+      {/* Hospital */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Hospital/Clinic Name *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter hospital or clinic name"
+          value={formData.hospital}
+          onChangeText={(value) => updateFormData('hospital', value)}
+        />
+      </View>
+
+      {/* Card Number */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Card Number</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter card number"
+          value={formData.cardNumber}
+          onChangeText={(value) => updateFormData('cardNumber', value)}
+        />
+      </View>
+    </>
+  );
+
+  // Insurance specific fields
+  const renderInsuranceFields = () => (
+    <>
+      {/* Provider */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Insurance Provider *</Text>
+        <TouchableOpacity
+          style={styles.selector}
+          onPress={() => setShowProviderPicker(true)}
+        >
+          <Text style={[
+            formData.provider ? styles.selectedText : styles.placeholderText
+          ]}>
+            {availableProviders.find(p => p.id === formData.provider)?.name || 'Select insurance provider'}
+          </Text>
+          <Ionicons name="chevron-down" size={20} color="#6b7280" />
+        </TouchableOpacity>
+        {formData.provider === 'other' && (
+          <TextInput
+            style={[styles.input, { marginTop: 8 }]}
+            placeholder="Enter insurance provider name"
+            value={formData.customProvider}
+            onChangeText={(value) => updateFormData('customProvider', value)}
+          />
+        )}
+      </View>
+
+      {/* Membership Number */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Membership Number *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter membership number"
+          value={formData.membershipNo}
+          onChangeText={(value) => updateFormData('membershipNo', value)}
+        />
+      </View>
+
+      {/* Date of Issue */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Date of Issue</Text>
+        <TouchableOpacity
+          style={styles.dateInput}
+          onPress={() => {
+            setSelectedDate(formData.dateOfIssue ? new Date(formData.dateOfIssue) : new Date());
+            setShowDatePicker(true);
+            setDatePickerMode('dateOfIssue');
+          }}
+        >
+          <Text style={[
+            styles.dateInputText,
+            !formData.dateOfIssue && styles.dateInputPlaceholder
+          ]}>
+            {formData.dateOfIssue || 'Select issue date'}
+          </Text>
+          <Ionicons name="calendar" size={20} color="#666" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Expiry Date */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Expiry Date</Text>
+        <TouchableOpacity
+          style={styles.dateInput}
+          onPress={() => {
+            setSelectedDate(formData.expiryDate ? new Date(formData.expiryDate) : new Date());
+            setShowDatePicker(true);
+            setDatePickerMode('expiryDate');
+          }}
+        >
+          <Text style={[
+            styles.dateInputText,
+            !formData.expiryDate && styles.dateInputPlaceholder
+          ]}>
+            {formData.expiryDate || 'Select expiry date'}
+          </Text>
+          <Ionicons name="calendar" size={20} color="#666" />
+        </TouchableOpacity>
+      </View>
+    </>
+  );
+
+  // Medical Bill specific fields
+  const renderMedicalBillFields = () => (
+    <>
+      {/* Hospital */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Hospital/Clinic *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter hospital or clinic name"
+          value={formData.hospital}
+          onChangeText={(value) => updateFormData('hospital', value)}
+        />
+      </View>
+
+      {/* Bill For */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Bill For *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="What is this bill for?"
+          value={formData.billFor}
+          onChangeText={(value) => updateFormData('billFor', value)}
+        />
+      </View>
+
+      {/* Bill Amount */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Bill Amount *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter amount (e.g., 150.00)"
+          value={formData.billAmount}
+          onChangeText={(value) => {
+            updateFormData('billAmount', value);
+            calculatePaymentStatus(value, formData.totalPaid);
+          }}
+          keyboardType="decimal-pad"
+        />
+      </View>
+
+      {/* Payment Status */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Payment Status</Text>
+        <View style={[styles.statusContainer, getPaymentStatusStyle(formData.paymentStatus)]}>
+          <Ionicons 
+            name={getPaymentStatusIcon(formData.paymentStatus)} 
+            size={20} 
+            color={getPaymentStatusColor(formData.paymentStatus)} 
+          />
+          <Text style={[styles.statusText, { color: getPaymentStatusColor(formData.paymentStatus) }]}>
+            {getPaymentStatusText(formData.paymentStatus)}
+          </Text>
+        </View>
+      </View>
+
+      {/* Total Paid */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Amount Paid</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter amount paid (e.g., 75.00)"
+          value={formData.totalPaid.toString()}
+          onChangeText={(value) => {
+            const paidAmount = parseFloat(value) || 0;
+            updateFormData('totalPaid', paidAmount);
+            calculatePaymentStatus(formData.billAmount, value);
+          }}
+          keyboardType="decimal-pad"
+        />
+      </View>
+    </>
+  );
+
+  // Default fields for Prescription and Diagnosis
+  const renderDefaultFields = () => (
+    <>
+      {/* Description */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Description</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          placeholder="Enter description"
+          value={formData.description}
+          onChangeText={(value) => updateFormData('description', value)}
+          multiline
+          numberOfLines={3}
+        />
+      </View>
+
+      {/* Doctor */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Doctor</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Doctor's name"
+          value={formData.doctor}
+          onChangeText={(value) => updateFormData('doctor', value)}
+        />
+      </View>
+    </>
+  );
+
+  // Payment status helper functions
+  const calculatePaymentStatus = (billAmount, paidAmount) => {
+    const bill = parseFloat(billAmount) || 0;
+    const paid = parseFloat(paidAmount) || 0;
+    
+    let status = 'pending';
+    if (paid === 0) {
+      status = 'pending';
+    } else if (paid >= bill) {
+      status = 'paid';
+    } else {
+      status = 'partial';
+    }
+    
+    updateFormData('paymentStatus', status);
+  };
+
+  const getPaymentStatusText = (status) => {
+    switch (status) {
+      case 'paid': return 'Fully Paid';
+      case 'partial': return 'Partially Paid';
+      case 'pending': 
+      default: return 'Pending Payment';
+    }
+  };
+
+  const getPaymentStatusColor = (status) => {
+    switch (status) {
+      case 'paid': return '#10b981';
+      case 'partial': return '#f59e0b';
+      case 'pending': 
+      default: return '#ef4444';
+    }
+  };
+
+  const getPaymentStatusIcon = (status) => {
+    switch (status) {
+      case 'paid': return 'checkmark-circle';
+      case 'partial': return 'time';
+      case 'pending': 
+      default: return 'alert-circle';
+    }
+  };
+
+  const getPaymentStatusStyle = (status) => {
+    const baseStyle = styles.statusBadge;
+    switch (status) {
+      case 'paid': return [baseStyle, styles.statusPaid];
+      case 'partial': return [baseStyle, styles.statusPartial];
+      case 'pending': 
+      default: return [baseStyle, styles.statusPending];
+    }
+  };
+
+  // Modern attachment component
+  const renderModernAttachments = () => (
+    <View style={styles.attachmentsSection}>
+      <Text style={styles.sectionTitle}>
+        <Ionicons name="attach" size={20} color="#6366f1" /> Attachments
+      </Text>
+      <Text style={styles.sectionSubtitle}>
+        {formData.type === 'insurance' 
+          ? 'Add front and back photos of your insurance card'
+          : 'Add photos or documents related to this record'
+        }
+      </Text>
+      
+      <View style={styles.modernAttachmentButtons}>
+        <TouchableOpacity style={styles.modernAttachmentButton} onPress={pickImage}>
+          <View style={styles.attachmentIconContainer}>
+            <Ionicons name="camera" size={28} color="#6366f1" />
+          </View>
+          <Text style={styles.modernAttachmentTitle}>Add Photo</Text>
+          <Text style={styles.modernAttachmentSubtitle}>Camera or Gallery</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity style={styles.modernAttachmentButton} onPress={pickDocument}>
+          <View style={styles.attachmentIconContainer}>
+            <Ionicons name="document-text" size={28} color="#6366f1" />
+          </View>
+          <Text style={styles.modernAttachmentTitle}>Add Document</Text>
+          <Text style={styles.modernAttachmentSubtitle}>PDF, Images</Text>
+        </TouchableOpacity>
+      </View>
+
+      {attachments.length > 0 && (
+        <View style={styles.modernAttachmentsList}>
+          <Text style={styles.attachedFilesTitle}>Attached Files ({attachments.length})</Text>
+          {attachments.map(attachment => (
+            <View key={attachment.id} style={styles.modernAttachmentItem}>
+              <View style={styles.attachmentPreviewContainer}>
+                {attachment.type === 'image' ? (
+                  <Image source={{ uri: attachment.uri }} style={styles.modernAttachmentPreview} />
+                ) : (
+                  <View style={styles.modernDocumentPreview}>
+                    <Ionicons name="document-text" size={32} color="#6366f1" />
+                  </View>
+                )}
+              </View>
+              <View style={styles.modernAttachmentInfo}>
+                <Text style={styles.modernAttachmentName} numberOfLines={1}>
+                  {attachment.name}
+                </Text>
+                <Text style={styles.modernAttachmentSize}>
+                  {(attachment.size / 1024).toFixed(1)} KB
+                </Text>
+                <Text style={styles.modernAttachmentType}>
+                  {attachment.type === 'image' ? 'Image' : 'Document'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.modernRemoveButton}
+                onPress={() => removeAttachment(attachment.id)}
+              >
+                <Ionicons name="trash" size={20} color="#ef4444" />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
 
   const TypePickerModal = () => (
     <Modal
@@ -435,6 +945,153 @@ const AddRecordScreen = ({ navigation }) => {
     </Modal>
   );
 
+  // Country Picker Modal
+  const CountryPickerModal = () => (
+    <Modal
+      visible={showCountryPicker}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setShowCountryPicker(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Select Country</Text>
+          <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={true}>
+            {COUNTRIES.map(country => (
+              <TouchableOpacity
+                key={country.id}
+                style={styles.memberOption}
+                onPress={() => {
+                  updateFormData('country', country.id);
+                  setShowCountryPicker(false);
+                }}
+              >
+                <Text style={styles.memberOptionText}>{country.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <TouchableOpacity
+            style={styles.modalCancelButton}
+            onPress={() => setShowCountryPicker(false)}
+          >
+            <Text style={styles.modalCancelText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  // City Picker Modal
+  const CityPickerModal = () => (
+    <Modal
+      visible={showCityPicker}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setShowCityPicker(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Select City</Text>
+          <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={true}>
+            {availableCities.map(city => (
+              <TouchableOpacity
+                key={city.id}
+                style={styles.memberOption}
+                onPress={() => {
+                  updateFormData('city', city.id);
+                  setShowCityPicker(false);
+                }}
+              >
+                <Text style={styles.memberOptionText}>{city.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <TouchableOpacity
+            style={styles.modalCancelButton}
+            onPress={() => setShowCityPicker(false)}
+          >
+            <Text style={styles.modalCancelText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  // Region Picker Modal
+  const RegionPickerModal = () => (
+    <Modal
+      visible={showRegionPicker}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setShowRegionPicker(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Select Region</Text>
+          <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={true}>
+            {availableRegions.map(region => (
+              <TouchableOpacity
+                key={region.id}
+                style={styles.memberOption}
+                onPress={() => {
+                  updateFormData('region', region.id);
+                  setShowRegionPicker(false);
+                }}
+              >
+                <Text style={styles.memberOptionText}>{region.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <TouchableOpacity
+            style={styles.modalCancelButton}
+            onPress={() => setShowRegionPicker(false)}
+          >
+            <Text style={styles.modalCancelText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  // Provider Picker Modal
+  const ProviderPickerModal = () => (
+    <Modal
+      visible={showProviderPicker}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setShowProviderPicker(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Select Insurance Provider</Text>
+          <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={true}>
+            {availableProviders.map(provider => (
+              <TouchableOpacity
+                key={provider.id}
+                style={styles.memberOption}
+                onPress={() => {
+                  if (provider.id === 'other') {
+                    setShowCustomProviderInput(true);
+                  }
+                  updateFormData('provider', provider.id);
+                  setShowProviderPicker(false);
+                }}
+              >
+                <Text style={styles.memberOptionText}>{provider.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <TouchableOpacity
+            style={styles.modalCancelButton}
+            onPress={() => setShowProviderPicker(false)}
+          >
+            <Text style={styles.modalCancelText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
   const selectedType = RECORD_TYPES.find(t => t.id === formData.type);
   const selectedMember = familyMembers.find(m => m.id === formData.familyMemberId);
 
@@ -486,6 +1143,9 @@ const AddRecordScreen = ({ navigation }) => {
           <ValidationError error={getFieldError('type', validationErrors)} />
         </View>
 
+        {/* Show rest of form only when type is selected */}
+        {formData.type ? (
+          <>
         {/* Family Member */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Family Member *</Text>
@@ -509,44 +1169,25 @@ const AddRecordScreen = ({ navigation }) => {
           <ValidationError error={getFieldError('familyMemberId', validationErrors)} />
         </View>
 
-        {/* Title */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Title *</Text>
-          <TextInput
-            style={[
-              styles.input,
-              hasFieldError('title', validationErrors) && styles.inputError
-            ]}
-            placeholder="Enter record title"
-            value={formData.title}
-            onChangeText={(value) => updateFormData('title', value)}
-          />
-          <ValidationError error={getFieldError('title', validationErrors)} />
-        </View>
+        {/* Title - Only show for prescription, diagnosis, and medical bill */}
+        {formData.type && !['hospital_card', 'insurance'].includes(formData.type) && (
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Title *</Text>
+            <TextInput
+              style={[
+                styles.input,
+                hasFieldError('title', validationErrors) && styles.inputError
+              ]}
+              placeholder="Enter record title"
+              value={formData.title}
+              onChangeText={(value) => updateFormData('title', value)}
+            />
+            <ValidationError error={getFieldError('title', validationErrors)} />
+          </View>
+        )}
 
-        {/* Description */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Description</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="Enter description"
-            value={formData.description}
-            onChangeText={(value) => updateFormData('description', value)}
-            multiline
-            numberOfLines={3}
-          />
-        </View>
-
-        {/* Doctor */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Doctor</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Doctor's name"
-            value={formData.doctor}
-            onChangeText={(value) => updateFormData('doctor', value)}
-          />
-        </View>
+        {/* Dynamic fields based on record type */}
+        {renderDynamicFields()}
 
         {/* Date */}
         <View style={styles.inputGroup}>
@@ -582,50 +1223,8 @@ const AddRecordScreen = ({ navigation }) => {
           />
         </View>
 
-        {/* Attachments */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Attachments</Text>
-          <View style={styles.attachmentButtons}>
-            <TouchableOpacity style={styles.attachmentButton} onPress={pickImage}>
-              <Ionicons name="camera" size={20} color="#6366f1" />
-              <Text style={styles.attachmentButtonText}>Add Photo</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.attachmentButton} onPress={pickDocument}>
-              <Ionicons name="document" size={20} color="#6366f1" />
-              <Text style={styles.attachmentButtonText}>Add Document</Text>
-            </TouchableOpacity>
-          </View>
-
-          {attachments.length > 0 && (
-            <View style={styles.attachmentsList}>
-              {attachments.map(attachment => (
-                <View key={attachment.id} style={styles.attachmentItem}>
-                  {attachment.type === 'image' ? (
-                    <Image source={{ uri: attachment.uri }} style={styles.attachmentPreview} />
-                  ) : (
-                    <View style={styles.documentPreview}>
-                      <Ionicons name="document" size={24} color="#6366f1" />
-                    </View>
-                  )}
-                  <View style={styles.attachmentInfo}>
-                    <Text style={styles.attachmentName} numberOfLines={1}>
-                      {attachment.name}
-                    </Text>
-                    <Text style={styles.attachmentSize}>
-                      {(attachment.size / 1024).toFixed(1)} KB
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.removeAttachment}
-                    onPress={() => removeAttachment(attachment.id)}
-                  >
-                    <Ionicons name="close-circle" size={24} color="#ef4444" />
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
+        {/* Modern Attachments */}
+        {renderModernAttachments()}
 
         {/* Submit Button */}
         <TouchableOpacity
@@ -637,11 +1236,26 @@ const AddRecordScreen = ({ navigation }) => {
             {loading ? 'Adding Record...' : 'Add Record'}
           </Text>
         </TouchableOpacity>
+          </>
+        ) : (
+          /* Show message when no type is selected */
+          <View style={styles.noTypeSelected}>
+            <Ionicons name="information-circle-outline" size={48} color="#9ca3af" />
+            <Text style={styles.noTypeTitle}>Select a Record Type</Text>
+            <Text style={styles.noTypeSubtitle}>
+              Choose the type of medical record you want to add to continue
+            </Text>
+          </View>
+        )}
           </View>
 
           <TypePickerModal />
           <MemberPickerModal />
           <DatePickerModal />
+          <CountryPickerModal />
+          <CityPickerModal />
+          <RegionPickerModal />
+          <ProviderPickerModal />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -718,6 +1332,38 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  selectorDisabled: {
+    backgroundColor: '#f9fafb',
+    borderColor: '#d1d5db',
+    opacity: 0.6,
+  },
+  selectedOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  selectedIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  selectedText: {
+    fontSize: 16,
+    color: '#1f2937',
+    fontWeight: '500',
+  },
+  selectedSubtext: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginLeft: 8,
+  },
+  placeholderText: {
+    fontSize: 16,
+    color: '#9ca3af',
   },
   dateInput: {
     backgroundColor: '#ffffff',
@@ -861,6 +1507,239 @@ const styles = StyleSheet.create({
     color: '#1f2937',
     marginBottom: 20,
     textAlign: 'center',
+  },
+  modalScrollView: {
+    maxHeight: 300,
+  },
+  noTypeSelected: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 32,
+  },
+  noTypeTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#374151',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  noTypeSubtitle: {
+    fontSize: 16,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  attachmentsSection: {
+    marginTop: 24,
+    marginBottom: 32,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 8,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 16,
+  },
+  modernAttachmentButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  modernAttachmentButton: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    paddingVertical: 16,
+    marginRight: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  attachmentIconContainer: {
+    backgroundColor: '#f3f4f6',
+    borderRadius: 50,
+    padding: 8,
+    marginBottom: 8,
+  },
+  modernAttachmentTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1f2937',
+  },
+  modernAttachmentSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  modernAttachmentsList: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  attachedFilesTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 12,
+  },
+  modernAttachmentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  attachmentPreviewContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginRight: 12,
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modernAttachmentPreview: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  modernDocumentPreview: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modernAttachmentInfo: {
+    flex: 1,
+  },
+  modernAttachmentName: {
+    fontSize: 16,
+    color: '#1f2937',
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  modernAttachmentSize: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 2,
+  },
+  modernAttachmentType: {
+    fontSize: 12,
+    color: '#9ca3af',
+  },
+  modernRemoveButton: {
+    padding: 8,
+    borderRadius: 50,
+    backgroundColor: '#fef2f2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 8,
+  },
+  statusText: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 8,
+  },
+  statusBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statusPaid: {
+    backgroundColor: '#10b98120',
+    borderColor: '#10b981',
+  },
+  statusPartial: {
+    backgroundColor: '#f59e0b20',
+    borderColor: '#f59e0b',
+  },
+  statusPending: {
+    backgroundColor: '#ef444420',
+    borderColor: '#ef4444',
+  },
+  // Date picker styles
+  dateInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 8,
+    backgroundColor: '#ffffff',
+  },
+  dateInputText: {
+    fontSize: 16,
+    color: '#1f2937',
+  },
+  dateInputPlaceholder: {
+    color: '#9ca3af',
+  },
+  // Dynamic field container styles
+  dynamicFieldsContainer: {
+    marginTop: 16,
+  },
+  fieldGroup: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  fieldGroupTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  paymentSection: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  paymentSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 12,
+  },
+  paymentAmountContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  paymentAmountText: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  paymentAmountValue: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1f2937',
   },
 });
 
