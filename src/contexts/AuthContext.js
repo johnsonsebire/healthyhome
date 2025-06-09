@@ -11,6 +11,7 @@ import {
   getDoc 
 } from 'firebase/firestore';
 import { auth, db } from '../../firebaseConfig';
+import emailService from '../services/emailService';
 
 const AuthContext = createContext();
 
@@ -106,9 +107,22 @@ export const AuthProvider = ({ children }) => {
       await setDoc(doc(db, 'users', result.user.uid), {
         email,
         createdAt: new Date(),
-        subscriptionPlan: 'basic',
+        subscriptionPlan: 'free',
         ...userData,
       });
+
+      // Send welcome email
+      try {
+        console.log('📧 Sending welcome email');
+        await emailService.sendWelcomeEmail({
+          email,
+          uid: result.user.uid,
+          ...userData
+        });
+      } catch (emailError) {
+        console.error('⚠️ Welcome email could not be sent:', emailError);
+        // Don't block registration if email fails
+      }
 
       console.log('✅ Registration successful');
       return result;

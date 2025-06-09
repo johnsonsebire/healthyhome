@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../firebaseConfig';
 
 // Screens
 import HomeScreen from '../screens/HomeScreen';
@@ -16,6 +18,7 @@ import AddRecordScreen from '../screens/AddRecordScreen';
 import RecordDetailScreen from '../screens/RecordDetailScreen';
 import FamilyMemberScreen from '../screens/FamilyMemberScreen';
 import SubscriptionScreen from '../screens/SubscriptionScreen';
+import OnboardingScreen from '../screens/OnboardingScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -114,15 +117,62 @@ const AppStack = () => (
 
 const AppNavigator = () => {
   const { user, loading } = useAuth();
+  const [isNewUser, setIsNewUser] = useState(false);
+  const [checkingUserStatus, setCheckingUserStatus] = useState(true);
   
-  console.log('🧭 AppNavigator - Auth state:', { user: user ? 'logged in' : 'not logged in', loading });
+  useEffect(() => {
+    const checkUserStatus = async () => {
+      if (user) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            // Check if the user is on free plan and has been registered in the last 10 minutes
+            const isRecentlyRegistered = userData.createdAt && 
+              (new Date().getTime() - userData.createdAt.toDate().getTime()) < 10 * 60 * 1000;
+            const isFreePlan = userData.subscriptionPlan === 'free';
+            
+            setIsNewUser(isRecentlyRegistered && isFreePlan);
+          }
+        } catch (error) {
+          console.error('Error checking user status:', error);
+        }
+        setCheckingUserStatus(false);
+      } else {
+        setCheckingUserStatus(false);
+      }
+    };
 
-  if (loading) {
+    checkUserStatus();
+  }, [user]);
+  
+  console.log('🧭 AppNavigator - Auth state:', { 
+    user: user ? 'logged in' : 'not logged in', 
+    loading,
+    isNewUser,
+    checkingUserStatus
+  });
+
+  if (loading || checkingUserStatus) {
     // Return null to let App.js loading spinner handle initial loading
     return null;
   }
 
-  return user ? <AppStack /> : <AuthStack />;
+  if (!user) {
+    return <AuthStack />;
+  }
+  
+  if (isNewUser) {
+    // If it's a new user (recently registered and on free plan), show onboarding
+    return (
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+        <Stack.Screen name="AppStack" component={AppStack} />
+      </Stack.Navigator>
+    );
+  }
+
+  return <AppStack />;
 };
 
 export default AppNavigator;

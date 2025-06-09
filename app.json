@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "FamilyMedicalApp",
+    "name": "Healthy Home",
     "slug": "FamilyMedicalApp",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -13,18 +13,25 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.manifestghana.FamilyMedicalApp"
+      "bundleIdentifier": "com.manifestghana.HealthyHome"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.manifestghana.FamilyMedicalApp",
+      "package": "com.manifestghana.HealthyHome",
       "permissions": [
         "INTERNET",
-        "ACCESS_NETWORK_STATE"
-      ]
+        "ACCESS_NETWORK_STATE",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "VIBRATE",
+        "RECEIVE_BOOT_COMPLETED",
+        "SCHEDULE_EXACT_ALARM"
+      ],
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -34,9 +41,9 @@
         "expo-build-properties",
         {
           "android": {
-            "compileSdkVersion": 34,
+            "compileSdkVersion": 35,
             "targetSdkVersion": 34,
-            "buildToolsVersion": "34.0.0"
+            "buildToolsVersion": "35.0.0"
           }
         }
       ]

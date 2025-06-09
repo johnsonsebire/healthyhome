@@ -27,6 +27,20 @@
         "EXPO_PUBLIC_FIREBASE_APP_ID": "1:320688524984:web:be8dadb6bac8de118e6e4d"
       }
     },
+    "preview-apk": {
+      "android": {
+        "buildType": "apk"
+      },
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyC2UB6QQeOW_du-5bGXbJC7N2dBP6hCqUo",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "familyhealthapp-e5fd3.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "familyhealthapp-e5fd3",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "familyhealthapp-e5fd3.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "320688524984",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:320688524984:web:be8dadb6bac8de118e6e4d"
+      }
+    },
     "production": {
       "autoIncrement": true,
       "env": {

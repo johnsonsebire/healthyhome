@@ -2,6 +2,9 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
 import { useAuth } from './AuthContext';
+import networkService from '../services/networkService';
+import offlineStorageService from '../services/offlineStorage';
+import emailService from '../services/emailService';
 
 const SubscriptionContext = createContext();
 
@@ -14,14 +17,27 @@ export const useSubscription = () => {
 };
 
 export const SUBSCRIPTION_PLANS = {
+  free: {
+    id: 'free',
+    name: 'Free',
+    price: 0,
+    features: {
+      familyMembers: 1, // only self
+      storage: 200, // MB
+      editAccess: false,
+      ocr: false,
+      offlineAccess: false,
+      reports: false
+    }
+  },
   basic: {
     id: 'basic',
     name: 'Basic',
     price: 1,
     features: {
-      familyMembers: 1,
+      familyMembers: 2,
       storage: 500, // MB
-      editAccess: false,
+      editAccess: true,
       ocr: false,
       offlineAccess: false,
       reports: false
@@ -32,7 +48,7 @@ export const SUBSCRIPTION_PLANS = {
     name: 'Standard',
     price: 2,
     features: {
-      familyMembers: 3,
+      familyMembers: 5,
       storage: 2048, // MB
       editAccess: true,
       ocr: true,
@@ -72,14 +88,48 @@ export const SubscriptionProvider = ({ children }) => {
 
   const fetchSubscriptionData = async () => {
     try {
+      // Check if we're online before making Firebase calls
+      if (!networkService.isOnline()) {
+        console.log('Device is offline, using cached subscription data');
+        // Try to use cached subscription data
+        const cachedSubscription = await offlineStorageService.getCachedSubscription();
+        if (cachedSubscription?.subscriptionPlan) {
+          setCurrentPlan(cachedSubscription.subscriptionPlan);
+          setSubscriptionStatus(cachedSubscription.subscriptionStatus || 'active');
+        }
+        return;
+      }
+
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (userDoc.exists()) {
         const userData = userDoc.data();
-        setCurrentPlan(userData.subscriptionPlan || 'basic');
-        setSubscriptionStatus(userData.subscriptionStatus || 'active');
+        const plan = userData.subscriptionPlan || 'basic';
+        const status = userData.subscriptionStatus || 'active';
+        
+        setCurrentPlan(plan);
+        setSubscriptionStatus(status);
+        
+        // Cache the subscription data for offline use
+        await offlineStorageService.cacheSubscription({
+          subscriptionPlan: plan,
+          subscriptionStatus: status,
+          lastSync: new Date().toISOString()
+        });
       }
     } catch (error) {
       console.error('Error fetching subscription data:', error);
+      
+      // Fallback to cached data if Firebase call fails
+      try {
+        const cachedSubscription = await offlineStorageService.getCachedSubscription();
+        if (cachedSubscription?.subscriptionPlan) {
+          setCurrentPlan(cachedSubscription.subscriptionPlan);
+          setSubscriptionStatus(cachedSubscription.subscriptionStatus || 'active');
+          console.log('Using cached subscription data as fallback');
+        }
+      } catch (cacheError) {
+        console.error('Error loading cached subscription data:', cacheError);
+      }
     }
   };
 
@@ -90,8 +140,30 @@ export const SubscriptionProvider = ({ children }) => {
         subscriptionStatus: 'active',
         updatedAt: new Date()
       });
+      
       setCurrentPlan(newPlan);
+      
+      // Send confirmation email for plan upgrade
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          await emailService.sendPlanUpgradeEmail({
+            email: user.email,
+            uid: user.uid,
+            firstName: userData.firstName,
+            displayName: userData.displayName || userData.firstName
+          }, SUBSCRIPTION_PLANS[newPlan].name);
+          console.log('✅ Plan upgrade email sent');
+        }
+      } catch (emailError) {
+        console.error('⚠️ Failed to send plan upgrade email:', emailError);
+        // Don't block the upgrade if email fails
+      }
+      
+      return { success: true };
     } catch (error) {
+      console.error('❌ Failed to upgrade plan:', error);
       throw error;
     }
   };

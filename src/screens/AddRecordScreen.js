@@ -16,6 +16,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../firebaseConfig';
@@ -54,6 +55,8 @@ const AddRecordScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [showTypePicker, setShowTypePicker] = useState(false);
   const [showMemberPicker, setShowMemberPicker] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
   const [isOnline, setIsOnline] = useState(true);
   const [validationErrors, setValidationErrors] = useState({});
 
@@ -179,6 +182,38 @@ const AddRecordScreen = ({ navigation }) => {
     setAttachments(prev => prev.filter(att => att.id !== id));
   };
 
+  const formatDate = (date) => {
+    return date.toISOString().split('T')[0];
+  };
+
+  const handleDateSelect = () => {
+    // Parse existing date or use current date
+    let initialDate = new Date();
+    if (formData.date) {
+      const parsed = new Date(formData.date);
+      if (!isNaN(parsed)) {
+        initialDate = parsed;
+      }
+    }
+    setSelectedDate(initialDate);
+    setShowDatePicker(true);
+  };
+
+  const onDateChange = (event, date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    
+    if (date) {
+      setSelectedDate(date);
+      updateFormData('date', formatDate(date));
+    }
+  };
+
+  const handleDatePickerDone = () => {
+    setShowDatePicker(false);
+  };
+
   const uploadAttachment = async (attachment) => {
     try {
       const response = await fetch(attachment.uri);
@@ -219,85 +254,80 @@ const AddRecordScreen = ({ navigation }) => {
     }
 
     setValidationErrors({});
+    setLoading(true);
 
-    const result = await withErrorHandling(
-      async () => {
-        // Check if online for real-time sync
-        if (!networkService.isOnline()) {
-          // Add to offline queue
-          const recordData = {
-            ...formData,
-            userId: user.uid,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            attachments: [], // Handle attachments differently for offline
-          };
-
-          // Get family member name
-          const familyMember = familyMembers.find(m => m.id === formData.familyMemberId);
-          recordData.familyMemberName = familyMember ? familyMember.name : '';
-
-          // Add to offline sync queue
-          await offlineStorageService.addToSyncQueue({
-            type: 'CREATE_RECORD',
-            data: recordData
-          });
-
-          // Cache locally
-          const existingRecords = await offlineStorageService.getCachedMedicalRecords();
-          const records = existingRecords?.data || [];
-          records.unshift({ ...recordData, id: `temp_${Date.now()}`, isLocal: true });
-          await offlineStorageService.cacheMedicalRecords(records);
-
-          Alert.alert(
-            'Record Saved Offline',
-            'Your record has been saved locally and will sync when you\'re back online.',
-            [{ text: 'OK', onPress: () => navigation.goBack() }]
-          );
-          return;
-        }
-
-        // Upload attachments if online
-        const uploadedAttachments = [];
-        for (const attachment of attachments) {
-          const uploaded = await uploadAttachment(attachment);
-          uploadedAttachments.push(uploaded);
-        }
-
-        // Get family member name
-        const familyMember = familyMembers.find(m => m.id === formData.familyMemberId);
-        
-        // Create record
+    try {
+      // Check if online for real-time sync
+      if (!networkService.isOnline()) {
+        // Add to offline queue
         const recordData = {
           ...formData,
-          familyMemberName: familyMember ? familyMember.name : '',
-          attachments: uploadedAttachments,
           userId: user.uid,
           createdAt: new Date(),
           updatedAt: new Date(),
+          attachments: [], // Handle attachments differently for offline
         };
 
-        await addDoc(collection(db, 'medicalRecords'), recordData);
-        
-        // Update cache
+        // Get family member name
+        const familyMember = familyMembers.find(m => m.id === formData.familyMemberId);
+        recordData.familyMemberName = familyMember ? familyMember.name : '';
+
+        // Add to offline sync queue
+        await offlineStorageService.addToSyncQueue({
+          type: 'CREATE_RECORD',
+          data: recordData
+        });
+
+        // Cache locally
         const existingRecords = await offlineStorageService.getCachedMedicalRecords();
         const records = existingRecords?.data || [];
-        records.unshift(recordData);
+        records.unshift({ ...recordData, id: `temp_${Date.now()}`, isLocal: true });
         await offlineStorageService.cacheMedicalRecords(records);
 
-        Alert.alert('Success', 'Record added successfully', [
-          { text: 'OK', onPress: () => navigation.goBack() }
-        ]);
-      },
-      {
-        errorType: ERROR_TYPES.STORAGE,
-        errorSeverity: ERROR_SEVERITY.HIGH,
-        showLoading: true,
+        setLoading(false);
+        Alert.alert(
+          'Record Saved Offline',
+          'Your record has been saved locally and will sync when you\'re back online.',
+          [{ text: 'OK', onPress: () => navigation.goBack() }]
+        );
+        return;
       }
-    );
 
-    if (!result.success && networkService.isOnline()) {
-      // If online but failed, show error
+      // Upload attachments if online
+      const uploadedAttachments = [];
+      for (const attachment of attachments) {
+        const uploaded = await uploadAttachment(attachment);
+        uploadedAttachments.push(uploaded);
+      }
+
+      // Get family member name
+      const familyMember = familyMembers.find(m => m.id === formData.familyMemberId);
+      
+      // Create record
+      const recordData = {
+        ...formData,
+        familyMemberName: familyMember ? familyMember.name : '',
+        attachments: uploadedAttachments,
+        userId: user.uid,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const docRef = await addDoc(collection(db, 'medicalRecords'), recordData);
+      
+      // Update cache
+      const existingRecords = await offlineStorageService.getCachedMedicalRecords();
+      const records = existingRecords?.data || [];
+      records.unshift({...recordData, id: docRef.id});
+      await offlineStorageService.cacheMedicalRecords(records);
+
+      setLoading(false);
+      Alert.alert('Success', 'Record added successfully', [
+        { text: 'OK', onPress: () => navigation.goBack() }
+      ]);
+    } catch (error) {
+      console.error('Error adding record:', error);
+      setLoading(false);
       Alert.alert('Error', 'Failed to add record. Please try again.');
     }
   };
@@ -367,6 +397,39 @@ const AddRecordScreen = ({ navigation }) => {
           >
             <Text style={styles.modalCancelText}>Cancel</Text>
           </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  const DatePickerModal = () => (
+    <Modal
+      visible={showDatePicker}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={() => setShowDatePicker(false)}
+    >
+      <View style={styles.datePickerModal}>
+        <View style={styles.datePickerContainer}>
+          {Platform.OS === 'ios' && (
+            <View style={styles.datePickerHeader}>
+              <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                <Text style={styles.datePickerCancel}>Cancel</Text>
+              </TouchableOpacity>
+              <Text style={styles.datePickerTitle}>Select Date</Text>
+              <TouchableOpacity onPress={handleDatePickerDone}>
+                <Text style={styles.datePickerDone}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          <DateTimePicker
+            value={selectedDate}
+            mode="date"
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            onChange={onDateChange}
+            maximumDate={new Date()}
+            minimumDate={new Date(1900, 0, 1)}
+          />
         </View>
       </View>
     </Modal>
@@ -488,15 +551,21 @@ const AddRecordScreen = ({ navigation }) => {
         {/* Date */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Date *</Text>
-          <TextInput
+          <TouchableOpacity
             style={[
-              styles.input,
+              styles.dateInput,
               hasFieldError('date', validationErrors) && styles.inputError
             ]}
-            placeholder="YYYY-MM-DD"
-            value={formData.date}
-            onChangeText={(value) => updateFormData('date', value)}
-          />
+            onPress={handleDateSelect}
+          >
+            <Text style={[
+              styles.dateInputText,
+              !formData.date && styles.dateInputPlaceholder
+            ]}>
+              {formData.date || 'Select date'}
+            </Text>
+            <Ionicons name="calendar" size={20} color="#666" />
+          </TouchableOpacity>
           <ValidationError error={getFieldError('date', validationErrors)} />
         </View>
 
@@ -572,6 +641,7 @@ const AddRecordScreen = ({ navigation }) => {
 
           <TypePickerModal />
           <MemberPickerModal />
+          <DatePickerModal />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -649,132 +719,62 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  selectedOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  selectedIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  selectedText: {
-    fontSize: 16,
-    color: '#1f2937',
-    fontWeight: '500',
-  },
-  selectedSubtext: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginLeft: 8,
-  },
-  placeholderText: {
-    fontSize: 16,
-    color: '#9ca3af',
-  },
-  attachmentButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  attachmentButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+  dateInput: {
     backgroundColor: '#ffffff',
     borderRadius: 12,
+    paddingHorizontal: 16,
     paddingVertical: 12,
     borderWidth: 1,
     borderColor: '#e5e7eb',
-    borderStyle: 'dashed',
-  },
-  attachmentButtonText: {
-    fontSize: 14,
-    color: '#6366f1',
-    fontWeight: '500',
-    marginLeft: 8,
-  },
-  attachmentsList: {
-    marginTop: 12,
-    gap: 8,
-  },
-  attachmentItem: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
   },
-  attachmentPreview: {
-    width: 48,
-    height: 48,
-    borderRadius: 8,
-    marginRight: 12,
-  },
-  documentPreview: {
-    width: 48,
-    height: 48,
-    borderRadius: 8,
-    backgroundColor: '#ede9fe',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  attachmentInfo: {
-    flex: 1,
-  },
-  attachmentName: {
-    fontSize: 14,
-    fontWeight: '500',
+  dateInputText: {
+    fontSize: 16,
     color: '#1f2937',
   },
-  attachmentSize: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginTop: 2,
+  dateInputPlaceholder: {
+    color: '#9ca3af',
   },
-  removeAttachment: {
-    padding: 4,
-  },
-  submitButton: {
-    backgroundColor: '#6366f1',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  submitButtonDisabled: {
-    backgroundColor: '#9ca3af',
-  },
-  submitButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  modalOverlay: {
+  datePickerModal: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
   },
-  modalContent: {
-    backgroundColor: '#ffffff',
+  datePickerContainer: {
+    backgroundColor: 'white',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '80%',
+    paddingBottom: 34,
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 20,
-    textAlign: 'center',
+  datePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  datePickerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+  },
+  datePickerCancel: {
+    fontSize: 16,
+    color: '#007AFF',
+  },
+  datePickerDone: {
+    fontSize: 16,
+    color: '#007AFF',
+    fontWeight: '600',
   },
   typeOption: {
     flexDirection: 'row',
@@ -820,6 +820,47 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6b7280',
     fontWeight: '500',
+  },
+  dateText: {
+    fontSize: 16,
+    color: '#1f2937',
+  },
+  dateIcon: {
+    marginLeft: 8,
+  },
+  submitButton: {
+    backgroundColor: '#6366f1',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#9ca3af',
+  },
+  submitButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 20,
+    textAlign: 'center',
   },
 });
 

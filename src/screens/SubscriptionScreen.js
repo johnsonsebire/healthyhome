@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,35 +10,71 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
-import { useSubscription } from '../contexts/SubscriptionContext';
+import { useSubscription, SUBSCRIPTION_PLANS } from '../contexts/SubscriptionContext';
 import { useError, ERROR_TYPES, ERROR_SEVERITY } from '../contexts/ErrorContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 
-const SubscriptionScreen = () => {
+const SubscriptionScreen = ({ route, navigation }) => {
   const { user } = useAuth();
-  const { subscription, updateSubscription } = useSubscription();
+  const { currentPlan, upgradePlan, isProcessing } = useSubscription();
   const { withErrorHandling, isLoading } = useError();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // Get parameters from route if coming from onboarding
+  const fromOnboarding = route?.params?.fromOnboarding;
+  const selectedPlanFromOnboarding = route?.params?.selectedPlan;
+
+  useEffect(() => {
+    // If coming from onboarding with a selected plan, pre-select it
+    if (fromOnboarding && selectedPlanFromOnboarding) {
+      const plan = plans.find(p => p.id === selectedPlanFromOnboarding);
+      if (plan) {
+        setSelectedPlan(plan);
+        // Automatically show payment modal
+        setShowPaymentModal(true);
+      }
+    }
+  }, [fromOnboarding, selectedPlanFromOnboarding]);
+
   const plans = [
+    {
+      id: 'free',
+      name: 'Free',
+      price: 0,
+      period: 'month',
+      features: [
+        'Single user only',
+        'Basic health records',
+        '200MB storage',
+        'Basic appointment scheduling',
+        'Standard support',
+      ],
+      limits: {
+        familyMembers: 1,
+        records: 10,
+        storage: 200 * 1024 * 1024, // 200MB in bytes
+      },
+      color: '#6b7280', // Gray
+      popular: false,
+    },
     {
       id: 'basic',
       name: 'Basic',
       price: 1,
       period: 'month',
       features: [
-        'Up to 3 family members',
-        'Up to 10 medical records',
-        '100MB storage',
+        'Up to 2 family members',
+        'Up to 20 medical records',
+        '500MB storage',
         'Basic appointment scheduling',
         'Standard support',
       ],
       limits: {
-        familyMembers: 3,
-        records: 10,
-        storage: 100 * 1024 * 1024, // 100MB in bytes
+        familyMembers: 2,
+        records: 20,
+        storage: 500 * 1024 * 1024, // 500MB in bytes
       },
       color: '#34C759',
       popular: false,
@@ -49,18 +85,18 @@ const SubscriptionScreen = () => {
       price: 2,
       period: 'month',
       features: [
-        'Up to 10 family members',
+        'Up to 5 family members',
         'Up to 100 medical records',
-        '500MB storage',
+        '2GB storage',
         'Advanced appointment scheduling',
         'OCR document scanning',
         'Data export',
         'Priority support',
       ],
       limits: {
-        familyMembers: 10,
+        familyMembers: 5,
         records: 100,
-        storage: 500 * 1024 * 1024, // 500MB in bytes
+        storage: 2 * 1024 * 1024 * 1024, // 2GB in bytes
       },
       color: '#007AFF',
       popular: true,
@@ -71,9 +107,9 @@ const SubscriptionScreen = () => {
       price: 3,
       period: 'month',
       features: [
-        'Up to 50 family members',
+        'Unlimited family members',
         'Unlimited medical records',
-        '2GB storage',
+        '10GB storage',
         'Advanced appointment scheduling',
         'OCR document scanning',
         'Data export & backup',
@@ -82,9 +118,9 @@ const SubscriptionScreen = () => {
         '24/7 premium support',
       ],
       limits: {
-        familyMembers: 50,
+        familyMembers: -1, // unlimited
         records: -1, // unlimited
-        storage: 2 * 1024 * 1024 * 1024, // 2GB in bytes
+        storage: 10 * 1024 * 1024 * 1024, // 10GB in bytes
       },
       color: '#FF9500',
       popular: false,
@@ -92,7 +128,7 @@ const SubscriptionScreen = () => {
   ];
 
   const handleSelectPlan = (plan) => {
-    if (subscription?.plan === plan.id) {
+    if (currentPlan === plan.id) {
       Alert.alert('Current Plan', 'You are already subscribed to this plan.');
       return;
     }
@@ -102,25 +138,18 @@ const SubscriptionScreen = () => {
   };
 
   const handlePayment = async () => {
+    if (!selectedPlan) return;
+    
     const result = await withErrorHandling(
       async () => {
         // In a real app, you would integrate with Stripe or another payment processor
         // For now, we'll simulate a successful payment
         await new Promise(resolve => setTimeout(resolve, 2000));
         
-        const newSubscription = {
-          plan: selectedPlan.id,
-          planName: selectedPlan.name,
-          price: selectedPlan.price,
-          status: 'active',
-          startDate: new Date(),
-          endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-          limits: selectedPlan.limits,
-        };
-
-        await updateSubscription(newSubscription);
+        // Upgrade to the selected plan
+        await upgradePlan(selectedPlan.id);
         
-        return newSubscription;
+        return { success: true };
       },
       {
         errorType: ERROR_TYPES.SUBSCRIPTION,
@@ -129,13 +158,26 @@ const SubscriptionScreen = () => {
       }
     );
 
-    if (result.success) {
+    if (result) {
       setShowPaymentModal(false);
-      setSelectedPlan(null);
       
       Alert.alert(
         'Success!',
-        `You have successfully subscribed to the ${selectedPlan.name} plan.`
+        `You have successfully subscribed to the ${selectedPlan.name} plan.`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // If coming from onboarding, navigate to Home
+              if (fromOnboarding) {
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'MainTabs' }],
+                });
+              }
+            }
+          }
+        ]
       );
     }
   };
@@ -150,11 +192,11 @@ const SubscriptionScreen = () => {
     }
   };
 
-  const getCurrentPlanFeatures = () => {
-    return plans.find(plan => plan.id === subscription?.plan) || plans[0];
+  const getCurrentPlanDetails = () => {
+    return plans.find(plan => plan.id === currentPlan) || plans[0];
   };
 
-  const currentPlan = getCurrentPlanFeatures();
+  const userCurrentPlan = getCurrentPlanDetails();
 
   return (
     <View style={styles.container}>
@@ -171,21 +213,16 @@ const SubscriptionScreen = () => {
 
         <View style={styles.currentPlanSection}>
           <Text style={styles.sectionTitle}>Current Plan</Text>
-          <View style={[styles.currentPlanCard, { borderColor: currentPlan.color }]}>
+          <View style={[styles.currentPlanCard, { borderColor: userCurrentPlan.color }]}>
             <View style={styles.currentPlanHeader}>
-              <Text style={styles.currentPlanName}>{currentPlan.name}</Text>
+              <Text style={styles.currentPlanName}>{userCurrentPlan.name}</Text>
               <Text style={styles.currentPlanPrice}>
-                ${currentPlan.price}/{currentPlan.period}
+                ${userCurrentPlan.price}/{userCurrentPlan.period}
               </Text>
             </View>
             <Text style={styles.currentPlanStatus}>
-              Status: {subscription?.status || 'Active'}
+              Status: Active
             </Text>
-            {subscription?.endDate && (
-              <Text style={styles.currentPlanExpiry}>
-                Expires: {new Date(subscription.endDate).toLocaleDateString()}
-              </Text>
-            )}
           </View>
         </View>
 

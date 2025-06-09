@@ -294,6 +294,9 @@ const HomeScreen = ({ navigation }) => {
       {/* Quick Actions */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Quick Actions</Text>
+
+        {/* Add Spacing */}
+        <View style={{ height: 12 }} />
         
         {/* COMMENTED OUT: Firebase Test Button - no longer needed as Firebase is working correctly */}
         {/*
