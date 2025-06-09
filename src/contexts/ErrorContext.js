@@ -147,14 +147,26 @@ export const ErrorProvider = ({ children }) => {
       showLoading = true,
     } = options;
 
+    console.log('🔄 withErrorHandling: Starting operation with options:', options);
+
     if (showLoading) {
+      console.log('⏳ withErrorHandling: Setting loading to true');
       setLoading(true);
     }
 
     try {
+      console.log('🚀 withErrorHandling: Executing operation...');
       const result = await operation();
+      console.log('✅ withErrorHandling: Operation completed successfully');
       return { success: true, data: result };
     } catch (error) {
+      console.error('❌ withErrorHandling: Operation failed:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        code: error.code,
+        stack: error.stack
+      });
+      
       const errorId = addError({
         type: errorType,
         severity: errorSeverity,
@@ -162,9 +174,11 @@ export const ErrorProvider = ({ children }) => {
         details: error,
       });
 
+      console.log('🚨 withErrorHandling: Error added with ID:', errorId);
       return { success: false, error, errorId };
     } finally {
       if (showLoading) {
+        console.log('⏳ withErrorHandling: Setting loading to false');
         setLoading(false);
       }
     }

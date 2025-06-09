@@ -30,26 +30,44 @@ const LoginScreen = ({ navigation }) => {
   const { withErrorHandling, isLoading } = useError();
 
   const handleLogin = async () => {
+    console.log('🔐 Login attempt started', { email: email || 'empty', password: password ? 'provided' : 'empty' });
+    
     // Validate form data
     const validationRules = {
-      email: ['required', 'email'],
-      password: ['required', { minLength: 6 }]
+      email: [
+        { required: true, message: 'Email is required' },
+        { email: true, message: 'Please enter a valid email' }
+      ],
+      password: [
+        { required: true, message: 'Password is required' },
+        { minLength: 6, message: 'Password must be at least 6 characters' }
+      ]
     };
     
     const formData = { email, password };
-    const errors = validateForm(formData, validationRules);
+    const validation = validateForm(formData, validationRules);
     
-    if (Object.keys(errors).length > 0) {
-      setValidationErrors(errors);
+    console.log('📋 Validation result:', validation);
+    
+    if (!validation.isValid) {
+      console.log('❌ Validation failed:', validation.errors);
+      setValidationErrors(validation.errors);
+      
+      // Show first validation error in alert
+      const firstError = Object.values(validation.errors)[0];
+      Alert.alert('Validation Error', firstError);
       return;
     }
     
     // Clear validation errors if form is valid
     setValidationErrors({});
+    console.log('✅ Validation passed, attempting login...');
 
     const result = await withErrorHandling(
       async () => {
+        console.log('🚀 Calling login function...');
         await login(email, password);
+        console.log('✅ Login function completed successfully');
       },
       {
         errorType: ERROR_TYPES.AUTHENTICATION,
@@ -58,6 +76,7 @@ const LoginScreen = ({ navigation }) => {
       }
     );
 
+    console.log('🔄 Login process result:', result);
     // Navigation will be handled by AuthContext on successful login
   };
 
@@ -114,7 +133,7 @@ const LoginScreen = ({ navigation }) => {
           <View style={styles.inputContainer}>
             <Ionicons name="mail-outline" size={20} color="#6b7280" style={styles.inputIcon} />
             <TextInput
-              style={[styles.input, hasFieldError(validationErrors, 'email') && styles.inputError]}
+              style={[styles.input, hasFieldError('email', validationErrors) && styles.inputError]}
               placeholder="Email"
               value={email}
               onChangeText={setEmail}
@@ -123,14 +142,14 @@ const LoginScreen = ({ navigation }) => {
               autoComplete="email"
             />
           </View>
-          {hasFieldError(validationErrors, 'email') && (
-            <ValidationError message={getFieldError(validationErrors, 'email')} />
+          {hasFieldError('email', validationErrors) && (
+            <ValidationError error={getFieldError('email', validationErrors)} />
           )}
 
           <View style={styles.inputContainer}>
             <Ionicons name="lock-closed-outline" size={20} color="#6b7280" style={styles.inputIcon} />
             <TextInput
-              style={[styles.input, hasFieldError(validationErrors, 'password') && styles.inputError]}
+              style={[styles.input, hasFieldError('password', validationErrors) && styles.inputError]}
               placeholder="Password"
               value={password}
               onChangeText={setPassword}
@@ -148,17 +167,20 @@ const LoginScreen = ({ navigation }) => {
               />
             </TouchableOpacity>
           </View>
-          {hasFieldError(validationErrors, 'password') && (
-            <ValidationError message={getFieldError(validationErrors, 'password')} />
+          {hasFieldError('password', validationErrors) && (
+            <ValidationError error={getFieldError('password', validationErrors)} />
           )}
 
           <TouchableOpacity
-            style={[styles.loginButton, loading && styles.disabledButton]}
-            onPress={handleLogin}
-            disabled={loading}
+            style={[styles.loginButton, (loading || isLoading) && styles.disabledButton]}
+            onPress={() => {
+              console.log('🔥 LOGIN BUTTON PRESSED!');
+              handleLogin();
+            }}
+            disabled={loading || isLoading}
           >
             <Text style={styles.loginButtonText}>
-              {loading ? 'Signing In...' : 'Sign In'}
+              {(loading || isLoading) ? 'Signing In...' : 'Sign In'}
             </Text>
           </TouchableOpacity>
 

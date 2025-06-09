@@ -141,20 +141,22 @@ const FamilyMemberScreen = () => {
 
     const result = await withErrorHandling(
       async () => {
-        // Check family member limit based on subscription
-        const canAdd = checkUsageLimit('familyMembers', familyMembers.length);
-        if (!canAdd) {
-          Alert.alert(
-            'Limit Reached',
-            'Upgrade your subscription to add more family members'
-          );
-          throw new Error('Family member limit reached');
+        // Only check family member limit for NEW members, not when editing existing ones
+        if (!editingMember) {
+          const canAdd = checkUsageLimit('familyMembers', familyMembers.length);
+          if (!canAdd) {
+            Alert.alert(
+              'Limit Reached',
+              'Upgrade your subscription to add more family members'
+            );
+            throw new Error('Family member limit reached');
+          }
         }
 
         const memberData = {
           ...formData,
           userId: user.uid,
-          createdAt: new Date(),
+          createdAt: editingMember ? editingMember.createdAt : new Date(),
           updatedAt: new Date(),
         };
 

@@ -18,10 +18,19 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 
 const SubscriptionScreen = ({ route, navigation }) => {
   const { user } = useAuth();
-  const { currentPlan, upgradePlan, isProcessing } = useSubscription();
+  const { 
+    currentPlan, 
+    upgradePlan, 
+    isProcessing, 
+    revenueCatOfferings, 
+    isRevenueCatInitialized,
+    purchaseSubscription,
+    restorePurchases 
+  } = useSubscription();
   const { withErrorHandling, isLoading } = useError();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
+  const [selectedPackage, setSelectedPackage] = useState(null);
   const [loading, setLoading] = useState(false);
 
   // Get parameters from route if coming from onboarding
@@ -137,51 +146,140 @@ const SubscriptionScreen = ({ route, navigation }) => {
       return;
     }
 
+    // Find the corresponding RevenueCat package
+    const correspondingPackage = revenueCatOfferings.find(pkg => {
+      // Match based on price or identifier
+      return pkg.product.price === plan.price || 
+             pkg.identifier.toLowerCase().includes(plan.id.toLowerCase());
+    });
+
+    if (!correspondingPackage && plan.id !== 'free') {
+      Alert.alert('Error', 'This subscription option is not available at the moment.');
+      return;
+    }
+
     setSelectedPlan(plan);
-    setShowPaymentModal(true);
+    setSelectedPackage(correspondingPackage);
+    
+    if (plan.id === 'free') {
+      // Handle free plan downgrade
+      handleDowngradeToFree();
+    } else {
+      setShowPaymentModal(true);
+    }
+  };
+
+  const handleDowngradeToFree = () => {
+    Alert.alert(
+      'Downgrade to Free',
+      'Are you sure you want to downgrade to the free plan? You will lose access to premium features.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Downgrade',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await upgradePlan('free');
+              Alert.alert('Success', 'You have been downgraded to the free plan.');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to downgrade plan. Please try again.');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handlePayment = async () => {
-    if (!selectedPlan) {
+    if (!selectedPlan || !selectedPackage) {
       Alert.alert('Error', 'No plan selected. Please select a plan first.');
+      return;
+    }
+
+    if (!isRevenueCatInitialized) {
+      Alert.alert('Error', 'Payment system is not ready. Please try again in a moment.');
       return;
     }
     
     setLoading(true);
     
     try {
-      // In a real app, you would integrate with Stripe or another payment processor
-      // For now, we'll simulate a successful payment
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Upgrade to the selected plan
-      await upgradePlan(selectedPlan.id);
+      const result = await purchaseSubscription(selectedPackage);
       
       setLoading(false);
       setShowPaymentModal(false);
       
-      Alert.alert(
-        'Success!',
-        `You have successfully subscribed to the ${selectedPlan.name} plan.`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              // If coming from onboarding, navigate to Home
-              if (fromOnboarding) {
-                navigation.reset({
-                  index: 0,
-                  routes: [{ name: 'MainTabs' }],
-                });
+      if (result.success) {
+        Alert.alert(
+          'Success!',
+          `You have successfully subscribed to the ${selectedPlan.name} plan.`,
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // If coming from onboarding, navigate to Home
+                if (fromOnboarding) {
+                  navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'MainTabs' }],
+                  });
+                }
               }
             }
-          }
-        ]
-      );
+          ]
+        );
+      } else if (result.cancelled) {
+        Alert.alert('Purchase Cancelled', 'You cancelled the purchase.');
+      } else {
+        throw new Error(result.error || 'Purchase failed');
+      }
     } catch (error) {
       setLoading(false);
       console.error('Payment error:', error);
-      Alert.alert('Error', 'There was an error processing your payment. Please try again later.');
+      
+      let errorMessage = 'There was an error processing your payment. Please try again later.';
+      
+      if (error.message?.includes('cancelled')) {
+        errorMessage = 'Purchase was cancelled.';
+      } else if (error.message?.includes('network')) {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      }
+      
+      Alert.alert('Error', errorMessage);
+    }
+  };
+
+  const handleRestorePurchases = async () => {
+    if (!isRevenueCatInitialized) {
+      Alert.alert('Error', 'Restore system is not ready. Please try again in a moment.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const result = await restorePurchases();
+      setLoading(false);
+
+      if (result.success) {
+        Alert.alert(
+          'Purchases Restored',
+          'Your previous purchases have been restored successfully.'
+        );
+      } else {
+        Alert.alert(
+          'No Purchases Found',
+          'No previous purchases were found to restore.'
+        );
+      }
+    } catch (error) {
+      setLoading(false);
+      console.error('Restore purchases error:', error);
+      Alert.alert(
+        'Error',
+        'Failed to restore purchases. Please try again later.'
+      );
     }
   };
 
@@ -300,6 +398,21 @@ const SubscriptionScreen = ({ route, navigation }) => {
               Yes, we use industry-standard encryption and secure payment processors to protect your financial information.
             </Text>
           </View>
+        </View>
+
+        {/* Restore Purchases Button */}
+        <View style={styles.restoreSection}>
+          <TouchableOpacity
+            style={styles.restoreButton}
+            onPress={handleRestorePurchases}
+            disabled={loading || !isRevenueCatInitialized}
+          >
+            <Ionicons name="refresh" size={20} color="#007AFF" />
+            <Text style={styles.restoreButtonText}>Restore Purchases</Text>
+          </TouchableOpacity>
+          <Text style={styles.restoreHint}>
+            Already have a subscription? Tap here to restore your purchase.
+          </Text>
         </View>
       </ScrollView>
 
@@ -665,6 +778,37 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     lineHeight: 16,
+  },
+  restoreSection: {
+    padding: 20,
+    alignItems: 'center',
+    backgroundColor: 'white',
+    marginTop: 20,
+    marginHorizontal: 20,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  restoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderWidth: 1,
+    borderColor: '#007AFF',
+    borderRadius: 8,
+    backgroundColor: 'transparent',
+  },
+  restoreButtonText: {
+    color: '#007AFF',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  restoreHint: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 8,
   },
 });
 

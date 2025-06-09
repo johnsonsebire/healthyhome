@@ -7,6 +7,7 @@ import { useAuth } from './AuthContext';
 import networkService from '../services/networkService';
 import offlineStorageService from '../services/offlineStorage';
 import emailService from '../services/emailService';
+import revenueCatService from '../services/revenueCat';
 
 const SubscriptionContext = createContext();
 
@@ -75,12 +76,55 @@ export const SUBSCRIPTION_PLANS = {
 
 export const SubscriptionProvider = ({ children }) => {
   const { user } = useAuth();
-  const [currentPlan, setCurrentPlan] = useState('basic');
+  const [currentPlan, setCurrentPlan] = useState('free');
   const [subscriptionStatus, setSubscriptionStatus] = useState('active');
   const [usageStats, setUsageStats] = useState({
     familyMembers: 0,
     storageUsed: 0
   });
+  const [revenueCatOfferings, setRevenueCatOfferings] = useState([]);
+  const [isRevenueCatInitialized, setIsRevenueCatInitialized] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      try {
+        initializeRevenueCat();
+        fetchSubscriptionData();
+      } catch (error) {
+        console.error('Error in subscription effect:', error);
+        // Default to free plan as fallback
+        setCurrentPlan('free');
+      }
+    } else {
+      // No user, default to free
+      setCurrentPlan('free');
+    }
+  }, [user]);
+
+  const initializeRevenueCat = async () => {
+    try {
+      await revenueCatService.initialize(user?.uid);
+      setIsRevenueCatInitialized(true);
+      
+      // Get offerings
+      const offerings = await revenueCatService.getOfferings();
+      setRevenueCatOfferings(offerings);
+      
+      // Get current customer info to determine active plan
+      const customerInfo = await revenueCatService.getCustomerInfo();
+      const activePlan = revenueCatService.getCurrentPlan();
+      
+      if (activePlan !== 'free') {
+        setCurrentPlan(activePlan);
+        setSubscriptionStatus('active');
+      }
+      
+      console.log('RevenueCat initialized with plan:', activePlan);
+    } catch (error) {
+      console.error('Failed to initialize RevenueCat:', error);
+      setIsRevenueCatInitialized(false);
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -144,6 +188,83 @@ export const SubscriptionProvider = ({ children }) => {
     }
   };
 
+  const purchaseSubscription = async (packageToPurchase) => {
+    try {
+      if (!isRevenueCatInitialized) {
+        throw new Error('RevenueCat not initialized');
+      }
+
+      const result = await revenueCatService.purchasePackage(packageToPurchase);
+      
+      if (result.success) {
+        // Update local state
+        const newPlan = revenueCatService.getCurrentPlan();
+        setCurrentPlan(newPlan);
+        setSubscriptionStatus('active');
+        
+        // Update Firebase
+        await updateDoc(doc(db, 'users', user.uid), {
+          subscriptionPlan: newPlan,
+          subscriptionStatus: 'active',
+          revenueCatCustomerId: result.customerInfo.originalAppUserId,
+          updatedAt: new Date()
+        });
+        
+        // Send confirmation email
+        try {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            await emailService.sendPlanUpgradeEmail({
+              email: user.email,
+              uid: user.uid,
+              firstName: userData.firstName,
+              displayName: userData.displayName || userData.firstName
+            }, SUBSCRIPTION_PLANS[newPlan].name);
+          }
+        } catch (emailError) {
+          console.error('Failed to send confirmation email:', emailError);
+        }
+        
+        return result;
+      } else {
+        throw new Error(result.error || 'Purchase failed');
+      }
+    } catch (error) {
+      console.error('Purchase error:', error);
+      throw error;
+    }
+  };
+
+  const restorePurchases = async () => {
+    try {
+      if (!isRevenueCatInitialized) {
+        throw new Error('RevenueCat not initialized');
+      }
+
+      const result = await revenueCatService.restorePurchases();
+      
+      if (result.success) {
+        const currentPlanFromRC = revenueCatService.getCurrentPlan();
+        setCurrentPlan(currentPlanFromRC);
+        
+        // Update Firebase
+        await updateDoc(doc(db, 'users', user.uid), {
+          subscriptionPlan: currentPlanFromRC,
+          subscriptionStatus: 'active',
+          updatedAt: new Date()
+        });
+        
+        return result;
+      } else {
+        throw new Error(result.error || 'Failed to restore purchases');
+      }
+    } catch (error) {
+      console.error('Restore purchases error:', error);
+      throw error;
+    }
+  };
+
   const upgradePlan = async (newPlan) => {
     try {
       // Check if running in Expo Go or if we don't have Firebase available
@@ -157,7 +278,11 @@ export const SubscriptionProvider = ({ children }) => {
         return { success: true };
       }
       
-      // Normal flow for production app
+      // For RevenueCat integration, we don't directly upgrade plans
+      // Instead, we guide users to make purchases through the offerings
+      console.warn('Direct plan upgrade deprecated. Use purchaseSubscription instead.');
+      
+      // Normal flow for production app (keeping for backward compatibility)
       await updateDoc(doc(db, 'users', user.uid), {
         subscriptionPlan: newPlan,
         subscriptionStatus: 'active',
@@ -234,7 +359,11 @@ export const SubscriptionProvider = ({ children }) => {
       plan: currentPlan,
       status: subscriptionStatus
     },
+    revenueCatOfferings,
+    isRevenueCatInitialized,
     upgradePlan,
+    purchaseSubscription,
+    restorePurchases,
     updateSubscription,
     checkUsageLimit,
     canAddFamilyMember,

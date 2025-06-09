@@ -39,11 +39,11 @@ const OnboardingScreen = () => {
       // Set the selectedPlan to 'free' if none is selected
       setSelectedPlan('free');
       upgradePlan('free').then(() => {
-        navigation.replace('Home');
+        navigation.replace('AppStack');
       }).catch(error => {
         console.error('Error upgrading to free plan:', error);
-        // Navigate to home anyway as fallback
-        navigation.replace('Home');
+        // Navigate to app stack anyway as fallback
+        navigation.replace('AppStack');
       });
     }
   };
@@ -69,9 +69,11 @@ const OnboardingScreen = () => {
         )}
         <View style={styles.planHeader}>
           <Text style={styles.planName}>{plan.name}</Text>
-          <Text style={styles.planPrice}>
-            {plan.price > 0 ? `$${plan.price}/mo` : 'Free'}
-          </Text>
+          {!isCurrent && (
+            <Text style={styles.planPrice}>
+              {plan.price > 0 ? `$${plan.price}/mo` : 'Free'}
+            </Text>
+          )}
         </View>
 
         <View style={styles.planFeatures}>

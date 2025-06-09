@@ -46,6 +46,21 @@ export const validateForm = (data, rules) => {
       // Skip validation if field already has error
       if (errors[field]) return;
       
+      // Handle string rules (legacy format)
+      if (typeof rule === 'string') {
+        if (rule === 'required' && !validateRequired(value)) {
+          errors[field] = `${field.charAt(0).toUpperCase() + field.slice(1)} is required`;
+        } else if (rule === 'email' && value && !validateEmail(value)) {
+          errors[field] = 'Invalid email format';
+        } else if (rule === 'password' && value && !validatePassword(value)) {
+          errors[field] = 'Password must be at least 8 characters with uppercase, lowercase, and number';
+        } else if (rule === 'phone' && value && !validatePhone(value)) {
+          errors[field] = 'Invalid phone number format';
+        }
+        return;
+      }
+      
+      // Handle object rules (new format)
       if (rule.required && !validateRequired(value)) {
         errors[field] = rule.message || `${field.charAt(0).toUpperCase() + field.slice(1)} is required`;
       } else if (rule.email && value && !validateEmail(value)) {
