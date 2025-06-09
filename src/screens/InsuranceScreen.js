@@ -17,6 +17,7 @@ import offlineStorageService from '../services/offlineStorage';
 import networkService from '../services/networkService';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
+import { getProviderDisplayName } from '../utils/recordTypes';
 
 const InsuranceScreen = ({ navigation }) => {
   const { user } = useAuth();
@@ -102,7 +103,7 @@ const InsuranceScreen = ({ navigation }) => {
 
   const getUniqueProviders = () => {
     const providers = insuranceRecords
-      .map(record => record.provider || record.title || 'Unknown Provider')
+      .map(record => getProviderDisplayName(record.provider, record.customProvider))
       .filter((value, index, self) => self.indexOf(value) === index);
     return providers;
   };
@@ -117,8 +118,13 @@ const InsuranceScreen = ({ navigation }) => {
           <Ionicons name="shield-checkmark" size={24} color="#8b5cf6" />
         </View>
         <View style={styles.cardInfo}>
-          <Text style={styles.cardTitle}>{record.title}</Text>
+          <Text style={styles.cardTitle}>
+            {getProviderDisplayName(record.provider, record.customProvider)}
+          </Text>
           <Text style={styles.cardMember}>{record.familyMemberName}</Text>
+          {record.membershipNo && (
+            <Text style={styles.cardMembership}>ID: {record.membershipNo}</Text>
+          )}
           <Text style={styles.cardDate}>Added: {formatDate(record.createdAt)}</Text>
         </View>
         <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
@@ -370,6 +376,12 @@ const styles = StyleSheet.create({
   cardMember: {
     fontSize: 14,
     color: '#6b7280',
+    marginBottom: 2,
+  },
+  cardMembership: {
+    fontSize: 13,
+    color: '#4b5563',
+    fontWeight: '500',
     marginBottom: 2,
   },
   cardDate: {

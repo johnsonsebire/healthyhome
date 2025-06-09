@@ -15,6 +15,7 @@ import SettingsScreen from '../screens/SettingsScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import AddRecordScreen from '../screens/AddRecordScreen';
+import EditRecordScreen from '../screens/EditRecordScreen';
 import RecordDetailScreen from '../screens/RecordDetailScreen';
 import FamilyMemberScreen from '../screens/FamilyMemberScreen';
 import SubscriptionScreen from '../screens/SubscriptionScreen';
@@ -90,6 +91,15 @@ const AppStack = () => (
       component={RecordDetailScreen}
       options={{ 
         title: 'Record Details',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="EditRecord" 
+      component={EditRecordScreen}
+      options={{ 
+        title: 'Edit Record',
         headerStyle: { backgroundColor: '#6366f1' },
         headerTintColor: '#fff'
       }}

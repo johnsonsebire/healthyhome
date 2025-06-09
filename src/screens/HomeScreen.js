@@ -17,7 +17,7 @@ import { useError, ERROR_TYPES, ERROR_SEVERITY } from '../contexts/ErrorContext'
 import offlineStorageService from '../services/offlineStorage';
 import networkService from '../services/networkService';
 import { LoadingSpinner } from '../components/LoadingSpinner';
-import { getRecordTypeDisplayName, getRecordTypeColor } from '../utils/recordTypes';
+import { getRecordTypeDisplayName, getRecordTypeColor, getProviderDisplayName } from '../utils/recordTypes';
 // COMMENTED OUT: Firebase diagnostics import - no longer needed as Firebase is working correctly
 // import { runFirebaseDiagnostics, formatDiagnosticResults } from '../utils/firebaseDiagnostics';
 
@@ -188,21 +188,64 @@ const HomeScreen = ({ navigation }) => {
     </TouchableOpacity>
   );
 
-  const RecordCard = ({ record }) => (
-    <TouchableOpacity 
-      style={styles.recordCard}
-      onPress={() => navigation.navigate('RecordDetail', { recordId: record.id })}
-    >
-      <View style={styles.recordHeader}>
-        <View style={[styles.recordTypeBadge, { backgroundColor: getRecordTypeColor(record.type) }]}>
-          <Text style={styles.recordType}>{getRecordTypeDisplayName(record.type)}</Text>
+  const RecordCard = ({ record }) => {
+    // Get additional details based on record type
+    const getRecordDetails = () => {
+      switch (record.type) {
+        case 'insurance':
+          return {
+            subtitle: getProviderDisplayName(record.provider, record.customProvider),
+            detail: record.membershipNo ? `ID: ${record.membershipNo}` : null
+          };
+        case 'hospital_card':
+          return {
+            subtitle: record.hospital || 'Hospital Card',
+            detail: record.cardNumber ? `Card: ${record.cardNumber}` : null
+          };
+        case 'bill':
+          return {
+            subtitle: record.hospital || 'Medical Bill',
+            detail: record.billAmount ? `₦${record.billAmount}` : null
+          };
+        case 'prescription':
+          return {
+            subtitle: record.doctor ? `Dr. ${record.doctor}` : 'Prescription',
+            detail: null
+          };
+        case 'diagnosis':
+          return {
+            subtitle: record.doctor ? `Dr. ${record.doctor}` : 'Diagnosis',
+            detail: null
+          };
+        default:
+          return { subtitle: null, detail: null };
+      }
+    };
+
+    const details = getRecordDetails();
+
+    return (
+      <TouchableOpacity 
+        style={styles.recordCard}
+        onPress={() => navigation.navigate('RecordDetail', { recordId: record.id })}
+      >
+        <View style={styles.recordHeader}>
+          <View style={[styles.recordTypeBadge, { backgroundColor: getRecordTypeColor(record.type) }]}>
+            <Text style={styles.recordType}>{getRecordTypeDisplayName(record.type)}</Text>
+          </View>
+          <Text style={styles.recordDate}>{formatDate(record.createdAt)}</Text>
         </View>
-        <Text style={styles.recordDate}>{formatDate(record.createdAt)}</Text>
-      </View>
-      <Text style={styles.recordTitle}>{record.title}</Text>
-      <Text style={styles.recordMember}>{record.familyMemberName}</Text>
-    </TouchableOpacity>
-  );
+        <Text style={styles.recordTitle}>{record.title || getRecordTypeDisplayName(record.type)}</Text>
+        <Text style={styles.recordMember}>{record.familyMemberName}</Text>
+        {details.subtitle && (
+          <Text style={styles.recordSubtitle}>{details.subtitle}</Text>
+        )}
+        {details.detail && (
+          <Text style={styles.recordDetail}>{details.detail}</Text>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   const AppointmentCard = ({ appointment }) => (
     <TouchableOpacity style={styles.appointmentCard}>
@@ -538,6 +581,18 @@ const styles = StyleSheet.create({
   recordMember: {
     fontSize: 14,
     color: '#6b7280',
+    marginBottom: 2,
+  },
+  recordSubtitle: {
+    fontSize: 13,
+    color: '#4b5563',
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  recordDetail: {
+    fontSize: 12,
+    color: '#9ca3af',
+    fontStyle: 'italic',
   },
   appointmentsList: {
     gap: 12,

@@ -1,4 +1,5 @@
 // Record type utilities and constants
+import { generateBarcode } from 'expo-barcode-generator';
 
 export const RECORD_TYPE_DISPLAY_NAMES = {
   prescription: 'Prescription',
@@ -36,31 +37,64 @@ export const getRecordTypeIcon = (type) => {
   return RECORD_TYPE_ICONS[type] || 'document';
 };
 
-// Generate a simple barcode pattern (simulation)
-export const generateBarcodePattern = (data) => {
+// Generate a proper barcode using expo-barcode-generator with CODE128
+export const generateBarcodePattern = async (data) => {
   if (!data) return '';
   
-  // Simple barcode simulation using alternating thick/thin lines
-  const chars = data.toString().split('');
+  try {
+    // Generate CODE128 barcode
+    const barcode = await generateBarcode({
+      value: data.toString(),
+      format: 'CODE128',
+      width: 200,
+      height: 60,
+      displayValue: false,
+    });
+    
+    return barcode;
+  } catch (error) {
+    console.error('Error generating barcode:', error);
+    // Fallback to text pattern if barcode generation fails
+    return generateBarcodePatternSync(data);
+  }
+};
+
+// Synchronous barcode pattern generation for immediate display
+export const generateBarcodePatternSync = (data) => {
+  if (!data) return '';
+  
+  const value = data.toString();
+  const barWidth = 2;
   let pattern = '';
   
-  chars.forEach((char, index) => {
-    const charCode = char.charCodeAt(0);
-    // Create pattern based on character code
-    for (let i = 0; i < 8; i++) {
-      pattern += (charCode & (1 << i)) ? '█' : '▌';
+  // Create alternating pattern based on data
+  for (let i = 0; i < value.length; i++) {
+    const charCode = value.charCodeAt(i) % 4;
+    switch (charCode) {
+      case 0:
+        pattern += '█'.repeat(barWidth) + '▌'.repeat(barWidth);
+        break;
+      case 1:
+        pattern += '▌'.repeat(barWidth) + '█'.repeat(barWidth);
+        break;
+      case 2:
+        pattern += '█'.repeat(barWidth * 2);
+        break;
+      default:
+        pattern += '▌'.repeat(barWidth * 2);
     }
-    if (index < chars.length - 1) pattern += ' ';
-  });
+  }
   
   return pattern;
 };
 
-// Format insurance provider names for ID cards
+// Format insurance provider names for display and ID cards
 export const formatProviderForCard = (provider) => {
-  if (!provider) return '';
+  if (!provider) return { organization: '', cardType: 'INSURANCE CARD', country: '' };
   
-  if (provider.toLowerCase().includes('nhis')) {
+  const providerLower = provider.toLowerCase();
+  
+  if (providerLower.includes('nhis') || providerLower === 'nhis') {
     return {
       country: 'REPUBLIC OF GHANA',
       organization: 'NATIONAL HEALTH INSURANCE SCHEME',
@@ -73,4 +107,18 @@ export const formatProviderForCard = (provider) => {
     organization: provider.toUpperCase(),
     cardType: 'INSURANCE CARD'
   };
+};
+
+// Get proper display name for insurance providers
+export const getProviderDisplayName = (providerId, customProvider = null) => {
+  if (providerId === 'other' && customProvider) {
+    return customProvider;
+  }
+  
+  const providerMap = {
+    'nhis': 'NHIS (National Health Insurance Scheme)',
+    'other': 'Other'
+  };
+  
+  return providerMap[providerId] || providerId;
 };

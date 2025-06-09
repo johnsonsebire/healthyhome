@@ -523,20 +523,40 @@ const EditRecordScreen = ({ route, navigation }) => {
   );
 
   // Insurance specific fields
-  const renderInsuranceFields = () => (
-    <>
-      {/* Provider */}
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Insurance Provider *</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter insurance provider"
-          value={formData.provider}
-          onChangeText={(value) => updateFormData('provider', value)}
-        />
-      </View>
+  const renderInsuranceFields = () => {
+    const selectedProvider = availableProviders.find(p => p.id === formData.provider);
+    
+    return (
+      <>
+        {/* Provider */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Insurance Provider *</Text>
+          <TouchableOpacity
+            style={[
+              styles.selector,
+              hasFieldError('provider', validationErrors) && styles.inputError
+            ]}
+            onPress={() => setShowProviderPicker(true)}
+          >
+            <Text style={[
+              selectedProvider ? styles.selectedText : styles.placeholderText
+            ]}>
+              {selectedProvider ? selectedProvider.name : 'Select insurance provider'}
+            </Text>
+            <Ionicons name="chevron-down" size={20} color="#6b7280" />
+          </TouchableOpacity>
+          {formData.provider === 'other' && (
+            <TextInput
+              style={[styles.input, { marginTop: 8 }]}
+              placeholder="Enter insurance provider name"
+              value={formData.customProvider}
+              onChangeText={(value) => updateFormData('customProvider', value)}
+            />
+          )}
+          <ValidationError error={getFieldError('provider', validationErrors)} />
+        </View>
 
-      {/* Membership Number */}
+        {/* Membership Number */}
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Membership Number *</Text>
         <TextInput
@@ -590,6 +610,7 @@ const EditRecordScreen = ({ route, navigation }) => {
       </View>
     </>
   );
+}
 
   // Medical Bill specific fields
   const renderMedicalBillFields = () => (
@@ -907,6 +928,42 @@ const EditRecordScreen = ({ route, navigation }) => {
     </Modal>
   );
 
+  // Provider Picker Modal
+  const ProviderPickerModal = () => (
+    <Modal
+      visible={showProviderPicker}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setShowProviderPicker(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Select Insurance Provider</Text>
+          <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={true}>
+            {availableProviders.map(provider => (
+              <TouchableOpacity
+                key={provider.id}
+                style={styles.memberOption}
+                onPress={() => {
+                  updateFormData('provider', provider.id);
+                  setShowProviderPicker(false);
+                }}
+              >
+                <Text style={styles.memberOptionText}>{provider.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <TouchableOpacity
+            style={styles.modalCancelButton}
+            onPress={() => setShowProviderPicker(false)}
+          >
+            <Text style={styles.modalCancelText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
   const selectedType = RECORD_TYPES.find(t => t.id === formData.type);
   const selectedMember = familyMembers.find(m => m.id === formData.familyMemberId);
 
@@ -1066,6 +1123,7 @@ const EditRecordScreen = ({ route, navigation }) => {
           <TypePickerModal />
           <MemberPickerModal />
           <DatePickerModal />
+          <ProviderPickerModal />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
