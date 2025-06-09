@@ -17,6 +17,7 @@ import { useError, ERROR_TYPES, ERROR_SEVERITY } from '../contexts/ErrorContext'
 import offlineStorageService from '../services/offlineStorage';
 import networkService from '../services/networkService';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { getRecordTypeDisplayName, getRecordTypeColor } from '../utils/recordTypes';
 // COMMENTED OUT: Firebase diagnostics import - no longer needed as Firebase is working correctly
 // import { runFirebaseDiagnostics, formatDiagnosticResults } from '../utils/firebaseDiagnostics';
 
@@ -193,7 +194,9 @@ const HomeScreen = ({ navigation }) => {
       onPress={() => navigation.navigate('RecordDetail', { recordId: record.id })}
     >
       <View style={styles.recordHeader}>
-        <Text style={styles.recordType}>{record.type}</Text>
+        <View style={[styles.recordTypeBadge, { backgroundColor: getRecordTypeColor(record.type) }]}>
+          <Text style={styles.recordType}>{getRecordTypeDisplayName(record.type)}</Text>
+        </View>
         <Text style={styles.recordDate}>{formatDate(record.createdAt)}</Text>
       </View>
       <Text style={styles.recordTitle}>{record.title}</Text>
@@ -512,14 +515,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
-  recordType: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6366f1',
-    backgroundColor: '#ede9fe',
+  recordTypeBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
+  },
+  recordType: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#ffffff',
   },
   recordDate: {
     fontSize: 12,

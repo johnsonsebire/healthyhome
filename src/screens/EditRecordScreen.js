@@ -901,8 +901,6 @@ const EditRecordScreen = ({ route, navigation }) => {
             mode="date"
             display={Platform.OS === 'ios' ? 'spinner' : 'default'}
             onChange={onDateChange}
-            maximumDate={new Date()}
-            minimumDate={new Date(1900, 0, 1)}
           />
         </View>
       </View>
@@ -983,20 +981,22 @@ const EditRecordScreen = ({ route, navigation }) => {
               <ValidationError error={getFieldError('familyMemberId', validationErrors)} />
             </View>
 
-            {/* Title */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Title *</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  hasFieldError('title', validationErrors) && styles.inputError
-                ]}
-                placeholder="Enter record title"
-                value={formData.title}
-                onChangeText={(value) => updateFormData('title', value)}
-              />
-              <ValidationError error={getFieldError('title', validationErrors)} />
-            </View>
+            {/* Title - Only show for prescription, diagnosis, and medical bill */}
+            {formData.type && !['hospital_card', 'insurance'].includes(formData.type) && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Title *</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    hasFieldError('title', validationErrors) && styles.inputError
+                  ]}
+                  placeholder="Enter record title"
+                  value={formData.title}
+                  onChangeText={(value) => updateFormData('title', value)}
+                />
+                <ValidationError error={getFieldError('title', validationErrors)} />
+              </View>
+            )}
 
             {/* Description */}
             <View style={styles.inputGroup}>

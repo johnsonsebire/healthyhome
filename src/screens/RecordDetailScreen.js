@@ -16,6 +16,13 @@ import { useError, ERROR_TYPES, ERROR_SEVERITY } from '../contexts/ErrorContext'
 import offlineStorageService from '../services/offlineStorage';
 import networkService from '../services/networkService';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { 
+  getRecordTypeDisplayName, 
+  getRecordTypeColor, 
+  getRecordTypeIcon,
+  generateBarcodePattern,
+  formatProviderForCard 
+} from '../utils/recordTypes';
 
 const RecordDetailScreen = ({ route, navigation }) => {
   const { recordId } = route.params;
@@ -173,26 +180,315 @@ const RecordDetailScreen = ({ route, navigation }) => {
     });
   };
 
-  const getRecordTypeColor = (type) => {
-    const colors = {
-      prescription: '#10b981',
-      diagnosis: '#f59e0b',
-      hospital_card: '#6366f1',
-      bill: '#ef4444',
-      insurance: '#8b5cf6'
-    };
-    return colors[type] || '#6b7280';
+  // Helper function to render ID card style view for insurance and hospital cards
+  const renderIDCard = () => {
+    if (!['insurance', 'hospital_card'].includes(record.type)) {
+      return null;
+    }
+
+    return (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>
+          {record.type === 'insurance' ? 'Insurance Card' : 'Hospital Card'}
+        </Text>
+        <View style={styles.idCard}>
+          {record.type === 'insurance' ? renderInsuranceCard() : renderHospitalCard()}
+        </View>
+      </View>
+    );
   };
 
-  const getRecordTypeIcon = (type) => {
-    const icons = {
-      prescription: 'medical',
-      diagnosis: 'pulse',
-      hospital_card: 'card',
-      bill: 'receipt',
-      insurance: 'shield-checkmark'
-    };
-    return icons[type] || 'document';
+  // Render insurance card
+  const renderInsuranceCard = () => {
+    const providerInfo = formatProviderForCard(record.provider || record.customProvider);
+    const membershipNo = record.membershipNo || record.cardNumber;
+    
+    return (
+      <View style={styles.cardContainer}>
+        {/* Header */}
+        <View style={styles.cardHeader}>
+          {providerInfo.country && (
+            <Text style={styles.cardCountry}>{providerInfo.country}</Text>
+          )}
+          <Text style={styles.cardOrganization}>{providerInfo.organization}</Text>
+          <Text style={styles.cardType}>{providerInfo.cardType}</Text>
+        </View>
+
+        {/* Member Information */}
+        <View style={styles.cardBody}>
+          <View style={styles.memberInfo}>
+            {/* Photo placeholder - will be added when family member photos are available */}
+            <View style={styles.photoContainer}>
+              <Ionicons name="person" size={40} color="#9ca3af" />
+            </View>
+            
+            <View style={styles.memberDetails}>
+              <Text style={styles.memberName}>{record.familyMemberName}</Text>
+              <Text style={styles.membershipNumber}>ID: {membershipNo}</Text>
+              
+              {record.dateOfIssue && (
+                <Text style={styles.cardDate}>Issued: {record.dateOfIssue}</Text>
+              )}
+              {record.expiryDate && (
+                <Text style={styles.cardDate}>Expires: {record.expiryDate}</Text>
+              )}
+            </View>
+          </View>
+
+          {/* Barcode */}
+          {membershipNo && (
+            <View style={styles.barcodeContainer}>
+              <Text style={styles.barcode}>{generateBarcodePattern(membershipNo)}</Text>
+              <Text style={styles.barcodeNumber}>{membershipNo}</Text>
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  // Render hospital card
+  const renderHospitalCard = () => {
+    const cardNumber = record.cardNumber;
+    
+    return (
+      <View style={styles.cardContainer}>
+        {/* Header */}
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardOrganization}>{record.hospital}</Text>
+          {record.city && record.region && (
+            <Text style={styles.cardLocation}>{record.city}, {record.region}</Text>
+          )}
+          <Text style={styles.cardType}>HOSPITAL CARD</Text>
+        </View>
+
+        {/* Member Information */}
+        <View style={styles.cardBody}>
+          <View style={styles.memberInfo}>
+            {/* Photo placeholder */}
+            <View style={styles.photoContainer}>
+              <Ionicons name="person" size={40} color="#9ca3af" />
+            </View>
+            
+            <View style={styles.memberDetails}>
+              <Text style={styles.memberName}>{record.familyMemberName}</Text>
+              {cardNumber && (
+                <Text style={styles.membershipNumber}>Card No: {cardNumber}</Text>
+              )}
+              {record.country && (
+                <Text style={styles.cardDate}>Country: {record.country}</Text>
+              )}
+            </View>
+          </View>
+
+          {/* Barcode */}
+          {cardNumber && (
+            <View style={styles.barcodeContainer}>
+              <Text style={styles.barcode}>{generateBarcodePattern(cardNumber)}</Text>
+              <Text style={styles.barcodeNumber}>{cardNumber}</Text>
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  // Render comprehensive details based on record type
+  const renderRecordDetails = () => {
+    return (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Record Details</Text>
+        <View style={styles.detailsContainer}>
+          {/* Common fields */}
+          {record.title && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Title</Text>
+              <Text style={styles.detailValue}>{record.title}</Text>
+            </View>
+          )}
+
+          {/* Type-specific fields */}
+          {record.type === 'insurance' && renderInsuranceDetails()}
+          {record.type === 'hospital_card' && renderHospitalCardDetails()}
+          {record.type === 'bill' && renderBillDetails()}
+          {record.type === 'prescription' && renderPrescriptionDetails()}
+          {record.type === 'diagnosis' && renderDiagnosisDetails()}
+
+          {/* Common fields */}
+          {record.date && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Date</Text>
+              <Text style={styles.detailValue}>{record.date}</Text>
+            </View>
+          )}
+          {record.notes && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Notes</Text>
+              <Text style={styles.detailValue}>{record.notes}</Text>
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  // Insurance specific details
+  const renderInsuranceDetails = () => (
+    <>
+      <View style={styles.detailRow}>
+        <Text style={styles.detailLabel}>Provider</Text>
+        <Text style={styles.detailValue}>{record.provider === 'other' ? record.customProvider : record.provider}</Text>
+      </View>
+      {record.membershipNo && (
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Membership Number</Text>
+          <Text style={styles.detailValue}>{record.membershipNo}</Text>
+        </View>
+      )}
+      {record.dateOfIssue && (
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Date of Issue</Text>
+          <Text style={styles.detailValue}>{record.dateOfIssue}</Text>
+        </View>
+      )}
+      {record.expiryDate && (
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Expiry Date</Text>
+          <Text style={styles.detailValue}>{record.expiryDate}</Text>
+        </View>
+      )}
+    </>
+  );
+
+  // Hospital card specific details
+  const renderHospitalCardDetails = () => (
+    <>
+      {record.country && (
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Country</Text>
+          <Text style={styles.detailValue}>{record.country}</Text>
+        </View>
+      )}
+      {record.city && (
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>City</Text>
+          <Text style={styles.detailValue}>{record.city === 'other' ? record.customCity : record.city}</Text>
+        </View>
+      )}
+      {record.region && (
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Region</Text>
+          <Text style={styles.detailValue}>{record.region === 'other' ? record.customRegion : record.region}</Text>
+        </View>
+      )}
+      {record.hospital && (
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Hospital/Clinic</Text>
+          <Text style={styles.detailValue}>{record.hospital}</Text>
+        </View>
+      )}
+      {record.cardNumber && (
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Card Number</Text>
+          <Text style={styles.detailValue}>{record.cardNumber}</Text>
+        </View>
+      )}
+    </>
+  );
+
+  // Medical bill specific details
+  const renderBillDetails = () => (
+    <>
+      {record.hospital && (
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Hospital/Clinic</Text>
+          <Text style={styles.detailValue}>{record.hospital}</Text>
+        </View>
+      )}
+      {record.billFor && (
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Bill For</Text>
+          <Text style={styles.detailValue}>{record.billFor}</Text>
+        </View>
+      )}
+      {record.billAmount && (
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Bill Amount</Text>
+          <Text style={styles.detailValue}>₵{record.billAmount}</Text>
+        </View>
+      )}
+      {record.totalPaid !== undefined && (
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Amount Paid</Text>
+          <Text style={styles.detailValue}>₵{record.totalPaid}</Text>
+        </View>
+      )}
+      {record.paymentStatus && (
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Payment Status</Text>
+          <View style={styles.statusBadge}>
+            <Text style={[styles.statusText, { color: getPaymentStatusColor(record.paymentStatus) }]}>
+              {getPaymentStatusText(record.paymentStatus)}
+            </Text>
+          </View>
+        </View>
+      )}
+    </>
+  );
+
+  // Prescription specific details
+  const renderPrescriptionDetails = () => (
+    <>
+      {record.description && (
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Description</Text>
+          <Text style={styles.detailValue}>{record.description}</Text>
+        </View>
+      )}
+      {record.doctor && (
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Doctor</Text>
+          <Text style={styles.detailValue}>Dr. {record.doctor}</Text>
+        </View>
+      )}
+    </>
+  );
+
+  // Diagnosis specific details
+  const renderDiagnosisDetails = () => (
+    <>
+      {record.description && (
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Description</Text>
+          <Text style={styles.detailValue}>{record.description}</Text>
+        </View>
+      )}
+      {record.doctor && (
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Doctor</Text>
+          <Text style={styles.detailValue}>Dr. {record.doctor}</Text>
+        </View>
+      )}
+    </>
+  );
+
+  // Helper functions for payment status
+  const getPaymentStatusText = (status) => {
+    switch (status) {
+      case 'paid': return 'Fully Paid';
+      case 'partial': return 'Partially Paid';
+      case 'pending': 
+      default: return 'Pending Payment';
+    }
+  };
+
+  const getPaymentStatusColor = (status) => {
+    switch (status) {
+      case 'paid': return '#10b981';
+      case 'partial': return '#f59e0b';
+      case 'pending': 
+      default: return '#ef4444';
+    }
   };
 
   if (loading) {
@@ -233,41 +529,19 @@ const RecordDetailScreen = ({ route, navigation }) => {
             color={getRecordTypeColor(record.type)} 
           />
         </View>
-        <Text style={styles.title}>{record.title}</Text>
+        <View style={[styles.typeBadge, { backgroundColor: getRecordTypeColor(record.type) }]}>
+          <Text style={styles.typeBadgeText}>{getRecordTypeDisplayName(record.type)}</Text>
+        </View>
+        <Text style={styles.title}>{record.title || getRecordTypeDisplayName(record.type)}</Text>
         <Text style={styles.familyMember}>{record.familyMemberName}</Text>
         <Text style={styles.date}>{formatDate(record.createdAt)}</Text>
       </View>
 
-      {/* Details */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Details</Text>
-        <View style={styles.detailsContainer}>
-          {record.description && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Description</Text>
-              <Text style={styles.detailValue}>{record.description}</Text>
-            </View>
-          )}
-          {record.doctor && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Doctor</Text>
-              <Text style={styles.detailValue}>Dr. {record.doctor}</Text>
-            </View>
-          )}
-          {record.date && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Date</Text>
-              <Text style={styles.detailValue}>{record.date}</Text>
-            </View>
-          )}
-          {record.notes && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Notes</Text>
-              <Text style={styles.detailValue}>{record.notes}</Text>
-            </View>
-          )}
-        </View>
-      </View>
+      {/* ID Card View for Insurance and Hospital Cards */}
+      {renderIDCard()}
+
+      {/* Comprehensive Record Details */}
+      {renderRecordDetails()}
 
       {/* Attachments */}
       {record.attachments && record.attachments.length > 0 && (
@@ -292,11 +566,20 @@ const RecordDetailScreen = ({ route, navigation }) => {
         </View>
       )}
 
+      {/* ID Card Section - Insurance and Hospital Cards */}
+      {renderIDCard()}
+
+      {/* Record Details Section */}
+      {renderRecordDetails()}
+
       {/* Actions */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Actions</Text>
         <View style={styles.actionsContainer}>
-          <TouchableOpacity style={styles.actionButton}>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('EditRecord', { recordId: record.id })}
+          >
             <Ionicons name="create-outline" size={20} color="#6366f1" />
             <Text style={styles.actionButtonText}>Edit Record</Text>
           </TouchableOpacity>
@@ -464,6 +747,217 @@ const styles = StyleSheet.create({
   },
   deleteButtonText: {
     color: '#ef4444',
+  },
+  idCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  cardContainer: {
+    padding: 16,
+  },
+  cardHeader: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+    paddingBottom: 12,
+    marginBottom: 12,
+  },
+  cardCountry: {
+    fontSize: 14,
+    color: '#4b5563',
+    marginBottom: 4,
+  },
+  cardOrganization: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  cardType: {
+    fontSize: 14,
+    color: '#6b7280',
+    textTransform: 'uppercase',
+  },
+  cardBody: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  memberInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  photoContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e5e7eb',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  memberDetails: {
+    flex: 1,
+  },
+  memberName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  membershipNumber: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 4,
+  },
+  cardDate: {
+    fontSize: 12,
+    color: '#9ca3af',
+  },
+  barcodeContainer: {
+    alignItems: 'flex-end',
+  },
+  barcode: {
+    fontSize: 18,
+    color: '#1f2937',
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  barcodeNumber: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  statusBadge: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    alignSelf: 'flex-start',
+  },
+  statusText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  // ID Card styles
+  idCard: {
+    marginHorizontal: 20,
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+  },
+  cardContainer: {
+    backgroundColor: '#ffffff',
+    minHeight: 200,
+  },
+  cardHeader: {
+    backgroundColor: '#f8fafc',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  cardCountry: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  cardOrganization: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  cardType: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  cardLocation: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  cardBody: {
+    padding: 20,
+  },
+  memberInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  photoContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+  },
+  memberDetails: {
+    flex: 1,
+  },
+  memberName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  membershipNumber: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6366f1',
+    marginBottom: 2,
+  },
+  cardDate: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  barcodeContainer: {
+    alignItems: 'center',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+  },
+  barcode: {
+    fontSize: 16,
+    fontFamily: 'monospace',
+    color: '#1f2937',
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  typeBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 8,
+  },
+  typeBadgeText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
   },
 });
 

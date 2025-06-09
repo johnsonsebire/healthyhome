@@ -18,6 +18,7 @@ import offlineStorageService from '../services/offlineStorage';
 import networkService from '../services/networkService';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
+import { getRecordTypeDisplayName, getRecordTypeColor } from '../utils/recordTypes';
 
 const RECORD_TYPES = [
   { id: 'all', name: 'All Records', icon: 'documents' },
@@ -189,25 +190,14 @@ const RecordsScreen = ({ navigation }) => {
     return recordType ? recordType.icon : 'document';
   };
 
-  const getRecordColor = (type) => {
-    const colors = {
-      prescription: '#10b981',
-      diagnosis: '#f59e0b',
-      hospital_card: '#6366f1',
-      bill: '#ef4444',
-      insurance: '#8b5cf6'
-    };
-    return colors[type] || '#6b7280';
-  };
-
   const RecordItem = ({ item }) => (
     <TouchableOpacity
       style={styles.recordItem}
       onPress={() => navigation.navigate('RecordDetail', { recordId: item.id })}
     >
       <View style={styles.recordHeader}>
-        <View style={[styles.recordIcon, { backgroundColor: getRecordColor(item.type) + '20' }]}>
-          <Ionicons name={getRecordIcon(item.type)} size={24} color={getRecordColor(item.type)} />
+        <View style={[styles.recordIcon, { backgroundColor: getRecordTypeColor(item.type) + '20' }]}>
+          <Ionicons name={getRecordIcon(item.type)} size={24} color={getRecordTypeColor(item.type)} />
         </View>
         <View style={styles.recordInfo}>
           <Text style={styles.recordTitle}>{item.title}</Text>
@@ -215,8 +205,8 @@ const RecordsScreen = ({ navigation }) => {
           <Text style={styles.recordDate}>{formatDate(item.createdAt)}</Text>
         </View>
         <View style={styles.recordMeta}>
-          <Text style={[styles.recordType, { color: getRecordColor(item.type) }]}>
-            {RECORD_TYPES.find(t => t.id === item.type)?.name || item.type}
+          <Text style={[styles.recordType, { color: getRecordTypeColor(item.type) }]}>
+            {getRecordTypeDisplayName(item.type)}
           </Text>
           <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
         </View>
