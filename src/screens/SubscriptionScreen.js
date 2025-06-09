@@ -7,8 +7,10 @@ import {
   TouchableOpacity,
   Alert,
   Modal,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Constants from 'expo-constants';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription, SUBSCRIPTION_PLANS } from '../contexts/SubscriptionContext';
 import { useError, ERROR_TYPES, ERROR_SEVERITY } from '../contexts/ErrorContext';
@@ -32,11 +34,13 @@ const SubscriptionScreen = ({ route, navigation }) => {
       const plan = plans.find(p => p.id === selectedPlanFromOnboarding);
       if (plan) {
         setSelectedPlan(plan);
-        // Automatically show payment modal
-        setShowPaymentModal(true);
+        // Automatically show payment modal after a short delay
+        setTimeout(() => {
+          setShowPaymentModal(true);
+        }, 500);
       }
     }
-  }, [fromOnboarding, selectedPlanFromOnboarding]);
+  }, [fromOnboarding, selectedPlanFromOnboarding, plans]);
 
   const plans = [
     {
@@ -138,27 +142,22 @@ const SubscriptionScreen = ({ route, navigation }) => {
   };
 
   const handlePayment = async () => {
-    if (!selectedPlan) return;
+    if (!selectedPlan) {
+      Alert.alert('Error', 'No plan selected. Please select a plan first.');
+      return;
+    }
     
-    const result = await withErrorHandling(
-      async () => {
-        // In a real app, you would integrate with Stripe or another payment processor
-        // For now, we'll simulate a successful payment
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Upgrade to the selected plan
-        await upgradePlan(selectedPlan.id);
-        
-        return { success: true };
-      },
-      {
-        errorType: ERROR_TYPES.SUBSCRIPTION,
-        errorSeverity: ERROR_SEVERITY.HIGH,
-        showLoading: true,
-      }
-    );
-
-    if (result) {
+    setLoading(true);
+    
+    try {
+      // In a real app, you would integrate with Stripe or another payment processor
+      // For now, we'll simulate a successful payment
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Upgrade to the selected plan
+      await upgradePlan(selectedPlan.id);
+      
+      setLoading(false);
       setShowPaymentModal(false);
       
       Alert.alert(
@@ -179,6 +178,10 @@ const SubscriptionScreen = ({ route, navigation }) => {
           }
         ]
       );
+    } catch (error) {
+      setLoading(false);
+      console.error('Payment error:', error);
+      Alert.alert('Error', 'There was an error processing your payment. Please try again later.');
     }
   };
 
@@ -251,13 +254,13 @@ const SubscriptionScreen = ({ route, navigation }) => {
                   style={[
                     styles.selectButton,
                     { backgroundColor: plan.color },
-                    subscription?.plan === plan.id && styles.currentPlanButton,
+                    currentPlan === plan.id && styles.currentPlanButton,
                   ]}
                   onPress={() => handleSelectPlan(plan)}
-                  disabled={subscription?.plan === plan.id}
+                  disabled={currentPlan === plan.id}
                 >
                   <Text style={styles.selectButtonText}>
-                    {subscription?.plan === plan.id ? 'Current' : 'Select'}
+                    {currentPlan === plan.id ? 'Current' : 'Select'}
                   </Text>
                 </TouchableOpacity>
               </View>

@@ -36,7 +36,15 @@ const OnboardingScreen = () => {
       navigation.navigate('Subscription', { fromOnboarding: true, selectedPlan });
     } else {
       // User wants to continue with free plan
-      navigation.replace('Home');
+      // Set the selectedPlan to 'free' if none is selected
+      setSelectedPlan('free');
+      upgradePlan('free').then(() => {
+        navigation.replace('Home');
+      }).catch(error => {
+        console.error('Error upgrading to free plan:', error);
+        // Navigate to home anyway as fallback
+        navigation.replace('Home');
+      });
     }
   };
 
@@ -54,6 +62,11 @@ const OnboardingScreen = () => {
         ]}
         onPress={() => setSelectedPlan(planId)}
       >
+        {isCurrent && (
+          <View style={styles.currentPlanBadge}>
+            <Text style={styles.currentPlanText}>CURRENT</Text>
+          </View>
+        )}
         <View style={styles.planHeader}>
           <Text style={styles.planName}>{plan.name}</Text>
           <Text style={styles.planPrice}>
@@ -101,28 +114,6 @@ const OnboardingScreen = () => {
 
           <View style={styles.featureItem}>
             <Ionicons 
-              name={plan.features.ocr ? "checkmark-circle" : "close-circle"} 
-              size={20} 
-              color={plan.features.ocr ? "#10b981" : "#6b7280"} 
-            />
-            <Text style={styles.featureText}>
-              {plan.features.ocr ? 'OCR document scanning' : 'No OCR scanning'}
-            </Text>
-          </View>
-
-          <View style={styles.featureItem}>
-            <Ionicons 
-              name={plan.features.offlineAccess ? "checkmark-circle" : "close-circle"} 
-              size={20} 
-              color={plan.features.offlineAccess ? "#10b981" : "#6b7280"} 
-            />
-            <Text style={styles.featureText}>
-              {plan.features.offlineAccess ? 'Offline access' : 'No offline access'}
-            </Text>
-          </View>
-
-          <View style={styles.featureItem}>
-            <Ionicons 
               name={plan.features.reports ? "checkmark-circle" : "close-circle"} 
               size={20} 
               color={plan.features.reports ? "#10b981" : "#6b7280"} 
@@ -132,12 +123,6 @@ const OnboardingScreen = () => {
             </Text>
           </View>
         </View>
-
-        {isCurrent && (
-          <View style={styles.currentPlanBadge}>
-            <Text style={styles.currentPlanText}>CURRENT</Text>
-          </View>
-        )}
       </TouchableOpacity>
     );
   };
@@ -268,6 +253,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
+    zIndex: 1,
   },
   currentPlanText: {
     color: 'white',

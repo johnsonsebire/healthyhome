@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Platform } from 'react-native';
+import * as Constants from 'expo-constants';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
 import { useAuth } from './AuthContext';
@@ -82,7 +84,16 @@ export const SubscriptionProvider = ({ children }) => {
 
   useEffect(() => {
     if (user) {
-      fetchSubscriptionData();
+      try {
+        fetchSubscriptionData();
+      } catch (error) {
+        console.error('Error in subscription effect:', error);
+        // Default to free plan as fallback
+        setCurrentPlan('free');
+      }
+    } else {
+      // No user, default to free
+      setCurrentPlan('free');
     }
   }, [user]);
 
@@ -135,6 +146,18 @@ export const SubscriptionProvider = ({ children }) => {
 
   const upgradePlan = async (newPlan) => {
     try {
+      // Check if running in Expo Go or if we don't have Firebase available
+      const isExpoGo = 
+        (Platform && !Platform.constants.isDevice) || 
+        (Constants && Constants.appOwnership === 'expo');
+        
+      if (isExpoGo) {
+        console.log('Running in Expo Go, simulating plan upgrade');
+        setCurrentPlan(newPlan);
+        return { success: true };
+      }
+      
+      // Normal flow for production app
       await updateDoc(doc(db, 'users', user.uid), {
         subscriptionPlan: newPlan,
         subscriptionStatus: 'active',
