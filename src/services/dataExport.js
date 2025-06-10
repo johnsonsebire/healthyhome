@@ -142,23 +142,47 @@ class DataExportService {
       // Generate HTML for the PDF report
       const html = this.generateHealthReportHTML(userData);
       
-      // Generate PDF from HTML
-      const { uri } = await Print.printToFileAsync({ html });
-      
-      // Move the file to app's document directory with a better filename
-      const fileName = `health_report_${this.getDateString()}.pdf`;
-      const fileUri = `${FileSystem.documentDirectory}${fileName}`;
-      
-      await FileSystem.moveAsync({
-        from: uri,
-        to: fileUri
+      // Generate PDF from HTML with proper options to ensure PDF creation
+      const { uri } = await Print.printToFileAsync({
+        html,
+        width: 612, // Standard US Letter width in points (8.5 inches)
+        height: 792, // Standard US Letter height in points (11 inches)
+        base64: false
       });
       
-      return {
-        success: true,
-        fileUri,
-        fileName
-      };
+      // Ensure the file extension is correct (.pdf)
+      if (!uri.toLowerCase().endsWith('.pdf')) {
+        // Move the file to app's document directory with correct filename and extension
+        const fileName = `health_report_${this.getDateString()}.pdf`;
+        const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+        
+        await FileSystem.moveAsync({
+          from: uri,
+          to: fileUri
+        });
+        
+        // Verify the file exists and is accessible
+        const fileInfo = await FileSystem.getInfoAsync(fileUri);
+        if (!fileInfo.exists) {
+          throw new Error('Failed to save PDF file.');
+        }
+        
+        return {
+          success: true,
+          fileUri,
+          fileName
+        };
+      } else {
+        // File already has .pdf extension, just use it
+        const pathParts = uri.split('/');
+        const fileName = pathParts[pathParts.length - 1];
+        
+        return {
+          success: true,
+          fileUri: uri,
+          fileName
+        };
+      }
     } catch (error) {
       console.error('Error creating health report:', error);
       return {
@@ -171,6 +195,19 @@ class DataExportService {
   // Share exported file
   async shareFile(fileUri, message = 'Sharing medical data') {
     try {
+      console.log('Attempting to share file:', fileUri);
+      
+      // Verify the file exists before attempting to share
+      const fileInfo = await FileSystem.getInfoAsync(fileUri);
+      
+      if (!fileInfo.exists) {
+        console.error('File does not exist:', fileUri);
+        Alert.alert('Error', 'The file does not exist or cannot be accessed');
+        return false;
+      }
+      
+      console.log('File info before sharing:', fileInfo);
+      
       const isAvailable = await Sharing.isAvailableAsync();
       
       if (!isAvailable) {
@@ -178,15 +215,34 @@ class DataExportService {
         return false;
       }
 
+      // Get the correct MIME type based on file extension
+      const mimeType = this.getMimeType(fileUri);
+      console.log('Using MIME type for sharing:', mimeType);
+      
+      // For PDF files, ensure they have the correct extension
+      if (mimeType === 'application/pdf' && !fileUri.toLowerCase().endsWith('.pdf')) {
+        console.log('File has PDF mime type but incorrect extension, creating a new file with .pdf extension');
+        const newFileUri = fileUri + '.pdf';
+        
+        await FileSystem.copyAsync({
+          from: fileUri,
+          to: newFileUri
+        });
+        
+        fileUri = newFileUri;
+        console.log('Using new file URI with correct extension:', fileUri);
+      }
+
       await Sharing.shareAsync(fileUri, {
-        mimeType: this.getMimeType(fileUri),
+        mimeType: mimeType,
         dialogTitle: message,
+        UTI: mimeType === 'application/pdf' ? 'com.adobe.pdf' : undefined // For iOS
       });
 
       return true;
     } catch (error) {
       console.error('Error sharing file:', error);
-      Alert.alert('Error', 'Failed to share file');
+      Alert.alert('Error', 'Failed to share file: ' + error.message);
       return false;
     }
   }
@@ -215,14 +271,41 @@ class DataExportService {
   }
 
   getMimeType(fileUri) {
-    const extension = fileUri.split('.').pop().toLowerCase();
+    // Extract the extension from the file URI
+    let extension = fileUri.split('.').pop().toLowerCase();
+    
+    // If the URI doesn't end with an extension or has a query string
+    if (extension.includes('?')) {
+      extension = extension.split('?')[0];
+    }
+    
+    // If still no extension, try to infer from context or default to PDF for health reports
+    if (!extension || extension === fileUri.toLowerCase()) {
+      if (fileUri.includes('health_report')) {
+        console.log('No extension found but appears to be a health report, defaulting to PDF');
+        extension = 'pdf';
+      } else {
+        console.log('No extension found, examining file content might be needed');
+      }
+    }
+    
+    console.log('Detected file extension:', extension);
+    
     const mimeTypes = {
       'csv': 'text/csv',
       'json': 'application/json',
       'pdf': 'application/pdf',
-      'txt': 'text/plain'
+      'txt': 'text/plain',
+      'html': 'text/html',
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png'
     };
-    return mimeTypes[extension] || 'text/plain';
+    
+    const mimeType = mimeTypes[extension] || 'application/octet-stream';
+    console.log('Using MIME type:', mimeType);
+    
+    return mimeType;
   }
 
   groupRecordsByType(records) {

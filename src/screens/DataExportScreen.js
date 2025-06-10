@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useError, ERROR_TYPES, ERROR_SEVERITY } from '../contexts/ErrorContext';
 import dataExportService from '../services/dataExport';
+import * as FileSystem from 'expo-file-system';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
 
@@ -264,6 +265,8 @@ const DataExportScreen = ({ navigation }) => {
     
     const result = await withErrorHandling(
       async () => {
+        console.log('Starting health report export process...');
+        
         // Build user data object for report
         const userData = {
           userProfile: {},
@@ -277,6 +280,9 @@ const DataExportScreen = ({ navigation }) => {
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         if (userDoc.exists()) {
           userData.userProfile = userDoc.data();
+          console.log('User profile data retrieved');
+        } else {
+          console.warn('User profile not found');
         }
         
         // Get family members
@@ -290,6 +296,7 @@ const DataExportScreen = ({ navigation }) => {
             id: doc.id,
             ...doc.data()
           }));
+          console.log(`Retrieved ${userData.familyMembers.length} family members`);
         }
         
         // Get medical records
@@ -303,6 +310,7 @@ const DataExportScreen = ({ navigation }) => {
             id: doc.id,
             ...doc.data()
           }));
+          console.log(`Retrieved ${userData.medicalRecords.length} medical records`);
         }
         
         // Get appointments
@@ -316,6 +324,7 @@ const DataExportScreen = ({ navigation }) => {
             id: doc.id,
             ...doc.data()
           }));
+          console.log(`Retrieved ${userData.appointments.length} appointments`);
         }
         
         // Get insurance info
@@ -330,11 +339,15 @@ const DataExportScreen = ({ navigation }) => {
               ...insuranceSnapshot.docs[0].data(),
               id: insuranceSnapshot.docs[0].id
             };
+            console.log('Insurance information retrieved');
+          } else {
+            console.log('No insurance information found');
           }
         }
         
         // Apply anonymization if needed
         if (exportOptions.anonymizeData) {
+          console.log('Applying anonymization to data');
           // Anonymize user data
           delete userData.userProfile.email;
           delete userData.userProfile.phone;
@@ -348,7 +361,31 @@ const DataExportScreen = ({ navigation }) => {
           // Anonymize other data as needed
         }
         
-        return await dataExportService.createHealthReport(userData);
+        console.log('Calling dataExportService.createHealthReport...');
+        const reportResult = await dataExportService.createHealthReport(userData);
+        
+        if (reportResult.success) {
+          console.log(`PDF report successfully created: ${reportResult.fileName}`);
+          
+          // Verify the file exists
+          const fileInfo = await FileSystem.getInfoAsync(reportResult.fileUri);
+          console.log('File info:', fileInfo);
+          
+          if (!fileInfo.exists) {
+            console.error('Generated file does not exist at path:', reportResult.fileUri);
+            throw new Error('Generated file not found');
+          }
+          
+          // Check file size to make sure it's a valid PDF
+          if (fileInfo.size < 100) { // If file is too small, it might not be a valid PDF
+            console.error('Generated file is too small:', fileInfo.size, 'bytes');
+            throw new Error('Generated file is invalid');
+          }
+        } else {
+          console.error('Failed to create health report:', reportResult.error);
+        }
+        
+        return reportResult;
       },
       {
         errorType: ERROR_TYPES.STORAGE,
@@ -362,11 +399,24 @@ const DataExportScreen = ({ navigation }) => {
     if (result.success && result.data.success) {
       Alert.alert(
         'Report Generated',
-        'Your health report has been created',
+        'Your health report has been created successfully',
         [
-          { text: 'Share', onPress: () => dataExportService.shareFile(result.data.fileUri) },
+          { 
+            text: 'Share', 
+            onPress: () => {
+              console.log('Sharing file:', result.data.fileUri);
+              dataExportService.shareFile(result.data.fileUri);
+            } 
+          },
           { text: 'OK' }
         ]
+      );
+    } else {
+      // Show error alert if generation failed
+      Alert.alert(
+        'Error',
+        result.data?.error || 'Failed to generate health report',
+        [{ text: 'OK' }]
       );
     }
   };
