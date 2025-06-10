@@ -84,12 +84,16 @@ const RegisterScreen = ({ navigation }) => {
   return (
     <KeyboardAvoidingView 
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : null}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
     >
       {/* Loading Overlay */}
       {isLoading && <LoadingSpinner />}
       
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.header}>
           <Ionicons name="person-add" size={60} color="#6366f1" />
           <Text style={styles.title}>Create Account</Text>
@@ -103,6 +107,7 @@ const RegisterScreen = ({ navigation }) => {
               <TextInput
                 style={[styles.input, hasFieldError('firstName', validationErrors) && styles.inputError]}
                 placeholder="First Name"
+                placeholderTextColor="#9ca3af"
                 value={formData.firstName}
                 onChangeText={(value) => updateFormData('firstName', value)}
                 autoCapitalize="words"
@@ -113,6 +118,7 @@ const RegisterScreen = ({ navigation }) => {
               <TextInput
                 style={[styles.input, hasFieldError('lastName', validationErrors) && styles.inputError]}
                 placeholder="Last Name"
+                placeholderTextColor="#9ca3af"
                 value={formData.lastName}
                 onChangeText={(value) => updateFormData('lastName', value)}
                 autoCapitalize="words"
@@ -131,6 +137,7 @@ const RegisterScreen = ({ navigation }) => {
             <TextInput
               style={[styles.input, hasFieldError('email', validationErrors) && styles.inputError]}
               placeholder="Email"
+              placeholderTextColor="#9ca3af"
               value={formData.email}
               onChangeText={(value) => updateFormData('email', value)}
               keyboardType="email-address"
@@ -147,6 +154,7 @@ const RegisterScreen = ({ navigation }) => {
             <TextInput
               style={[styles.input, hasFieldError('password', validationErrors) && styles.inputError]}
               placeholder="Password"
+              placeholderTextColor="#9ca3af"
               value={formData.password}
               onChangeText={(value) => updateFormData('password', value)}
               secureTextEntry={!showPassword}
@@ -172,6 +180,7 @@ const RegisterScreen = ({ navigation }) => {
             <TextInput
               style={[styles.input, hasFieldError('confirmPassword', validationErrors) && styles.inputError]}
               placeholder="Confirm Password"
+              placeholderTextColor="#9ca3af"
               value={formData.confirmPassword}
               onChangeText={(value) => updateFormData('confirmPassword', value)}
               secureTextEntry={!showConfirmPassword}
@@ -266,6 +275,9 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     fontSize: 16,
     color: '#1f2937',
+  },
+  inputPlaceholder: {
+    color: '#9ca3af',
   },
   inputError: {
     borderColor: '#ef4444',

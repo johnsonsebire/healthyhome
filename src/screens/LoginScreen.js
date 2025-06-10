@@ -32,6 +32,14 @@ const LoginScreen = ({ navigation }) => {
   const handleLogin = async () => {
     console.log('🔐 Login attempt started', { email: email || 'empty', password: password ? 'provided' : 'empty' });
     
+    // Prevent multiple submission attempts
+    if (loading || isLoading) {
+      return;
+    }
+    
+    // Set local loading state
+    setLoading(true);
+    
     // Validate form data
     const validationRules = {
       email: [
@@ -56,6 +64,7 @@ const LoginScreen = ({ navigation }) => {
       // Show first validation error in alert
       const firstError = Object.values(validation.errors)[0];
       Alert.alert('Validation Error', firstError);
+      setLoading(false);
       return;
     }
     
@@ -77,6 +86,8 @@ const LoginScreen = ({ navigation }) => {
     );
 
     console.log('🔄 Login process result:', result);
+    // Reset loading state in case navigation hasn't happened yet
+    setLoading(false);
     // Navigation will be handled by AuthContext on successful login
   };
 
@@ -117,12 +128,16 @@ const LoginScreen = ({ navigation }) => {
   return (
     <KeyboardAvoidingView 
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : null}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
     >
       {/* Loading Overlay */}
       {isLoading && <LoadingSpinner />}
       
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.header}>
           <Ionicons name="medical" size={80} color="#6366f1" />
           <Text style={styles.title}>Family Medical Records</Text>
@@ -135,6 +150,7 @@ const LoginScreen = ({ navigation }) => {
             <TextInput
               style={[styles.input, hasFieldError('email', validationErrors) && styles.inputError]}
               placeholder="Email"
+              placeholderTextColor="#9ca3af"
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
@@ -151,6 +167,7 @@ const LoginScreen = ({ navigation }) => {
             <TextInput
               style={[styles.input, hasFieldError('password', validationErrors) && styles.inputError]}
               placeholder="Password"
+              placeholderTextColor="#9ca3af"
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
@@ -178,6 +195,7 @@ const LoginScreen = ({ navigation }) => {
               handleLogin();
             }}
             disabled={loading || isLoading}
+            activeOpacity={0.8}
           >
             <Text style={styles.loginButtonText}>
               {(loading || isLoading) ? 'Signing In...' : 'Sign In'}
@@ -258,6 +276,9 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     fontSize: 16,
     color: '#1f2937',
+  },
+  inputPlaceholder: {
+    color: '#9ca3af',
   },
   inputError: {
     borderColor: '#ef4444',
