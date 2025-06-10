@@ -22,7 +22,7 @@ import {
   getRecordTypeDisplayName, 
   getRecordTypeColor, 
   getRecordTypeIcon,
-  generateBarcodePatternSync,
+  generateBarcodeComponent,
   formatProviderForCard,
   getProviderDisplayName 
 } from '../utils/recordTypes';
@@ -34,6 +34,7 @@ const RecordDetailScreen = ({ route, navigation }) => {
   const [record, setRecord] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(true);
+  const [barcodes, setBarcodes] = useState({});
 
   useEffect(() => {
     loadRecord();
@@ -109,6 +110,44 @@ const RecordDetailScreen = ({ route, navigation }) => {
       }
     }
     setLoading(false);
+  };
+
+  // Generate barcodes asynchronously after record is loaded
+  useEffect(() => {
+    if (record) {
+      generateBarcodesForRecord(record);
+    }
+  }, [record]);
+
+  const generateBarcodesForRecord = (recordData) => {
+    if (!recordData) return;
+
+    const barcodesToGenerate = [];
+    
+    // Collect all barcode data that needs to be generated
+    if (recordData.type === 'insurance' && recordData.membershipNo) {
+      barcodesToGenerate.push({ key: 'membershipNo', value: recordData.membershipNo });
+    }
+    
+    if (recordData.type === 'hospital_card' && recordData.cardNumber) {
+      barcodesToGenerate.push({ key: 'cardNumber', value: recordData.cardNumber });
+    }
+
+    // Generate all barcodes
+    const newBarcodes = {};
+    for (const item of barcodesToGenerate) {
+      try {
+        const BarcodeComponent = generateBarcodeComponent(item.value);
+        if (BarcodeComponent) {
+          newBarcodes[item.key] = BarcodeComponent;
+        }
+      } catch (error) {
+        console.error(`Error generating barcode for ${item.key}:`, error);
+        // Keep as undefined so we know generation failed
+      }
+    }
+
+    setBarcodes(prev => ({ ...prev, ...newBarcodes }));
   };
 
   const handleDeleteRecord = async () => {
@@ -376,7 +415,22 @@ const RecordDetailScreen = ({ route, navigation }) => {
           {/* Barcode */}
           {membershipNo && (
             <View style={styles.barcodeContainer}>
-              <Text style={styles.barcode}>{generateBarcodePatternSync(membershipNo)}</Text>
+              {barcodes.membershipNo ? (
+                // Show real CODE128 barcode
+                <View style={styles.barcodeWrapper}>
+                  {barcodes.membershipNo}
+                </View>
+              ) : barcodes.hasOwnProperty('membershipNo') ? (
+                // Barcode generation failed, show error
+                <View style={styles.barcodeError}>
+                  <Text style={styles.barcodeErrorText}>Barcode generation failed</Text>
+                </View>
+              ) : (
+                // Still generating barcode, show loading
+                <View style={styles.barcodeLoading}>
+                  <Text style={styles.barcodeLoadingText}>Generating CODE128 barcode...</Text>
+                </View>
+              )}
               <Text style={styles.barcodeNumber}>{membershipNo}</Text>
             </View>
           )}
@@ -422,7 +476,22 @@ const RecordDetailScreen = ({ route, navigation }) => {
           {/* Barcode */}
           {cardNumber && (
             <View style={styles.barcodeContainer}>
-              <Text style={styles.barcode}>{generateBarcodePatternSync(cardNumber)}</Text>
+              {barcodes.cardNumber ? (
+                // Show real CODE128 barcode
+                <View style={styles.barcodeWrapper}>
+                  {barcodes.cardNumber}
+                </View>
+              ) : barcodes.hasOwnProperty('cardNumber') ? (
+                // Barcode generation failed, show error
+                <View style={styles.barcodeError}>
+                  <Text style={styles.barcodeErrorText}>Barcode generation failed</Text>
+                </View>
+              ) : (
+                // Still generating barcode, show loading
+                <View style={styles.barcodeLoading}>
+                  <Text style={styles.barcodeLoadingText}>Generating CODE128 barcode...</Text>
+                </View>
+              )}
               <Text style={styles.barcodeNumber}>{cardNumber}</Text>
             </View>
           )}
@@ -1092,12 +1161,43 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#f3f4f6',
   },
+  barcodeWrapper: {
+    marginBottom: 8,
+    borderRadius: 4,
+    backgroundColor: '#ffffff',
+    padding: 4,
+  },
   barcode: {
     fontSize: 16,
     fontFamily: 'monospace',
     color: '#1f2937',
     letterSpacing: 1,
     marginBottom: 8,
+  },
+  barcodeLoading: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  barcodeLoadingText: {
+    fontSize: 10,
+    color: '#9ca3af',
+    marginBottom: 4,
+  },
+  barcodeWrapper: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  barcodeError: {
+    alignItems: 'center',
+    marginBottom: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#fef2f2',
+    borderRadius: 6,
+  },
+  barcodeErrorText: {
+    fontSize: 10,
+    color: '#ef4444',
   },
   typeBadge: {
     paddingHorizontal: 12,

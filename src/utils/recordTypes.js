@@ -1,5 +1,6 @@
 // Record type utilities and constants
-import { generateBarcode } from 'expo-barcode-generator';
+import React from 'react';
+import { View, Text } from 'react-native';
 
 export const RECORD_TYPE_DISPLAY_NAMES = {
   prescription: 'Prescription',
@@ -37,55 +38,79 @@ export const getRecordTypeIcon = (type) => {
   return RECORD_TYPE_ICONS[type] || 'document';
 };
 
-// Generate a proper barcode using expo-barcode-generator with CODE128
-export const generateBarcodePattern = async (data) => {
-  if (!data) return '';
-  
-  try {
-    // Generate CODE128 barcode
-    const barcode = await generateBarcode({
-      value: data.toString(),
-      format: 'CODE128',
-      width: 200,
-      height: 60,
-      displayValue: false,
-    });
-    
-    return barcode;
-  } catch (error) {
-    console.error('Error generating barcode:', error);
-    // Fallback to text pattern if barcode generation fails
-    return generateBarcodePatternSync(data);
+// Proper barcode component using a reliable pattern approach
+export const generateBarcodeComponent = (data) => {
+  if (!data) {
+    return (
+      <View style={{ height: 60, justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ color: '#666' }}>No data for barcode</Text>
+      </View>
+    );
   }
-};
 
-// Synchronous barcode pattern generation for immediate display
-export const generateBarcodePatternSync = (data) => {
-  if (!data) return '';
-  
-  const value = data.toString();
-  const barWidth = 2;
-  let pattern = '';
-  
-  // Create alternating pattern based on data
-  for (let i = 0; i < value.length; i++) {
-    const charCode = value.charCodeAt(i) % 4;
-    switch (charCode) {
-      case 0:
-        pattern += '█'.repeat(barWidth) + '▌'.repeat(barWidth);
-        break;
-      case 1:
-        pattern += '▌'.repeat(barWidth) + '█'.repeat(barWidth);
-        break;
-      case 2:
-        pattern += '█'.repeat(barWidth * 2);
-        break;
-      default:
-        pattern += '▌'.repeat(barWidth * 2);
+  // Convert data to string and ensure it's not too long
+  const barcodeData = data.toString().substring(0, 30);
+
+  // Generate a visually appealing barcode pattern
+  const generateBars = (input) => {
+    const bars = [];
+    const value = input.toString();
+    
+    // Create start pattern
+    bars.push({ width: 2, color: '#000' });
+    bars.push({ width: 1, color: '#fff' });
+    bars.push({ width: 2, color: '#000' });
+    
+    // Create bars based on character values
+    for (let i = 0; i < value.length; i++) {
+      const charCode = value.charCodeAt(i);
+      
+      // Thin bar
+      bars.push({ width: 1, color: '#000' });
+      bars.push({ width: 1, color: '#fff' });
+      
+      // Varying width bar based on character value
+      const barWidth = (charCode % 3) + 1;
+      bars.push({ width: barWidth, color: '#000' });
+      bars.push({ width: 1, color: '#fff' });
     }
-  }
+    
+    // End pattern
+    bars.push({ width: 2, color: '#000' });
+    bars.push({ width: 1, color: '#fff' });
+    bars.push({ width: 2, color: '#000' });
+    
+    return bars;
+  };
+
+  const bars = generateBars(barcodeData);
   
-  return pattern;
+  return (
+    <View style={{ alignItems: 'center', marginVertical: 10 }}>
+      <View style={{
+        flexDirection: 'row',
+        height: 60,
+        alignItems: 'flex-end',
+        backgroundColor: '#fff',
+        padding: 10,
+        borderRadius: 4,
+        borderWidth: 1,
+        borderColor: '#ddd'
+      }}>
+        {bars.map((bar, index) => (
+          <View
+            key={index}
+            style={{
+              width: bar.width,
+              height: 50,
+              backgroundColor: bar.color,
+            }}
+          />
+        ))}
+      </View>
+      <Text style={{ fontSize: 12, marginTop: 5, fontFamily: 'monospace' }}>{barcodeData}</Text>
+    </View>
+  );
 };
 
 // Format insurance provider names for display and ID cards

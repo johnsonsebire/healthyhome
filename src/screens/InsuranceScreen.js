@@ -240,8 +240,9 @@ const InsuranceScreen = ({ navigation }) => {
 
         {/* Tips Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Insurance Tips</Text>            <View style={styles.tipsSpacing}>
-              <View style={styles.tipsContainer}>
+          <Text style={styles.sectionTitle}>Insurance Tips</Text>
+          <View style={styles.tipsSpacing}>
+            <View style={styles.tipsContainer}>
               <View style={styles.tipItem}>
                 <Ionicons name="bulb" size={20} color="#f59e0b" />
                 <Text style={styles.tipText}>
