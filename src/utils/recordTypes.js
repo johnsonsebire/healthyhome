@@ -38,12 +38,21 @@ export const getRecordTypeIcon = (type) => {
   return RECORD_TYPE_ICONS[type] || 'document';
 };
 
-// Proper barcode component using a reliable pattern approach
+// Generate barcode component - improved appearance for better UI integration
 export const generateBarcodeComponent = (data) => {
   if (!data) {
     return (
-      <View style={{ height: 60, justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ color: '#666' }}>No data for barcode</Text>
+      <View style={{ 
+        width: '100%',
+        height: 60, 
+        justifyContent: 'center', 
+        alignItems: 'center',
+        backgroundColor: '#f9fafb',
+        borderRadius: 4,
+        borderWidth: 1,
+        borderColor: '#e5e7eb'
+      }}>
+        <Text style={{ color: '#6b7280', fontSize: 14 }}>No data for barcode</Text>
       </View>
     );
   }
@@ -51,34 +60,36 @@ export const generateBarcodeComponent = (data) => {
   // Convert data to string and ensure it's not too long
   const barcodeData = data.toString().substring(0, 30);
 
-  // Generate a visually appealing barcode pattern
+  // Generate a visually appealing barcode pattern with better spacing
   const generateBars = (input) => {
     const bars = [];
     const value = input.toString();
     
-    // Create start pattern
-    bars.push({ width: 2, color: '#000' });
-    bars.push({ width: 1, color: '#fff' });
-    bars.push({ width: 2, color: '#000' });
+    // Create start pattern - wider for better visibility
+    bars.push({ width: 3, color: '#000' });
+    bars.push({ width: 2, color: '#fff' });
+    bars.push({ width: 3, color: '#000' });
+    bars.push({ width: 2, color: '#fff' });
     
-    // Create bars based on character values
+    // Create bars based on character values - with increased spacing
     for (let i = 0; i < value.length; i++) {
       const charCode = value.charCodeAt(i);
       
-      // Thin bar
-      bars.push({ width: 1, color: '#000' });
-      bars.push({ width: 1, color: '#fff' });
-      
-      // Varying width bar based on character value
-      const barWidth = (charCode % 3) + 1;
+      // Variable width bars based on character value
+      const barWidth = 2 + (charCode % 4); // Width between 2-5 pixels
       bars.push({ width: barWidth, color: '#000' });
-      bars.push({ width: 1, color: '#fff' });
+      bars.push({ width: 2, color: '#fff' }); // Wider spacing between bars
+      
+      // Add second bar with different width for visual variety
+      const secondBarWidth = 1 + (charCode % 3); // Width between 1-3 pixels
+      bars.push({ width: secondBarWidth, color: '#000' });
+      bars.push({ width: 3, color: '#fff' }); // Even wider spacing
     }
     
-    // End pattern
-    bars.push({ width: 2, color: '#000' });
-    bars.push({ width: 1, color: '#fff' });
-    bars.push({ width: 2, color: '#000' });
+    // End pattern - wider for better visibility
+    bars.push({ width: 3, color: '#000' });
+    bars.push({ width: 2, color: '#fff' });
+    bars.push({ width: 3, color: '#000' });
     
     return bars;
   };
@@ -86,29 +97,71 @@ export const generateBarcodeComponent = (data) => {
   const bars = generateBars(barcodeData);
   
   return (
-    <View style={{ alignItems: 'center', marginVertical: 10 }}>
+    <View style={{ 
+      width: '100%',
+      backgroundColor: '#ffffff',
+      borderRadius: 6,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: '#e5e7eb'
+    }}>
       <View style={{
-        flexDirection: 'row',
-        height: 60,
-        alignItems: 'flex-end',
-        backgroundColor: '#fff',
-        padding: 10,
-        borderRadius: 4,
-        borderWidth: 1,
-        borderColor: '#ddd'
+        width: '100%',
+        alignItems: 'center',
+        backgroundColor: '#f8fafc',
+        paddingVertical: 12,
+        paddingHorizontal: 16
       }}>
-        {bars.map((bar, index) => (
-          <View
-            key={index}
-            style={{
-              width: bar.width,
-              height: 50,
-              backgroundColor: bar.color,
-            }}
-          />
-        ))}
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: '#ffffff',
+          width: '100%',
+          paddingVertical: 16,
+          paddingHorizontal: 24,
+          borderRadius: 4,
+          borderWidth: 1,
+          borderColor: '#f3f4f6',
+          minHeight: 80
+        }}>
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            width: '100%'
+          }}>
+            <View style={{ flex: 1 }} />
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '80%' // Make the barcode take up 80% of available width
+            }}>
+              {bars.map((bar, index) => (
+                <View
+                  key={index}
+                  style={{
+                    width: bar.width,
+                    height: 60,
+                    backgroundColor: bar.color,
+                    marginHorizontal: 0.5, // Add small horizontal spacing between bars
+                  }}
+                />
+              ))}
+            </View>
+            <View style={{ flex: 1 }} />
+          </View>
+        </View>
+        <Text style={{ 
+          fontSize: 12, 
+          marginTop: 8,
+          fontFamily: 'monospace',
+          color: '#4b5563',
+          letterSpacing: 0.5,
+          textAlign: 'center'
+        }}>{barcodeData}</Text>
       </View>
-      <Text style={{ fontSize: 12, marginTop: 5, fontFamily: 'monospace' }}>{barcodeData}</Text>
     </View>
   );
 };

@@ -409,6 +409,9 @@ const RecordDetailScreen = ({ route, navigation }) => {
               {record.expiryDate && (
                 <Text style={styles.cardDate}>Expires: {record.expiryDate}</Text>
               )}
+            
+            <Text style={styles.barcodeNumber}>Membership No: {membershipNo}</Text>
+
             </View>
           </View>
 
@@ -431,7 +434,6 @@ const RecordDetailScreen = ({ route, navigation }) => {
                   <Text style={styles.barcodeLoadingText}>Generating CODE128 barcode...</Text>
                 </View>
               )}
-              <Text style={styles.barcodeNumber}>{membershipNo}</Text>
             </View>
           )}
         </View>
@@ -1160,12 +1162,11 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: '#f3f4f6',
+    width: '100%',
   },
   barcodeWrapper: {
     marginBottom: 8,
-    borderRadius: 4,
-    backgroundColor: '#ffffff',
-    padding: 4,
+    width: '100%',
   },
   barcode: {
     fontSize: 16,
