@@ -1201,16 +1201,20 @@ const styles = StyleSheet.create({
     color: '#ef4444',
   },
   typeBadge: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingVertical: 6,
     borderRadius: 20,
     marginBottom: 8,
+    minWidth: 120,
+    alignItems: 'center',
   },
   typeBadgeText: {
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '600',
     textTransform: 'uppercase',
+    flexShrink: 1,
+    textAlign: 'center',
   },
 });
 
