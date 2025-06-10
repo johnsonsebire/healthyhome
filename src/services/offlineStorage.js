@@ -8,6 +8,8 @@ const CACHE_KEYS = {
   USER_PROFILE: 'user_profile_cache',
   SUBSCRIPTION: 'subscription_cache',
   SYNC_QUEUE: 'sync_queue',
+  SHARING_PREFERENCES: 'sharing_preferences_cache',
+  FAMILY_INVITATIONS: 'family_invitations_cache',
 };
 
 class OfflineStorageService {
@@ -213,6 +215,26 @@ class OfflineStorageService {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  // Sharing preferences methods
+  async cacheSharingPreferences(preferences) {
+    return await this.saveToCache(CACHE_KEYS.SHARING_PREFERENCES, preferences);
+  }
+
+  async getCachedSharingPreferences() {
+    const cachedData = await this.getFromCache(CACHE_KEYS.SHARING_PREFERENCES);
+    return cachedData ? cachedData.data : null;
+  }
+
+  // Family invitations methods
+  async cacheFamilyInvitations(invitations) {
+    return await this.saveToCache(CACHE_KEYS.FAMILY_INVITATIONS, invitations);
+  }
+
+  async getCachedFamilyInvitations() {
+    const cachedData = await this.getFromCache(CACHE_KEYS.FAMILY_INVITATIONS);
+    return cachedData ? cachedData.data : [];
   }
 }
 

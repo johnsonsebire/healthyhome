@@ -46,6 +46,7 @@ const FamilyMemberScreen = () => {
     bloodType: '',
     allergies: '',
     emergencyContact: '',
+    email: '',
     photo: null,
   });
 
@@ -126,6 +127,10 @@ const FamilyMemberScreen = () => {
       emergencyContact: { 
         phone: true, 
         message: 'Please enter a valid phone number (if provided)' 
+      },
+      email: {
+        email: true,
+        message: 'Please enter a valid email address (if provided)'
       }
     });
 
@@ -222,6 +227,7 @@ const FamilyMemberScreen = () => {
         bloodType: '',
         allergies: '',
         emergencyContact: '',
+        email: '',
         photo: null,
       });
       
@@ -241,6 +247,7 @@ const FamilyMemberScreen = () => {
       bloodType: member.bloodType || '',
       allergies: member.allergies || '',
       emergencyContact: member.emergencyContact || '',
+      email: member.email || '',
       photo: member.photo || null,
     });
     setShowAddModal(true);
@@ -648,6 +655,56 @@ const FamilyMemberScreen = () => {
               />
               <ValidationError error={getFieldError('emergencyContact', validationErrors)} />
             </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  hasFieldError('email', validationErrors) && styles.inputError
+                ]}
+                value={formData.email}
+                onChangeText={(text) => setFormData({ ...formData, email: text })}
+                placeholder="Email address"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                {...getStandardTextInputProps()}
+              />
+              <ValidationError error={getFieldError('email', validationErrors)} />
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Sharing Preference</Text>
+              <View style={styles.sharingPreferenceContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.sharingPreferenceButton,
+                    formData.sharingPreference === 'nuclear' && styles.sharingPreferenceButtonActive,
+                  ]}
+                  onPress={() => setFormData({ ...formData, sharingPreference: 'nuclear' })}
+                >
+                  <Text style={styles.sharingPreferenceText}>Nuclear Family</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.sharingPreferenceButton,
+                    formData.sharingPreference === 'all' && styles.sharingPreferenceButtonActive,
+                  ]}
+                  onPress={() => setFormData({ ...formData, sharingPreference: 'all' })}
+                >
+                  <Text style={styles.sharingPreferenceText}>All Family Members</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.sharingPreferenceButton,
+                    formData.sharingPreference === 'none' && styles.sharingPreferenceButtonActive,
+                  ]}
+                  onPress={() => setFormData({ ...formData, sharingPreference: 'none' })}
+                >
+                  <Text style={styles.sharingPreferenceText}>No Sharing</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </ScrollView>
         </View>
       </Modal>
@@ -1023,6 +1080,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#ef4444',
     fontWeight: '500',
+  },
+  sharingPreferenceContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  sharingPreferenceButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    backgroundColor: 'white',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 4,
+  },
+  sharingPreferenceButtonActive: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  sharingPreferenceText: {
+    fontSize: 14,
+    color: '#333',
   },
 });
 

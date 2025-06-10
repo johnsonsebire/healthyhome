@@ -221,6 +221,20 @@ const SettingsScreen = ({ navigation }) => {
           color="#10b981"
         />
         <SettingItem
+          icon="git-network-outline"
+          title="Family Tree"
+          subtitle="Visualize your family connections"
+          onPress={() => navigation.navigate('FamilyTree')}
+          color="#06b6d4"
+        />
+        <SettingItem
+          icon="share-social-outline"
+          title="Family Sharing"
+          subtitle="Manage how you share medical records"
+          onPress={() => navigation.navigate('FamilySharing')}
+          color="#3b82f6"
+        />
+        <SettingItem
           icon="card-outline"
           title="Subscription"
           subtitle={`Current plan: ${plans && plans[currentPlan] ? plans[currentPlan].name : 'Basic'}`}

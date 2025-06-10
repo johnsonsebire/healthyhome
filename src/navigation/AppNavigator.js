@@ -18,6 +18,9 @@ import AddRecordScreen from '../screens/AddRecordScreen';
 import EditRecordScreen from '../screens/EditRecordScreen';
 import RecordDetailScreen from '../screens/RecordDetailScreen';
 import FamilyMemberScreen from '../screens/FamilyMemberScreen';
+import FamilyMemberDetailScreen from '../screens/FamilyMemberDetailScreen';
+import FamilyTreeScreen from '../screens/FamilyTreeScreen';
+import FamilySharingScreen from '../screens/FamilySharingScreen';
 import SubscriptionScreen from '../screens/SubscriptionScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import ProfileScreen from '../screens/ProfileScreen';
@@ -118,6 +121,36 @@ const AppStack = () => (
         title: 'Family Member',
         headerStyle: { backgroundColor: '#6366f1' },
         headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="FamilyMemberDetail" 
+      component={FamilyMemberDetailScreen}
+      options={{ 
+        title: 'Family Member Details',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff',
+        headerShown: false
+      }}
+    />
+    <Stack.Screen 
+      name="FamilyTree" 
+      component={FamilyTreeScreen}
+      options={{ 
+        title: 'Family Tree',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff',
+        headerShown: false
+      }}
+    />
+    <Stack.Screen 
+      name="FamilySharing" 
+      component={FamilySharingScreen}
+      options={{ 
+        title: 'Family Sharing',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff',
+        headerShown: false
       }}
     />
     <Stack.Screen 

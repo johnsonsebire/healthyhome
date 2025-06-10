@@ -6,6 +6,7 @@ import { Provider as PaperProvider } from 'react-native-paper';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { SubscriptionProvider } from './src/contexts/SubscriptionContext';
 import { ErrorProvider, ErrorBoundary } from './src/contexts/ErrorContext';
+import FamilySharingProvider from './src/contexts/FamilySharingContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import * as SplashScreen from 'expo-splash-screen';
 
@@ -95,10 +96,12 @@ export default function App() {
           <ErrorProvider>
             <AuthProvider>
               <SubscriptionProvider>
-                <View style={{flex: 1}}>
-                  <AppNavigator />
-                  <StatusBar style="auto" />
-                </View>
+                <FamilySharingProvider>
+                  <View style={{flex: 1}}>
+                    <AppNavigator />
+                    <StatusBar style="auto" />
+                  </View>
+                </FamilySharingProvider>
               </SubscriptionProvider>
             </AuthProvider>
           </ErrorProvider>
