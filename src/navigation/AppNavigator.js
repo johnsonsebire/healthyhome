@@ -165,6 +165,33 @@ const AppStack = () => (
         headerTintColor: '#fff'
       }}
     />
+    <Stack.Screen 
+      name="Notifications" 
+      component={NotificationsScreen}
+      options={{ 
+        title: 'Notifications',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="PrivacySecurity" 
+      component={PrivacySecurityScreen}
+      options={{ 
+        title: 'Privacy & Security',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="DataExport" 
+      component={DataExportScreen}
+      options={{ 
+        title: 'Data Export',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
   </Stack.Navigator>
 );
 

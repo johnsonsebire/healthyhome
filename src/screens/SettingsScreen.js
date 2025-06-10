@@ -14,6 +14,7 @@ import { useSubscription } from '../contexts/SubscriptionContext';
 import { useError } from '../contexts/ErrorContext';
 import dataExportService from '../services/dataExport';
 import offlineStorageService from '../services/offlineStorage';
+import { openStoreRating, recordAppRated } from '../services/appRating';
 import { APP_CONFIG } from '../constants';
 
 const SettingsScreen = ({ navigation }) => {
@@ -143,6 +144,25 @@ const SettingsScreen = ({ navigation }) => {
     }
   };
 
+  const handleRateApp = async () => {
+    Alert.alert(
+      'Rate Our App',
+      'Would you like to rate Family Medical App in the app store?',
+      [
+        { text: 'Not Now', style: 'cancel' },
+        { 
+          text: 'Rate App', 
+          onPress: async () => {
+            const success = await openStoreRating();
+            if (success) {
+              Alert.alert('Thank You', 'Thank you for rating our app!');
+            }
+          } 
+        }
+      ]
+    );
+  };
+
   const SettingItem = ({ icon, title, subtitle, onPress, rightComponent, color = "#6366f1" }) => (
     <TouchableOpacity style={styles.settingItem} onPress={onPress}>
       <View style={[styles.settingIcon, { backgroundColor: color + '20' }]}>
@@ -215,20 +235,20 @@ const SettingsScreen = ({ navigation }) => {
           icon="notifications-outline"
           title="Notifications"
           subtitle="Manage notification preferences"
-          onPress={() => Alert.alert('Coming Soon', 'Notification settings will be available soon')}
+          onPress={() => navigation.navigate('Notifications')}
         />
         <SettingItem
           icon="shield-checkmark-outline"
           title="Privacy & Security"
           subtitle="Data protection and security settings"
-          onPress={() => Alert.alert('Coming Soon', 'Privacy settings will be available soon')}
+          onPress={() => navigation.navigate('PrivacySecurity')}
           color="#f59e0b"
         />
         <SettingItem
           icon="download-outline"
           title="Data Export"
           subtitle="Download your medical records"
-          onPress={() => Alert.alert('Coming Soon', 'Data export will be available soon')}
+          onPress={() => navigation.navigate('DataExport')}
           color="#ef4444"
         />
       </SettingSection>
@@ -251,7 +271,7 @@ const SettingsScreen = ({ navigation }) => {
           icon="star-outline"
           title="Rate App"
           subtitle="Help us improve with your feedback"
-          onPress={() => Alert.alert('Rate App', 'Thank you for your feedback!')}
+          onPress={() => handleRateApp()}
         />
       </SettingSection>
 
