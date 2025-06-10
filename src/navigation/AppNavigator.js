@@ -24,6 +24,9 @@ import ProfileScreen from '../screens/ProfileScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import TermsOfServiceScreen from '../screens/TermsOfServiceScreen';
 import HelpFaqScreen from '../screens/HelpFaqScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
+import PrivacySecurityScreen from '../screens/PrivacySecurityScreen';
+import DataExportScreen from '../screens/DataExportScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
