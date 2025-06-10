@@ -20,6 +20,10 @@ import RecordDetailScreen from '../screens/RecordDetailScreen';
 import FamilyMemberScreen from '../screens/FamilyMemberScreen';
 import SubscriptionScreen from '../screens/SubscriptionScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
+import ProfileScreen from '../screens/ProfileScreen';
+import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
+import TermsOfServiceScreen from '../screens/TermsOfServiceScreen';
+import HelpFaqScreen from '../screens/HelpFaqScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -118,6 +122,42 @@ const AppStack = () => (
       component={SubscriptionScreen}
       options={{ 
         title: 'Subscription',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="Profile" 
+      component={ProfileScreen}
+      options={{ 
+        title: 'My Profile',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="PrivacyPolicy" 
+      component={PrivacyPolicyScreen}
+      options={{ 
+        title: 'Privacy Policy',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="TermsOfService" 
+      component={TermsOfServiceScreen}
+      options={{ 
+        title: 'Terms of Service',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="HelpFaq" 
+      component={HelpFaqScreen}
+      options={{ 
+        title: 'Help & FAQ',
         headerStyle: { backgroundColor: '#6366f1' },
         headerTintColor: '#fff'
       }}

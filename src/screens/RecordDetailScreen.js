@@ -26,6 +26,11 @@ import {
   formatProviderForCard,
   getProviderDisplayName 
 } from '../utils/recordTypes';
+import {
+  getCountryDisplayName,
+  getCityDisplayName,
+  getRegionDisplayName
+} from '../utils/locationUtils';
 
 const RecordDetailScreen = ({ route, navigation }) => {
   const { recordId } = route.params;
@@ -70,6 +75,22 @@ const RecordDetailScreen = ({ route, navigation }) => {
         if (recordDoc.exists()) {
           const recordData = { id: recordDoc.id, ...recordDoc.data() };
           
+          // Load family member photo if not already included
+          if (recordData.familyMemberId && !recordData.familyMemberPhoto) {
+            try {
+              const familyMemberDoc = await getDoc(doc(db, 'familyMembers', recordData.familyMemberId));
+              if (familyMemberDoc.exists()) {
+                const familyMemberData = familyMemberDoc.data();
+                if (familyMemberData.photo) {
+                  recordData.familyMemberPhoto = familyMemberData.photo;
+                }
+              }
+            } catch (error) {
+              console.log('Error loading family member photo:', error);
+              // Continue without photo if there's an error
+            }
+          }
+          
           // Cache the data
           const cachedRecords = await offlineStorageService.getCachedMedicalRecords();
           const records = cachedRecords?.data || [];
@@ -97,6 +118,20 @@ const RecordDetailScreen = ({ route, navigation }) => {
       if (cachedRecords && cachedRecords.data) {
         const cachedRecord = cachedRecords.data.find(r => r.id === recordId);
         if (cachedRecord) {
+          // Try to get family member photo from cache if not present
+          if (cachedRecord.familyMemberId && !cachedRecord.familyMemberPhoto) {
+            try {
+              const cachedFamilyMembers = await offlineStorageService.getCachedFamilyMembers();
+              if (cachedFamilyMembers && cachedFamilyMembers.data) {
+                const familyMember = cachedFamilyMembers.data.find(m => m.id === cachedRecord.familyMemberId);
+                if (familyMember && familyMember.photo) {
+                  cachedRecord.familyMemberPhoto = familyMember.photo;
+                }
+              }
+            } catch (error) {
+              console.log('Error loading cached family member photo:', error);
+            }
+          }
           setRecord(cachedRecord);
         } else {
           Alert.alert('Error', 'Record not found', [
@@ -283,10 +318,13 @@ const RecordDetailScreen = ({ route, navigation }) => {
         lines.push(`🏥 Hospital: ${record.hospital}`);
       }
       if (record.country) {
-        lines.push(`🌍 Country: ${record.country}`);
+        lines.push(`🌍 Country: ${getCountryDisplayName(record.country)}`);
       }
       if (record.city) {
-        lines.push(`🏙️ City: ${record.city}`);
+        lines.push(`🏙️ City: ${getCityDisplayName(record.city, record.country, record.customCity)}`);
+      }
+      if (record.region) {
+        lines.push(`🗺️ Region: ${getRegionDisplayName(record.region, record.country, record.customRegion)}`);
       }
       if (record.cardNumber) {
         lines.push(`🆔 Card Number: ${record.cardNumber}`);
@@ -394,9 +432,13 @@ const RecordDetailScreen = ({ route, navigation }) => {
         {/* Member Information */}
         <View style={styles.cardBody}>
           <View style={styles.memberInfo}>
-            {/* Photo placeholder - will be added when family member photos are available */}
+            {/* Photo display or placeholder */}
             <View style={styles.photoContainer}>
-              <Ionicons name="person" size={40} color="#9ca3af" />
+              {record.familyMemberPhoto ? (
+                <Image source={{ uri: record.familyMemberPhoto }} style={styles.memberPhoto} />
+              ) : (
+                <Ionicons name="person" size={40} color="#9ca3af" />
+              )}
             </View>
             
             <View style={styles.memberDetails}>
@@ -445,13 +487,18 @@ const RecordDetailScreen = ({ route, navigation }) => {
   const renderHospitalCard = () => {
     const cardNumber = record.cardNumber;
     
+    // Format location data using utility functions
+    const formattedCountry = getCountryDisplayName(record.country);
+    const formattedCity = getCityDisplayName(record.city, record.country, record.customCity);
+    const formattedRegion = getRegionDisplayName(record.region, record.country, record.customRegion);
+    
     return (
       <View style={styles.cardContainer}>
         {/* Header */}
         <View style={styles.cardHeader}>
           <Text style={styles.cardOrganization}>{record.hospital}</Text>
-          {record.city && record.region && (
-            <Text style={styles.cardLocation}>{record.city}, {record.region}</Text>
+          {formattedCity && formattedRegion && (
+            <Text style={styles.cardLocation}>{formattedCity}, {formattedRegion}</Text>
           )}
           <Text style={styles.cardType}>HOSPITAL CARD</Text>
         </View>
@@ -459,9 +506,13 @@ const RecordDetailScreen = ({ route, navigation }) => {
         {/* Member Information */}
         <View style={styles.cardBody}>
           <View style={styles.memberInfo}>
-            {/* Photo placeholder */}
+            {/* Photo display or placeholder */}
             <View style={styles.photoContainer}>
-              <Ionicons name="person" size={40} color="#9ca3af" />
+              {record.familyMemberPhoto ? (
+                <Image source={{ uri: record.familyMemberPhoto }} style={styles.memberPhoto} />
+              ) : (
+                <Ionicons name="person" size={40} color="#9ca3af" />
+              )}
             </View>
             
             <View style={styles.memberDetails}>
@@ -469,8 +520,8 @@ const RecordDetailScreen = ({ route, navigation }) => {
               {cardNumber && (
                 <Text style={styles.membershipNumber}>Card No: {cardNumber}</Text>
               )}
-              {record.country && (
-                <Text style={styles.cardDate}>Country: {record.country}</Text>
+              {formattedCountry && (
+                <Text style={styles.cardDate}>Country: {formattedCountry}</Text>
               )}
             </View>
           </View>
@@ -577,19 +628,19 @@ const RecordDetailScreen = ({ route, navigation }) => {
       {record.country && (
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Country</Text>
-          <Text style={styles.detailValue}>{record.country}</Text>
+          <Text style={styles.detailValue}>{getCountryDisplayName(record.country)}</Text>
         </View>
       )}
       {record.city && (
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>City</Text>
-          <Text style={styles.detailValue}>{record.city === 'other' ? record.customCity : record.city}</Text>
+          <Text style={styles.detailValue}>{getCityDisplayName(record.city, record.country, record.customCity)}</Text>
         </View>
       )}
       {record.region && (
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Region</Text>
-          <Text style={styles.detailValue}>{record.region === 'other' ? record.customRegion : record.region}</Text>
+          <Text style={styles.detailValue}>{getRegionDisplayName(record.region, record.country, record.customRegion)}</Text>
         </View>
       )}
       {record.hospital && (
@@ -1137,6 +1188,12 @@ const styles = StyleSheet.create({
     marginRight: 16,
     borderWidth: 2,
     borderColor: '#e5e7eb',
+    overflow: 'hidden',
+  },
+  memberPhoto: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 30,
   },
   memberDetails: {
     flex: 1,

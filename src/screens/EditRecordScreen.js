@@ -306,13 +306,33 @@ const EditRecordScreen = ({ route, navigation }) => {
   };
 
   const handleSubmit = async () => {
-    // Validate form
-    const validation = validateForm(formData, {
+    // Define base validation rules
+    const baseValidationRules = {
       type: { required: true, message: 'Please select a record type' },
-      title: { required: true, minLength: 3, message: 'Title must be at least 3 characters' },
       familyMemberId: { required: true, message: 'Please select a family member' },
       date: { required: true, date: true, message: 'Please enter a valid date' }
-    });
+    };
+    
+    // Add title validation only for record types that use title
+    // (not for insurance or hospital_card which use card-based layouts)
+    if (!['insurance', 'hospital_card'].includes(formData.type)) {
+      baseValidationRules.title = { 
+        required: true, 
+        minLength: 3, 
+        message: 'Title must be at least 3 characters' 
+      };
+    }
+    
+    // Add insurance-specific validation
+    if (formData.type === 'insurance') {
+      baseValidationRules.provider = { 
+        required: true, 
+        message: 'Please select an insurance provider' 
+      };
+    }
+
+    // Validate form
+    const validation = validateForm(formData, baseValidationRules);
 
     if (!validation.isValid) {
       setValidationErrors(validation.errors);

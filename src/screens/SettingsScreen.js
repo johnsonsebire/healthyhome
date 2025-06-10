@@ -191,7 +191,7 @@ const SettingsScreen = ({ navigation }) => {
           icon="person-outline"
           title="Profile"
           subtitle="Manage your personal information"
-          onPress={() => Alert.alert('Coming Soon', 'Profile editing will be available soon')}
+          onPress={() => navigation.navigate('Profile')}
         />
         <SettingItem
           icon="people-outline"
@@ -239,7 +239,7 @@ const SettingsScreen = ({ navigation }) => {
           icon="help-circle-outline"
           title="Help & FAQ"
           subtitle="Get answers to common questions"
-          onPress={() => Alert.alert('Help', 'Help documentation will be available soon')}
+          onPress={() => navigation.navigate('HelpFaq')}
         />
         <SettingItem
           icon="mail-outline"
@@ -268,13 +268,13 @@ const SettingsScreen = ({ navigation }) => {
           icon="document-text-outline"
           title="Terms of Service"
           subtitle="Read our terms and conditions"
-          onPress={() => Alert.alert('Terms of Service', 'Terms will be available soon')}
+          onPress={() => navigation.navigate('TermsOfService')}
         />
         <SettingItem
           icon="shield-outline"
           title="Privacy Policy"
           subtitle="Learn how we protect your data"
-          onPress={() => Alert.alert('Privacy Policy', 'Privacy policy will be available soon')}
+          onPress={() => navigation.navigate('PrivacyPolicy')}
         />
       </SettingSection>
 
