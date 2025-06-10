@@ -337,7 +337,7 @@ const RecordDetailScreen = ({ route, navigation }) => {
         lines.push(`💰 Bill For: ${record.billFor}`);
       }
       if (record.billAmount) {
-        lines.push(`💵 Amount: ₦${record.billAmount}`);
+        lines.push(`💵 Amount: ₵${record.billAmount}`);
       }
       if (record.paymentStatus) {
         lines.push(`📊 Status: ${record.paymentStatus}`);

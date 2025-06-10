@@ -28,6 +28,7 @@ import networkService from '../services/networkService';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import ValidationError from '../components/ValidationError';
 import { validateForm, getFieldError, hasFieldError } from '../utils/validation';
+import { placeholderTextColor, getStandardTextInputProps } from '../utils/inputStyles';
 import { 
   COUNTRIES, 
   getCitiesByCountry, 
@@ -481,6 +482,7 @@ const AddRecordScreen = ({ navigation, route }) => {
             placeholder="Enter city name"
             value={formData.customCity || ''}
             onChangeText={(value) => updateFormData('customCity', value)}
+            {...getStandardTextInputProps()}
           />
         )}
       </View>
@@ -507,6 +509,7 @@ const AddRecordScreen = ({ navigation, route }) => {
             placeholder="Enter region/state name"
             value={formData.customRegion || ''}
             onChangeText={(value) => updateFormData('customRegion', value)}
+            {...getStandardTextInputProps()}
           />
         )}
       </View>
@@ -519,6 +522,7 @@ const AddRecordScreen = ({ navigation, route }) => {
           placeholder="Enter hospital or clinic name"
           value={formData.hospital}
           onChangeText={(value) => updateFormData('hospital', value)}
+          {...getStandardTextInputProps()}
         />
       </View>
 
@@ -530,6 +534,7 @@ const AddRecordScreen = ({ navigation, route }) => {
           placeholder="Enter card number"
           value={formData.cardNumber}
           onChangeText={(value) => updateFormData('cardNumber', value)}
+          {...getStandardTextInputProps()}
         />
       </View>
     </>
@@ -558,6 +563,7 @@ const AddRecordScreen = ({ navigation, route }) => {
             placeholder="Enter insurance provider name"
             value={formData.customProvider}
             onChangeText={(value) => updateFormData('customProvider', value)}
+            {...getStandardTextInputProps()}
           />
         )}
       </View>
@@ -570,6 +576,7 @@ const AddRecordScreen = ({ navigation, route }) => {
           placeholder="Enter membership number"
           value={formData.membershipNo}
           onChangeText={(value) => updateFormData('membershipNo', value)}
+          {...getStandardTextInputProps()}
         />
       </View>
 
@@ -628,6 +635,7 @@ const AddRecordScreen = ({ navigation, route }) => {
           placeholder="Enter hospital or clinic name"
           value={formData.hospital}
           onChangeText={(value) => updateFormData('hospital', value)}
+          {...getStandardTextInputProps()}
         />
       </View>
 
@@ -639,6 +647,7 @@ const AddRecordScreen = ({ navigation, route }) => {
           placeholder="What is this bill for?"
           value={formData.billFor}
           onChangeText={(value) => updateFormData('billFor', value)}
+          {...getStandardTextInputProps()}
         />
       </View>
 
@@ -654,6 +663,7 @@ const AddRecordScreen = ({ navigation, route }) => {
             calculatePaymentStatus(value, formData.totalPaid);
           }}
           keyboardType="decimal-pad"
+          {...getStandardTextInputProps()}
         />
       </View>
 
@@ -685,6 +695,7 @@ const AddRecordScreen = ({ navigation, route }) => {
             calculatePaymentStatus(formData.billAmount, value);
           }}
           keyboardType="decimal-pad"
+          {...getStandardTextInputProps()}
         />
       </View>
     </>
@@ -703,6 +714,7 @@ const AddRecordScreen = ({ navigation, route }) => {
           onChangeText={(value) => updateFormData('description', value)}
           multiline
           numberOfLines={3}
+          {...getStandardTextInputProps()}
         />
       </View>
 
@@ -714,6 +726,7 @@ const AddRecordScreen = ({ navigation, route }) => {
           placeholder="Doctor's name"
           value={formData.doctor}
           onChangeText={(value) => updateFormData('doctor', value)}
+          {...getStandardTextInputProps()}
         />
       </View>
     </>
@@ -1218,6 +1231,7 @@ const AddRecordScreen = ({ navigation, route }) => {
             onChangeText={(value) => updateFormData('notes', value)}
             multiline
             numberOfLines={3}
+            {...getStandardTextInputProps()}
           />
         </View>
 

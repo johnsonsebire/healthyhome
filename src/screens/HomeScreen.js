@@ -205,7 +205,7 @@ const HomeScreen = ({ navigation }) => {
         case 'bill':
           return {
             subtitle: record.hospital || 'Medical Bill',
-            detail: record.billAmount ? `₦${record.billAmount}` : null
+            detail: record.billAmount ? `₵${record.billAmount}` : null
           };
         case 'prescription':
           return {

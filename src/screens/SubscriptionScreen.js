@@ -355,13 +355,14 @@ const SubscriptionScreen = ({ route, navigation }) => {
   const handleProviderSelection = (providerId) => {
     setCurrentSelectedProvider(providerId);
     switchPaymentProvider(providerId);
-    setShowProviderSelection(false);
+    // We don't close the modal here to allow the user to click Continue
+    // setShowProviderSelection(false);
   };
 
   // Get formatted currency for display
   const formatCurrency = (amount, currency = 'USD') => {
-    if (currency === 'NGN') {
-      return `₦${amount.toFixed(2)}`;
+    if (currency === 'GHS') {
+      return `₵${amount.toFixed(2)}`;
     }
     return `$${amount.toFixed(2)}`;
   };
@@ -514,7 +515,11 @@ const SubscriptionScreen = ({ route, navigation }) => {
             <View style={{ width: 60 }} />
           </View>
 
-          <View style={styles.modalContent}>
+          <ScrollView 
+            style={styles.modalContent}
+            contentContainerStyle={styles.modalContentContainer}
+            showsVerticalScrollIndicator={true}
+          >
             {selectedPlan && (
               <View style={styles.paymentSummary}>
                 <Text style={styles.paymentPlanName}>{selectedPlan.name} Plan</Text>
@@ -565,6 +570,12 @@ const SubscriptionScreen = ({ route, navigation }) => {
               </TouchableOpacity>
             ))}
 
+            {currentSelectedProvider && (
+              <Text style={styles.helperText}>
+                Please tap "Continue" below to proceed with payment
+              </Text>
+            )}
+
             <TouchableOpacity
               style={[
                 styles.continueButton,
@@ -583,7 +594,7 @@ const SubscriptionScreen = ({ route, navigation }) => {
                 Continue with {availablePaymentMethods.find(m => m.id === currentSelectedProvider)?.name || 'Selected Method'}
               </Text>
             </TouchableOpacity>
-          </View>
+          </ScrollView>
         </View>
       </Modal>
 
@@ -602,7 +613,11 @@ const SubscriptionScreen = ({ route, navigation }) => {
             <View style={{ width: 60 }} />
           </View>
 
-          <View style={styles.modalContent}>
+          <ScrollView 
+            style={styles.scrollableModalContent}
+            contentContainerStyle={styles.modalContentContainer}
+            showsVerticalScrollIndicator={true}
+          >
             {selectedPlan && (
               <>
                 <View style={styles.paymentSummary}>
@@ -687,7 +702,7 @@ const SubscriptionScreen = ({ route, navigation }) => {
                 </Text>
               </>
             )}
-          </View>
+          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -1043,6 +1058,7 @@ const styles = StyleSheet.create({
   providerOptionSelected: {
     borderWidth: 2,
     borderColor: '#007AFF',
+    backgroundColor: '#f0f8ff',
   },
   providerOptionHeader: {
     flexDirection: 'row',
@@ -1083,6 +1099,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
+  selectedProviderIndicator: {
+    position: 'absolute',
+    right: 10,
+    top: 10,
+  },
   providerFeatures: {
     marginTop: 10,
   },
@@ -1096,12 +1117,21 @@ const styles = StyleSheet.create({
     color: '#666',
     marginLeft: 6,
   },
+  helperText: {
+    fontSize: 14,
+    color: '#4b5563',
+    textAlign: 'center',
+    marginTop: 16,
+    fontStyle: 'italic',
+  },
   continueButton: {
     backgroundColor: '#007AFF',
     borderRadius: 12,
     paddingVertical: 16,
     marginTop: 20,
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
   },
   continueButtonDisabled: {
     backgroundColor: '#ccc',
@@ -1144,6 +1174,13 @@ const styles = StyleSheet.create({
     color: '#856404',
     fontSize: 12,
     fontWeight: '600',
+  },
+  scrollableModalContent: {
+    flex: 1,
+    padding: 20,
+  },
+  modalContentContainer: {
+    paddingBottom: 40,
   },
 });
 

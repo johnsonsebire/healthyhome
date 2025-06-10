@@ -3,15 +3,16 @@ import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
 import emailService from './emailService';
 
-// Paystack Configuration
-const PAYSTACK_PUBLIC_KEY = 'pk_test_your_paystack_public_key_here'; // Replace with your actual key
-const PAYSTACK_SECRET_KEY = 'sk_test_your_paystack_secret_key_here'; // Replace with your actual key (server-side only)
-
-// Your backend API base URL - you'll need to implement these endpoints
-const API_BASE_URL = 'https://your-backend-api.com'; // Replace with your actual backend
+// Paystack Configuration from environment variables
+const PAYSTACK_PUBLIC_KEY = process.env.PAYSTACK_PUBLIC_KEY;
+const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+const API_BASE_URL = process.env.API_BASE_URL;
 
 class PaystackService {
   constructor() {
+    if (!PAYSTACK_PUBLIC_KEY || !PAYSTACK_SECRET_KEY || !API_BASE_URL) {
+      throw new Error('Missing required environment variables for Paystack configuration');
+    }
     this.publicKey = PAYSTACK_PUBLIC_KEY;
     this.initialized = true;
   }
@@ -22,24 +23,24 @@ class PaystackService {
       basic: {
         id: 'basic_monthly',
         name: 'Basic Plan',
-        amount: 100, // Amount in kobo (₦1.00)
-        currency: 'NGN',
+        amount: 100, // Amount in pesewas (₵1.00)
+        currency: 'GHS',
         interval: 'monthly',
-        planCode: 'PLN_basic_monthly' // This should match your Paystack plan code
+        planCode: 'PLN_basic_monthly'
       },
       standard: {
-        id: 'standard_monthly', 
+        id: 'standard_monthly',
         name: 'Standard Plan',
-        amount: 200, // Amount in kobo (₦2.00)
-        currency: 'NGN',
+        amount: 200, // Amount in pesewas (₵2.00)
+        currency: 'GHS',
         interval: 'monthly',
         planCode: 'PLN_standard_monthly'
       },
       premium: {
         id: 'premium_monthly',
-        name: 'Premium Plan', 
-        amount: 300, // Amount in kobo (₃.00)
-        currency: 'NGN',
+        name: 'Premium Plan',
+        amount: 300, // Amount in pesewas (₵3.00)
+        currency: 'GHS',
         interval: 'monthly',
         planCode: 'PLN_premium_monthly'
       }
@@ -51,7 +52,7 @@ class PaystackService {
     try {
       const plans = this.getPaystackPlans();
       const selectedPlan = plans[planId];
-      
+
       if (!selectedPlan) {
         throw new Error('Invalid plan selected');
       }
@@ -79,16 +80,16 @@ class PaystackService {
             },
             {
               display_name: 'Plan',
-              variable_name: 'plan_id', 
+              variable_name: 'plan_id',
               value: planId
             }
           ]
         }
       };
 
-      // Call your backend to initialize the payment
+      // Call backend to initialize the payment
       const response = await this.callBackendAPI('/paystack/initialize', 'POST', paymentData);
-      
+
       if (response.status && response.data) {
         return {
           success: true,
@@ -109,11 +110,11 @@ class PaystackService {
   async initiatePayment(planId, customerEmail, userId) {
     try {
       const paymentResult = await this.createPaymentUrl(planId, customerEmail, userId);
-      
+
       if (paymentResult.success) {
         // Open the payment URL in the default browser
         const supported = await Linking.canOpenURL(paymentResult.authorization_url);
-        
+
         if (supported) {
           await Linking.openURL(paymentResult.authorization_url);
           return {
@@ -137,10 +138,10 @@ class PaystackService {
   async verifyPayment(reference) {
     try {
       const response = await this.callBackendAPI(`/paystack/verify/${reference}`, 'GET');
-      
+
       if (response.status && response.data) {
         const paymentData = response.data;
-        
+
         return {
           success: true,
           status: paymentData.status,
@@ -170,7 +171,7 @@ class PaystackService {
       }
 
       const planId = verificationResult.metadata.plan_id;
-      
+
       // Update user subscription in Firestore
       await updateDoc(doc(db, 'users', userId), {
         subscriptionPlan: planId,
@@ -209,7 +210,7 @@ class PaystackService {
     }
   }
 
-  // Cancel subscription (if using Paystack subscriptions)
+  // Cancel subscription
   async cancelSubscription(subscriptionCode) {
     try {
       const response = await this.callBackendAPI(`/paystack/subscription/disable`, 'POST', {
@@ -238,7 +239,7 @@ class PaystackService {
         method,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${PAYSTACK_SECRET_KEY}`, // This should be handled server-side
+          'Authorization': `Bearer ${PAYSTACK_SECRET_KEY}`
         }
       };
 
@@ -248,7 +249,7 @@ class PaystackService {
 
       const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
       const result = await response.json();
-      
+
       return result;
     } catch (error) {
       console.error('API call error:', error);
@@ -262,8 +263,8 @@ class PaystackService {
     return Object.keys(plans).map(key => ({
       id: key,
       name: plans[key].name,
-      price: plans[key].amount / 100, // Convert from kobo to naira
-      currency: 'NGN',
+      price: plans[key].amount / 100, // Convert from pesewas to cedis
+      currency: 'GHS',
       interval: plans[key].interval,
       provider: 'paystack'
     }));

@@ -28,6 +28,7 @@ import networkService from '../services/networkService';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import ValidationError from '../components/ValidationError';
 import { validateForm, getFieldError, hasFieldError } from '../utils/validation';
+import { placeholderTextColor, getStandardTextInputProps } from '../utils/inputStyles';
 import { 
   COUNTRIES, 
   getCitiesByCountry, 
@@ -643,6 +644,7 @@ const EditRecordScreen = ({ route, navigation }) => {
           placeholder="Enter hospital or clinic name"
           value={formData.hospital}
           onChangeText={(value) => updateFormData('hospital', value)}
+          {...getStandardTextInputProps()}
         />
       </View>
 
@@ -654,6 +656,7 @@ const EditRecordScreen = ({ route, navigation }) => {
           placeholder="Enter what the bill is for"
           value={formData.billFor}
           onChangeText={(value) => updateFormData('billFor', value)}
+          {...getStandardTextInputProps()}
         />
       </View>
 
@@ -666,6 +669,7 @@ const EditRecordScreen = ({ route, navigation }) => {
           value={formData.billAmount}
           onChangeText={(value) => updateFormData('billAmount', value)}
           keyboardType="numeric"
+          {...getStandardTextInputProps()}
         />
       </View>
 
@@ -696,16 +700,16 @@ const EditRecordScreen = ({ route, navigation }) => {
               <Text style={styles.paymentSectionTitle}>Payment Details</Text>
               <View style={styles.paymentAmountContainer}>
                 <Text style={styles.paymentAmountText}>Total Amount:</Text>
-                <Text style={styles.paymentAmountValue}>₦{formData.billAmount}</Text>
+                <Text style={styles.paymentAmountValue}>₵{formData.billAmount}</Text>
               </View>
               <View style={styles.paymentAmountContainer}>
                 <Text style={styles.paymentAmountText}>Amount Paid:</Text>
-                <Text style={styles.paymentAmountValue}>₦{formData.totalPaid || 0}</Text>
+                <Text style={styles.paymentAmountValue}>₵{formData.totalPaid || 0}</Text>
               </View>
               <View style={styles.paymentAmountContainer}>
                 <Text style={styles.paymentAmountText}>Balance:</Text>
                 <Text style={[styles.paymentAmountValue, { color: '#ef4444' }]}>
-                  ₦{Math.max(0, (parseFloat(formData.billAmount) || 0) - (formData.totalPaid || 0))}
+                  ₵{Math.max(0, (parseFloat(formData.billAmount) || 0) - (formData.totalPaid || 0))}
                 </Text>
               </View>
             </View>
@@ -726,6 +730,7 @@ const EditRecordScreen = ({ route, navigation }) => {
           placeholder="Enter doctor's name"
           value={formData.doctor}
           onChangeText={(value) => updateFormData('doctor', value)}
+          {...getStandardTextInputProps()}
         />
       </View>
     </>

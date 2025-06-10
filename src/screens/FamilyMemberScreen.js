@@ -25,6 +25,7 @@ import networkService from '../services/networkService';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import ValidationError from '../components/ValidationError';
 import { validateForm, getFieldError, hasFieldError } from '../utils/validation';
+import { placeholderTextColor, getStandardTextInputProps } from '../utils/inputStyles';
 
 const FamilyMemberScreen = () => {
   const { user, userProfile } = useAuth();
@@ -541,6 +542,7 @@ const FamilyMemberScreen = () => {
                     ? 'Your full name' 
                     : 'Enter full name'
                 }
+                {...getStandardTextInputProps()}
               />
               <ValidationError error={getFieldError('name', validationErrors)} />
             </View>
@@ -627,6 +629,7 @@ const FamilyMemberScreen = () => {
                 placeholder="List any allergies"
                 multiline
                 numberOfLines={3}
+                {...getStandardTextInputProps()}
               />
             </View>
 
@@ -641,6 +644,7 @@ const FamilyMemberScreen = () => {
                 onChangeText={(text) => setFormData({ ...formData, emergencyContact: text })}
                 placeholder="Phone number"
                 keyboardType="phone-pad"
+                {...getStandardTextInputProps()}
               />
               <ValidationError error={getFieldError('emergencyContact', validationErrors)} />
             </View>
