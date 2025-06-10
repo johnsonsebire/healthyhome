@@ -309,9 +309,22 @@ class DataExportService {
   }
 
   groupRecordsByType(records) {
+    // Import function from recordTypes.js would be better, but we'll implement it here for simplicity
+    const getRecordTypeDisplayName = (type) => {
+      const displayNames = {
+        prescription: 'Prescription',
+        diagnosis: 'Diagnosis',
+        hospital_card: 'Hospital Card',
+        bill: 'Medical Bill',
+        insurance: 'Insurance'
+      };
+      return displayNames[type] || type;
+    };
+    
     return records.reduce((acc, record) => {
       const type = record.type || 'Other';
-      acc[type] = (acc[type] || 0) + 1;
+      const displayName = getRecordTypeDisplayName(type);
+      acc[displayName] = (acc[displayName] || 0) + 1;
       return acc;
     }, {});
   }
