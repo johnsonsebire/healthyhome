@@ -27,6 +27,8 @@ import ValidationError from '../components/ValidationError';
 import { validateForm, getFieldError, hasFieldError } from '../utils/validation';
 import { placeholderTextColor, getStandardTextInputProps } from '../utils/inputStyles';
 import { getGenderSpecificRelationship, getRelationshipEmoji } from '../utils/genderBasedRelationships';
+import photoStorage from '../services/photoStorage';
+import CachedPhoto from '../components/CachedPhoto';
 
 const FamilyMemberScreen = ({ route, navigation }) => {
   const { editMemberId } = route.params || {};
@@ -111,8 +113,8 @@ const FamilyMemberScreen = ({ route, navigation }) => {
           members.push({ id: doc.id, ...doc.data() });
         });
 
-        // Cache the data
-        await offlineStorageService.cacheFamilyMembers(members);
+        // Cache the data with photos
+        await offlineStorageService.cacheFamilyMembers(members, user.uid);
         return members;
       },
       {
@@ -181,6 +183,23 @@ const FamilyMemberScreen = ({ route, navigation }) => {
           updatedAt: new Date(),
         };
 
+        // Cache photo if provided
+        if (memberData.photo && memberData.photo.startsWith('file://')) {
+          try {
+            const cachedPhotoUri = await photoStorage.cachePhoto(
+              memberData.photo, 
+              user.uid, 
+              editingMember?.id || 'temp_' + Date.now()
+            );
+            if (cachedPhotoUri) {
+              memberData.photo = cachedPhotoUri;
+            }
+          } catch (error) {
+            console.error('Error caching member photo:', error);
+            // Continue with original photo URI
+          }
+        }
+
         if (!networkService.isOnline()) {
           // Add to offline sync queue
           await offlineStorageService.addToSyncQueue({
@@ -197,11 +216,11 @@ const FamilyMemberScreen = ({ route, navigation }) => {
             const updatedMembers = members.map(m => 
               m.id === editingMember.id ? { ...memberData, id: editingMember.id } : m
             );
-            await offlineStorageService.cacheFamilyMembers(updatedMembers);
+            await offlineStorageService.cacheFamilyMembers(updatedMembers, user.uid);
           } else {
             const newMember = { ...memberData, id: `temp_${Date.now()}`, isLocal: true };
             members.push(newMember);
-            await offlineStorageService.cacheFamilyMembers(members);
+            await offlineStorageService.cacheFamilyMembers(members, user.uid);
           }
 
           Alert.alert(
@@ -299,7 +318,10 @@ const FamilyMemberScreen = ({ route, navigation }) => {
           const cachedMembers = await offlineStorageService.getCachedFamilyMembers();
           if (cachedMembers && cachedMembers.data) {
             const updatedMembers = cachedMembers.data.filter(m => m.id !== memberId);
-            await offlineStorageService.cacheFamilyMembers(updatedMembers);
+            await offlineStorageService.cacheFamilyMembers(updatedMembers, user.uid);
+            
+            // Also delete cached photo
+            await photoStorage.deleteMemberPhoto(user.uid, memberId);
           }
 
           Alert.alert(
@@ -338,11 +360,26 @@ const FamilyMemberScreen = ({ route, navigation }) => {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.5,
+      quality: 0.7, // Slightly higher quality for better offline viewing
     });
 
     if (!result.canceled) {
-      setFormData({ ...formData, photo: result.assets[0].uri });
+      const imageUri = result.assets[0].uri;
+      setFormData({ ...formData, photo: imageUri });
+      
+      // Try to cache the photo immediately for offline access, but don't fail if it doesn't work
+      if (user?.uid) {
+        try {
+          const cachedUri = await photoStorage.cachePhoto(imageUri, user.uid, 'temp_' + Date.now());
+          if (cachedUri && cachedUri !== imageUri) {
+            console.log('Photo cached successfully for offline use');
+            setFormData({ ...formData, photo: cachedUri });
+          }
+        } catch (error) {
+          console.log('Could not cache photo immediately, will use original:', error.message);
+          // Continue with original URI - photo will still work online
+        }
+      }
     }
   };
 
@@ -444,21 +481,27 @@ const FamilyMemberScreen = ({ route, navigation }) => {
         refreshControl={
           <RefreshControl refreshing={loading} onRefresh={onRefresh} />
         }
+        contentContainerStyle={{ paddingBottom: 90 }}
         showsVerticalScrollIndicator={false}
       >
         {familyMembers && familyMembers.length > 0 && familyMembers.map((member) => (
           member && member.id ? (
-            <View key={member.id} style={styles.memberCard}>
+            <TouchableOpacity 
+              key={member.id} 
+              style={styles.memberCard}
+              onPress={() => navigation.navigate('FamilyMemberDetail', { memberId: member.id })}
+            >
               <View style={styles.memberInfo}>
-                {member.photo ? (
-                  <Image source={{ uri: member.photo }} style={styles.memberPhoto} />
-                ) : (
-                  <View style={styles.memberPhotoPlaceholder}>
-                    <Text style={styles.memberPhotoText}>
-                      {getRelationshipEmoji(member.relationship, member.gender)}
-                    </Text>
-                  </View>
-                )}
+                <CachedPhoto
+                  photoUri={member.photo}
+                  userId={user?.uid}
+                  memberId={member.id}
+                  relationship={member.relationship}
+                  gender={member.gender}
+                  style={styles.memberPhoto}
+                  placeholderStyle={styles.memberPhotoPlaceholder}
+                  showEmoji={true}
+                />
                 <View style={styles.memberDetails}>
                   <Text style={styles.memberName}>{member.name || 'Unknown'}</Text>
                   <Text style={styles.memberRelationship}>
@@ -480,18 +523,24 @@ const FamilyMemberScreen = ({ route, navigation }) => {
               <View style={styles.memberActions}>
                 <TouchableOpacity
                   style={styles.actionButton}
-                  onPress={() => handleEditMember(member)}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleEditMember(member);
+                  }}
                 >
                   <Ionicons name="pencil" size={20} color="#007AFF" />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.actionButton}
-                  onPress={() => handleDeleteMember(member.id)}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleDeleteMember(member.id);
+                  }}
                 >
                   <Ionicons name="trash" size={20} color="#FF3B30" />
                 </TouchableOpacity>
               </View>
-            </View>
+            </TouchableOpacity>
           ) : null
         ))}
 
@@ -550,7 +599,17 @@ const FamilyMemberScreen = ({ route, navigation }) => {
             <View style={styles.photoSection}>
               <TouchableOpacity style={styles.photoButton} onPress={pickImage}>
                 {formData.photo ? (
-                  <Image source={{ uri: formData.photo }} style={styles.photoPreview} />
+                  <CachedPhoto
+                    photoUri={formData.photo}
+                    userId={user?.uid}
+                    memberId={editingMember?.id || 'temp'}
+                    relationship={formData.relationship}
+                    gender={formData.gender}
+                    style={styles.photoPreview}
+                    placeholderStyle={styles.photoPlaceholder}
+                    showEmoji={false}
+                    fallbackIcon="camera"
+                  />
                 ) : (
                   <View style={styles.photoPlaceholder}>
                     <Ionicons name="camera" size={30} color="#666" />

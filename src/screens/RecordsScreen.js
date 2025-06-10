@@ -130,8 +130,8 @@ const RecordsScreen = ({ navigation }) => {
           ...doc.data()
         }));
 
-        // Cache the data
-        await offlineStorageService.cacheFamilyMembers(membersData);
+        // Cache the data with photos
+        await offlineStorageService.cacheFamilyMembers(membersData, user.uid);
         return membersData;
       },
       {

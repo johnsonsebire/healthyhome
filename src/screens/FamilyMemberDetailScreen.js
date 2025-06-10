@@ -16,10 +16,12 @@ import { useAuth } from '../contexts/AuthContext';
 import { useFamilySharing } from '../contexts/FamilySharingContext';
 import { useError, ERROR_TYPES, ERROR_SEVERITY } from '../contexts/ErrorContext';
 import { hasAccessToRecords, getRelationshipCategory, FAMILY_CATEGORIES } from '../utils/familyRelationships';
-import { getGenderSpecificRelationship } from '../utils/genderBasedRelationships';
+import { getGenderSpecificRelationship, getRelationshipEmoji } from '../utils/genderBasedRelationships';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import networkService from '../services/networkService';
 import offlineStorageService from '../services/offlineStorage';
+import photoStorage from '../services/photoStorage';
+import CachedPhoto from '../components/CachedPhoto';
 import { getRecordTypeDisplayName, getRecordTypeIcon, getRecordTypeColor } from '../utils/recordTypes';
 
 const FamilyMemberDetailScreen = ({ route, navigation }) => {
@@ -85,6 +87,20 @@ const FamilyMemberDetailScreen = ({ route, navigation }) => {
         const memberDoc = await getDoc(doc(db, 'familyMembers', memberId));
         if (memberDoc.exists()) {
           const memberData = { id: memberDoc.id, ...memberDoc.data() };
+          
+          // Cache photo locally if it exists and user is available
+          if (memberData.photo && user?.uid) {
+            try {
+              const cachedPhotoUri = await photoStorage.cachePhoto(memberData.photo, user.uid, memberData.id);
+              if (cachedPhotoUri) {
+                memberData.photo = cachedPhotoUri;
+                memberData.isPhotoCached = true;
+              }
+            } catch (error) {
+              console.error('Error caching member photo:', error);
+            }
+          }
+          
           return memberData;
         } else {
           throw new Error('Family member not found');
@@ -105,6 +121,18 @@ const FamilyMemberDetailScreen = ({ route, navigation }) => {
       if (cachedMembers && cachedMembers.data) {
         const cachedMember = cachedMembers.data.find(m => m.id === memberId);
         if (cachedMember) {
+          // Try to get cached photo if not already cached
+          if (cachedMember.photo && !cachedMember.isPhotoCached && user?.uid) {
+            try {
+              const cachedPhotoUri = await photoStorage.getCachedPhoto(cachedMember.photo, user.uid, cachedMember.id);
+              if (cachedPhotoUri) {
+                cachedMember.photo = cachedPhotoUri;
+                cachedMember.isPhotoCached = true;
+              }
+            } catch (error) {
+              console.error('Error getting cached photo:', error);
+            }
+          }
           setFamilyMember(cachedMember);
         } else {
           Alert.alert('Error', 'Family member not found');
@@ -213,16 +241,17 @@ const FamilyMemberDetailScreen = ({ route, navigation }) => {
     <View style={styles.container}>
       {renderOfflineBanner()}
       
-      <ScrollView>
+      <ScrollView contentContainerStyle={{ paddingBottom: 90 }}>
         <View style={styles.header}>
           <View style={styles.profileContainer}>
-            {familyMember.photo ? (
-              <Image source={{ uri: familyMember.photo }} style={styles.profilePhoto} />
-            ) : (
-              <View style={styles.profilePhotoPlaceholder}>
-                <Ionicons name="person" size={60} color="#666" />
-              </View>
-            )}
+            <CachedPhoto
+              photoUri={familyMember.photo}
+              style={styles.profilePhoto}
+              placeholderStyle={styles.profilePhotoPlaceholder}
+              placeholderText={getRelationshipEmoji(familyMember.relationship, familyMember.gender)}
+              userId={user.uid}
+              memberId={familyMember.id}
+            />
             
             <View style={styles.profileInfo}>
               <Text style={styles.profileName}>{familyMember.name || 'Unknown'}</Text>
@@ -432,6 +461,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  profilePhotoEmoji: {
+    fontSize: 40,
   },
   profileInfo: {
     marginLeft: 20,

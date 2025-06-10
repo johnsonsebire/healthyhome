@@ -17,6 +17,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import FamilyTreeView from '../components/FamilyTreeView';
 import networkService from '../services/networkService';
 import offlineStorageService from '../services/offlineStorage';
+import photoStorage from '../services/photoStorage';
 
 const FamilyTreeScreen = ({ navigation }) => {
   const { user } = useAuth();
@@ -65,8 +66,8 @@ const FamilyTreeScreen = ({ navigation }) => {
           members.push({ id: doc.id, ...doc.data() });
         });
 
-        // Cache the data
-        await offlineStorageService.cacheFamilyMembers(members);
+        // Cache the data with photos
+        await offlineStorageService.cacheFamilyMembers(members, user.uid);
         return members;
       },
       {

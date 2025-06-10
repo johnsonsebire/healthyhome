@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import photoStorage from './photoStorage';
 
 // Offline storage service for caching data when network is unavailable
 const CACHE_KEYS = {
@@ -63,9 +64,21 @@ class OfflineStorageService {
     return this.getFromCache(CACHE_KEYS.MEDICAL_RECORDS);
   }
 
-  // Family Members caching
-  async cacheFamilyMembers(members) {
-    return this.saveToCache(CACHE_KEYS.FAMILY_MEMBERS, members);
+  // Family Members caching with photo support
+  async cacheFamilyMembers(members, userId = null) {
+    try {
+      // Cache photos locally if userId is provided
+      let membersWithCachedPhotos = members;
+      if (userId && members.length > 0) {
+        membersWithCachedPhotos = await photoStorage.cacheFamilyMemberPhotos(members, userId);
+      }
+      
+      return this.saveToCache(CACHE_KEYS.FAMILY_MEMBERS, membersWithCachedPhotos);
+    } catch (error) {
+      console.error('Error caching family members with photos:', error);
+      // Fallback to regular caching without photos
+      return this.saveToCache(CACHE_KEYS.FAMILY_MEMBERS, members);
+    }
   }
 
   async getCachedFamilyMembers() {
