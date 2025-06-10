@@ -56,14 +56,21 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
     
     // Find children
     const children = familyMembers.filter(member => member.relationship === 'Child');
-    children.forEach((child, index) => {
-      const childX = windowWidth / 2 - (children.length - 1) * 60 / 2 + index * 60;
-      layout.push({
-        ...child,
-        x: childX,
-        y: 240
+    
+    // Position children relative to both parents if spouse exists
+    if (children.length > 0) {
+      const childrenStartX = spouse 
+        ? (windowWidth / 2 + 60) - (children.length * 60) / 2  // Center children between self and spouse
+        : windowWidth / 2 - (children.length - 1) * 60 / 2;    // Center children under self if no spouse
+        
+      children.forEach((child, index) => {
+        layout.push({
+          ...child,
+          x: childrenStartX + index * 60,
+          y: 240
+        });
       });
-    });
+    }
     
     // Find parents
     const parents = familyMembers.filter(member => member.relationship === 'Parent');
@@ -135,64 +142,114 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
     const self = treeLayout.find(member => member.relationship === 'Self');
     const spouse = treeLayout.find(member => member.relationship === 'Spouse');
     
-    if (self && spouse) {
-      lines.push(
-        <Line
-          key="spouse-line"
-          x1={self.x}
-          y1={self.y + 100}
-          x2={spouse.x}
-          y2={spouse.y + 100}
-          stroke="#007AFF"
-          strokeWidth="2"
-        />
-      );
-    }
-    
-    // Connect self to children
+    // Connect self and spouse to children
     const children = treeLayout.filter(member => member.relationship === 'Child');
     if (self && children.length > 0) {
-      const midPointY = (self.y + children[0].y) / 2 + 100;
-      
-      lines.push(
-        <Line
-          key="self-children-line"
-          x1={self.x}
-          y1={self.y + 120}
-          x2={self.x}
-          y2={midPointY}
-          stroke="#007AFF"
-          strokeWidth="2"
-        />
-      );
-      
-      if (children.length > 1) {
+      // If there's a spouse, create a family unit connection
+      if (spouse) {
+        // Create a midpoint between self and spouse
+        const familyMidpointX = (self.x + spouse.x) / 2;
+        const familyMidpointY = self.y + 140;
+        
+        // Connect self and spouse to form family unit
         lines.push(
           <Line
-            key="children-connector"
-            x1={children[0].x}
-            y1={midPointY}
-            x2={children[children.length - 1].x}
+            key="spouse-line"
+            x1={self.x}
+            y1={self.y + 100}
+            x2={spouse.x}
+            y2={spouse.y + 100}
+            stroke="#007AFF"
+            strokeWidth="2"
+          />
+        );
+        
+        // Add vertical line down from the middle of self-spouse line
+        lines.push(
+          <Line
+            key="family-center-line"
+            x1={familyMidpointX}
+            y1={self.y + 100}
+            x2={familyMidpointX}
+            y2={familyMidpointY}
+            stroke="#007AFF"
+            strokeWidth="2"
+          />
+        );
+        
+        // Add horizontal line connecting all children
+        if (children.length > 1) {
+          lines.push(
+            <Line
+              key="children-connector"
+              x1={children[0].x}
+              y1={familyMidpointY}
+              x2={children[children.length - 1].x}
+              y2={familyMidpointY}
+              stroke="#007AFF"
+              strokeWidth="2"
+            />
+          );
+        }
+        
+        // Connect each child to the horizontal line
+        children.forEach((child, index) => {
+          lines.push(
+            <Line
+              key={`child-line-${index}`}
+              x1={child.x}
+              y1={familyMidpointY}
+              x2={child.x}
+              y2={child.y + 80}
+              stroke="#007AFF"
+              strokeWidth="2"
+            />
+          );
+        });
+      } else {
+        // If no spouse, fallback to original implementation
+        const midPointY = (self.y + children[0].y) / 2 + 100;
+        
+        lines.push(
+          <Line
+            key="self-children-line"
+            x1={self.x}
+            y1={self.y + 120}
+            x2={self.x}
             y2={midPointY}
             stroke="#007AFF"
             strokeWidth="2"
           />
         );
+        
+        if (children.length > 1) {
+          lines.push(
+            <Line
+              key="children-connector"
+              x1={children[0].x}
+              y1={midPointY}
+              x2={children[children.length - 1].x}
+              y2={midPointY}
+              stroke="#007AFF"
+              strokeWidth="2"
+            />
+          );
+        }
+        
+        children.forEach((child, index) => {
+          lines.push(
+            <Line
+              key={`child-line-${index}`}
+              x1={child.x}
+              y1={midPointY}
+              x2={child.x}
+              y2={child.y + 80}
+              stroke="#007AFF"
+              strokeWidth="2"
+            />
+          );
+        });
       }
-      
-      children.forEach((child, index) => {
-        lines.push(
-          <Line
-            key={`child-line-${index}`}
-            x1={child.x}
-            y1={midPointY}
-            x2={child.x}
-            y2={child.y + 80}
-            stroke="#007AFF"
-            strokeWidth="2"
-          />
-        );
-      });
     }
     
     // Connect self to parents
