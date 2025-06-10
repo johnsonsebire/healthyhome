@@ -16,9 +16,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { useFamilySharing } from '../contexts/FamilySharingContext';
 import { useError, ERROR_TYPES, ERROR_SEVERITY } from '../contexts/ErrorContext';
 import { hasAccessToRecords, getRelationshipCategory, FAMILY_CATEGORIES } from '../utils/familyRelationships';
+import { getGenderSpecificRelationship } from '../utils/genderBasedRelationships';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import networkService from '../services/networkService';
 import offlineStorageService from '../services/offlineStorage';
+import { getRecordTypeDisplayName, getRecordTypeIcon, getRecordTypeColor } from '../utils/recordTypes';
 
 const FamilyMemberDetailScreen = ({ route, navigation }) => {
   const { memberId } = route.params;
@@ -225,7 +227,9 @@ const FamilyMemberDetailScreen = ({ route, navigation }) => {
             <View style={styles.profileInfo}>
               <Text style={styles.profileName}>{familyMember.name || 'Unknown'}</Text>
               <View style={styles.relationshipContainer}>
-                <Text style={styles.relationshipText}>{familyMember.relationship}</Text>
+                <Text style={styles.relationshipText}>
+                  {getGenderSpecificRelationship(familyMember.relationship, familyMember.gender)}
+                </Text>
                 <View style={[
                   styles.categoryBadge, 
                   getRelationshipCategory(familyMember.relationship) === FAMILY_CATEGORIES.NUCLEAR
@@ -238,17 +242,37 @@ const FamilyMemberDetailScreen = ({ route, navigation }) => {
                 </View>
               </View>
               
+              {familyMember.gender && (
+                <Text style={styles.profileDetail}>
+                  <Ionicons name="person" size={16} color="#666" /> {familyMember.gender}
+                </Text>
+              )}
+              
               {familyMember.email && (
                 <Text style={styles.profileDetail}>
                   <Ionicons name="mail" size={16} color="#666" /> {familyMember.email}
                 </Text>
               )}
             </View>
+            
+            <TouchableOpacity
+              style={styles.editButton}
+              onPress={() => navigation.navigate('FamilyMember', { editMemberId: memberId })}
+            >
+              <Ionicons name="pencil" size={20} color="#007AFF" />
+            </TouchableOpacity>
           </View>
         </View>
         
         <View style={styles.detailsCard}>
           <Text style={styles.sectionTitle}>Personal Information</Text>
+          
+          {familyMember.gender && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Gender</Text>
+              <Text style={styles.detailValue}>{familyMember.gender}</Text>
+            </View>
+          )}
           
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Date of Birth</Text>
@@ -279,7 +303,7 @@ const FamilyMemberDetailScreen = ({ route, navigation }) => {
             
             {hasAccess ? (
               <TouchableOpacity
-                onPress={() => navigation.navigate('AddRecordScreen', { familyMemberId: memberId })}
+                onPress={() => navigation.navigate('AddRecord', { familyMemberId: memberId })}
               >
                 <Text style={styles.addRecordText}>Add Record</Text>
               </TouchableOpacity>
@@ -304,7 +328,7 @@ const FamilyMemberDetailScreen = ({ route, navigation }) => {
               <Text style={styles.emptyRecordsText}>No medical records found</Text>
               <TouchableOpacity
                 style={styles.addFirstRecordButton}
-                onPress={() => navigation.navigate('AddRecordScreen', { familyMemberId: memberId })}
+                onPress={() => navigation.navigate('AddRecord', { familyMemberId: memberId })}
               >
                 <Text style={styles.addFirstRecordText}>Add First Record</Text>
               </TouchableOpacity>
@@ -314,13 +338,18 @@ const FamilyMemberDetailScreen = ({ route, navigation }) => {
               <TouchableOpacity
                 key={record.id}
                 style={styles.recordItem}
-                onPress={() => navigation.navigate('RecordDetailScreen', { recordId: record.id })}
+                onPress={() => navigation.navigate('RecordDetail', { recordId: record.id })}
               >
-                <View style={styles.recordIcon}>
-                  <Ionicons name="document-text" size={24} color="#007AFF" />
+                <View style={[styles.recordIcon, { backgroundColor: getRecordTypeColor(record.type) + '20' }]}>
+                  <Ionicons name={getRecordTypeIcon(record.type)} size={24} color={getRecordTypeColor(record.type)} />
                 </View>
                 <View style={styles.recordInfo}>
-                  <Text style={styles.recordTitle}>{record.title || 'Untitled Record'}</Text>
+                  <Text style={styles.recordTitle}>
+                    {record.title || getRecordTypeDisplayName(record.type) || 'Untitled Record'}
+                  </Text>
+                  <Text style={[styles.recordType, { color: getRecordTypeColor(record.type) }]}>
+                    {getRecordTypeDisplayName(record.type)}
+                  </Text>
                   <Text style={styles.recordDate}>
                     {record.date ? formatDate(record.date) : 'No date'}
                   </Text>
@@ -579,6 +608,11 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 4,
   },
+  recordType: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
   recordDate: {
     fontSize: 14,
     color: '#666',
@@ -603,6 +637,17 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '600',
     marginLeft: 8,
+  },
+  editButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f0f7ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'absolute',
+    right: 0,
+    top: 0,
   },
 });
 

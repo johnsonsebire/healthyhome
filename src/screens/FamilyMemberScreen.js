@@ -26,8 +26,10 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import ValidationError from '../components/ValidationError';
 import { validateForm, getFieldError, hasFieldError } from '../utils/validation';
 import { placeholderTextColor, getStandardTextInputProps } from '../utils/inputStyles';
+import { getGenderSpecificRelationship, getRelationshipEmoji } from '../utils/genderBasedRelationships';
 
-const FamilyMemberScreen = () => {
+const FamilyMemberScreen = ({ route, navigation }) => {
+  const { editMemberId } = route.params || {};
   const { user, userProfile } = useAuth();
   const { subscription, checkUsageLimit, canAddFamilyMember, currentPlan, plans } = useSubscription();
   const { withErrorHandling, isLoading } = useError();
@@ -42,6 +44,7 @@ const FamilyMemberScreen = () => {
   const [formData, setFormData] = useState({
     name: '',
     relationship: '',
+    gender: '',
     dateOfBirth: '',
     bloodType: '',
     allergies: '',
@@ -53,6 +56,8 @@ const FamilyMemberScreen = () => {
   const relationships = [
     'Self', 'Spouse', 'Child', 'Parent', 'Sibling', 'Grandparent', 'Grandchild', 'Other'
   ];
+
+  const genders = ['Male', 'Female', 'Other'];
 
   const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -72,6 +77,16 @@ const FamilyMemberScreen = () => {
 
     return unsubscribe;
   }, [user]);
+
+  // Load the specific family member for editing if editMemberId is provided
+  useEffect(() => {
+    if (editMemberId && familyMembers.length > 0) {
+      const memberToEdit = familyMembers.find(m => m.id === editMemberId);
+      if (memberToEdit) {
+        handleEditMember(memberToEdit);
+      }
+    }
+  }, [editMemberId, familyMembers]);
 
   const loadFamilyMembers = async () => {
     const result = await withErrorHandling(
@@ -223,6 +238,7 @@ const FamilyMemberScreen = () => {
       setFormData({
         name: '',
         relationship: '',
+        gender: '',
         dateOfBirth: '',
         bloodType: '',
         allergies: '',
@@ -243,6 +259,7 @@ const FamilyMemberScreen = () => {
     setFormData({
       name: member.name || '',
       relationship: member.relationship || '',
+      gender: member.gender || '',
       dateOfBirth: member.dateOfBirth || '',
       bloodType: member.bloodType || '',
       allergies: member.allergies || '',
@@ -405,7 +422,7 @@ const FamilyMemberScreen = () => {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={{ flexGrow: 1 }}>
       {/* Offline Indicator */}
       {!isOnline && (
         <View style={styles.offlineIndicator}>
@@ -422,13 +439,12 @@ const FamilyMemberScreen = () => {
         <Text style={styles.subtitle}>
           {familyMembers.length}/{getFamilyMemberLimit()} members
         </Text>
-      </View>
-
-      <ScrollView 
+      </View>      <ScrollView
         style={styles.content}
         refreshControl={
           <RefreshControl refreshing={loading} onRefresh={onRefresh} />
         }
+        showsVerticalScrollIndicator={false}
       >
         {familyMembers && familyMembers.length > 0 && familyMembers.map((member) => (
           member && member.id ? (
@@ -438,12 +454,21 @@ const FamilyMemberScreen = () => {
                   <Image source={{ uri: member.photo }} style={styles.memberPhoto} />
                 ) : (
                   <View style={styles.memberPhotoPlaceholder}>
-                    <Ionicons name="person" size={30} color="#666" />
+                    <Text style={styles.memberPhotoText}>
+                      {getRelationshipEmoji(member.relationship, member.gender)}
+                    </Text>
                   </View>
                 )}
                 <View style={styles.memberDetails}>
                   <Text style={styles.memberName}>{member.name || 'Unknown'}</Text>
-                  <Text style={styles.memberRelationship}>{member.relationship || 'Unknown'}</Text>
+                  <Text style={styles.memberRelationship}>
+                    {getGenderSpecificRelationship(member.relationship, member.gender)}
+                  </Text>
+                  {member.gender && (
+                    <Text style={styles.memberGender}>
+                      {member.gender === 'Male' ? '👨 Male' : member.gender === 'Female' ? '👩 Female' : '🧑 Other'}
+                    </Text>
+                  )}
                   {member.dateOfBirth && (
                     <Text style={styles.memberInfo}>DOB: {member.dateOfBirth}</Text>
                   )}
@@ -585,6 +610,33 @@ const FamilyMemberScreen = () => {
             </View>
 
             <View style={styles.formGroup}>
+              <Text style={styles.label}>Gender</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.genderButtons}>
+                  {genders.map((gender) => (
+                    <TouchableOpacity
+                      key={gender}
+                      style={[
+                        styles.genderButton,
+                        formData.gender === gender && styles.genderButtonActive,
+                      ]}
+                      onPress={() => setFormData({ ...formData, gender })}
+                    >
+                      <Text
+                        style={[
+                          styles.genderButtonText,
+                          formData.gender === gender && styles.genderButtonTextActive,
+                        ]}
+                      >
+                        {gender === 'Male' ? '👨 Male' : gender === 'Female' ? '👩 Female' : '🧑 Other'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+
+            <View style={styles.formGroup}>
               <Text style={styles.label}>Date of Birth</Text>
               <TouchableOpacity
                 style={styles.dateInput}
@@ -656,7 +708,7 @@ const FamilyMemberScreen = () => {
               <ValidationError error={getFieldError('emergencyContact', validationErrors)} />
             </View>
 
-            <View style={styles.formGroup}>
+            <View style={[styles.formGroup, { marginBottom: 50 }]}>
               <Text style={styles.label}>Email</Text>
               <TextInput
                 style={[
@@ -671,39 +723,6 @@ const FamilyMemberScreen = () => {
                 {...getStandardTextInputProps()}
               />
               <ValidationError error={getFieldError('email', validationErrors)} />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Sharing Preference</Text>
-              <View style={styles.sharingPreferenceContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.sharingPreferenceButton,
-                    formData.sharingPreference === 'nuclear' && styles.sharingPreferenceButtonActive,
-                  ]}
-                  onPress={() => setFormData({ ...formData, sharingPreference: 'nuclear' })}
-                >
-                  <Text style={styles.sharingPreferenceText}>Nuclear Family</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.sharingPreferenceButton,
-                    formData.sharingPreference === 'all' && styles.sharingPreferenceButtonActive,
-                  ]}
-                  onPress={() => setFormData({ ...formData, sharingPreference: 'all' })}
-                >
-                  <Text style={styles.sharingPreferenceText}>All Family Members</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.sharingPreferenceButton,
-                    formData.sharingPreference === 'none' && styles.sharingPreferenceButtonActive,
-                  ]}
-                  onPress={() => setFormData({ ...formData, sharingPreference: 'none' })}
-                >
-                  <Text style={styles.sharingPreferenceText}>No Sharing</Text>
-                </TouchableOpacity>
-              </View>
             </View>
           </ScrollView>
         </View>
@@ -742,7 +761,7 @@ const FamilyMemberScreen = () => {
           </View>
         </Modal>
       )}
-    </View>
+    </ScrollView>
   );
 };
 
@@ -779,7 +798,7 @@ const styles = StyleSheet.create({
   },
   memberCard: {
     backgroundColor: 'white',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     flexDirection: 'row',
@@ -787,9 +806,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
   },
   memberInfo: {
     flexDirection: 'row',
@@ -806,10 +827,15 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#f8f9fa',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
+    borderWidth: 2,
+    borderColor: '#e9ecef',
+  },
+  memberPhotoText: {
+    fontSize: 24,
   },
   memberDetails: {
     flex: 1,
@@ -823,7 +849,36 @@ const styles = StyleSheet.create({
   memberRelationship: {
     fontSize: 16,
     color: '#007AFF',
+    fontWeight: '500',
     marginBottom: 2,
+  },
+  memberGender: {
+    fontSize: 14,
+    color: '#10b981',
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  memberInfo: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 1,
+  },
+  memberRelationship: {
+    fontSize: 16,
+    color: '#007AFF',
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  memberGender: {
+    fontSize: 14,
+    color: '#10b981',
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  memberInfo: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 1,
   },
   memberActions: {
     flexDirection: 'row',
@@ -1042,6 +1097,29 @@ const styles = StyleSheet.create({
   relationshipButtonTextActive: {
     color: 'white',
   },
+  genderButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  genderButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    backgroundColor: 'white',
+  },
+  genderButtonActive: {
+    backgroundColor: '#10b981',
+    borderColor: '#10b981',
+  },
+  genderButtonText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  genderButtonTextActive: {
+    color: 'white',
+  },
   bloodTypeButtons: {
     flexDirection: 'row',
     gap: 8,
@@ -1080,31 +1158,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#ef4444',
     fontWeight: '500',
-  },
-  sharingPreferenceContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  sharingPreferenceButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    backgroundColor: 'white',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 4,
-  },
-  sharingPreferenceButtonActive: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
-  },
-  sharingPreferenceText: {
-    fontSize: 14,
-    color: '#333',
   },
 });
 

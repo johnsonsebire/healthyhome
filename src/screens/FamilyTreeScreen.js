@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
+  ScrollView,
   Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -124,28 +125,37 @@ const FamilyTreeScreen = ({ navigation }) => {
         </Text>
       </View>
 
-      <View style={styles.treeContainer}>
-        <FamilyTreeView 
-          familyMembers={familyMembers}
-          onMemberPress={handleMemberPress}
-        />
-      </View>
+      <ScrollView 
+        style={styles.scrollContainer}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.treeContainer}>
+          <FamilyTreeView 
+            familyMembers={familyMembers}
+            onMemberPress={handleMemberPress}
+          />
+        </View>
 
-      <View style={styles.instructionsContainer}>
-        <Text style={styles.instructionsTitle}>
-          <Ionicons name="information-circle" size={16} color="#666" /> How to use
-        </Text>
-        <Text style={styles.instructionsText}>
-          • Tap on any family member to view their details{'\n'}
-          • Blue circles represent your nuclear family{'\n'}
-          • Purple circles represent extended family{'\n'}
-          • Add more family members to expand your tree
-        </Text>
-      </View>
+        <View style={styles.instructionsContainer}>
+          <Text style={styles.instructionsTitle}>
+            <Ionicons name="information-circle" size={16} color="#666" /> How to use
+          </Text>
+          <Text style={styles.instructionsText}>
+            • Tap on any family member to view their details{'\n'}
+            • Blue circles represent your nuclear family{'\n'}
+            • Purple circles represent extended family{'\n'}
+            • Add more family members to expand your tree
+          </Text>
+        </View>
+
+        {/* Add spacing after instructions so FAB doesn't obstruct content */}
+        <View style={styles.bottomSpacing} />
+      </ScrollView>
 
       <TouchableOpacity
         style={styles.addButton}
-        onPress={() => navigation.navigate('FamilyMemberScreen')}
+        onPress={() => navigation.navigate('FamilyMember')}
       >
         <Ionicons name="person-add" size={20} color="white" />
         <Text style={styles.addButtonText}>Add Family Member</Text>
@@ -195,8 +205,13 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 5,
   },
-  treeContainer: {
+  scrollContainer: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 100, // Extra padding for FAB
+  },
+  treeContainer: {
     backgroundColor: 'white',
     margin: 16,
     borderRadius: 12,
@@ -206,6 +221,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    minHeight: 300, // Ensure minimum height for tree
   },
   instructionsContainer: {
     backgroundColor: '#f8f9fa',
@@ -226,6 +242,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     lineHeight: 20,
+  },
+  bottomSpacing: {
+    height: 80, // Space for floating action button
   },
   addButton: {
     position: 'absolute',

@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getRelationshipCategory, FAMILY_CATEGORIES } from '../utils/familyRelationships';
+import { getGenderSpecificRelationship } from '../utils/genderBasedRelationships';
 import Svg, { Line, Circle, Text as SvgText } from 'react-native-svg';
 
 const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
@@ -26,7 +27,7 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
     const self = familyMembers.find(member => member.relationship === 'Self');
     
     if (!self) {
-      // If no self, just arrange linearly
+      // If no self, arrange linearly
       const layout = familyMembers.map((member, index) => ({
         ...member,
         x: windowWidth / 2,
@@ -135,14 +136,13 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
     const spouse = treeLayout.find(member => member.relationship === 'Spouse');
     
     if (self && spouse) {
-      // Connect self and spouse with a horizontal line
       lines.push(
         <Line
           key="spouse-line"
           x1={self.x}
-          y1={self.y}
+          y1={self.y + 100}
           x2={spouse.x}
-          y2={spouse.y}
+          y2={spouse.y + 100}
           stroke="#007AFF"
           strokeWidth="2"
         />
@@ -152,14 +152,13 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
     // Connect self to children
     const children = treeLayout.filter(member => member.relationship === 'Child');
     if (self && children.length > 0) {
-      // Vertical line down from self
-      const midPointY = (self.y + children[0].y) / 2;
+      const midPointY = (self.y + children[0].y) / 2 + 100;
       
       lines.push(
         <Line
           key="self-children-line"
           x1={self.x}
-          y1={self.y + 20}
+          y1={self.y + 120}
           x2={self.x}
           y2={midPointY}
           stroke="#007AFF"
@@ -167,7 +166,6 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
         />
       );
       
-      // Horizontal line connecting all children
       if (children.length > 1) {
         lines.push(
           <Line
@@ -182,7 +180,6 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
         );
       }
       
-      // Vertical lines to each child
       children.forEach((child, index) => {
         lines.push(
           <Line
@@ -190,7 +187,7 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
             x1={child.x}
             y1={midPointY}
             x2={child.x}
-            y2={child.y - 20}
+            y2={child.y + 80}
             stroke="#007AFF"
             strokeWidth="2"
           />
@@ -201,14 +198,13 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
     // Connect self to parents
     const parents = treeLayout.filter(member => member.relationship === 'Parent');
     if (self && parents.length > 0) {
-      // Vertical line up from self
-      const midPointY = (self.y + parents[0].y) / 2;
+      const midPointY = (self.y + parents[0].y) / 2 + 100;
       
       lines.push(
         <Line
           key="self-parents-line"
           x1={self.x}
-          y1={self.y - 20}
+          y1={self.y + 80}
           x2={self.x}
           y2={midPointY}
           stroke="#007AFF"
@@ -216,7 +212,6 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
         />
       );
       
-      // Horizontal line connecting all parents
       if (parents.length > 1) {
         lines.push(
           <Line
@@ -231,7 +226,6 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
         );
       }
       
-      // Vertical lines to each parent
       parents.forEach((parent, index) => {
         lines.push(
           <Line
@@ -239,7 +233,7 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
             x1={parent.x}
             y1={midPointY}
             x2={parent.x}
-            y2={parent.y + 20}
+            y2={parent.y + 120}
             stroke="#007AFF"
             strokeWidth="2"
           />
@@ -250,15 +244,14 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
     // Connect parents to grandparents
     const grandparents = treeLayout.filter(member => member.relationship === 'Grandparent');
     if (parents.length > 0 && grandparents.length > 0) {
-      // Simplified connection - just connect to first parent
       if (parents[0] && grandparents[0]) {
         lines.push(
           <Line
             key="parent-grandparent-line"
             x1={parents[0].x}
-            y1={parents[0].y - 20}
+            y1={parents[0].y + 80}
             x2={grandparents[0].x}
-            y2={grandparents[0].y + 20}
+            y2={grandparents[0].y + 120}
             stroke="#5E5CE6"
             strokeWidth="1.5"
             strokeDasharray="5,5"
@@ -270,15 +263,14 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
     // Connect children to grandchildren
     const grandchildren = treeLayout.filter(member => member.relationship === 'Grandchild');
     if (children.length > 0 && grandchildren.length > 0) {
-      // Simplified connection - just connect to first child
       if (children[0] && grandchildren[0]) {
         lines.push(
           <Line
             key="child-grandchild-line"
             x1={children[0].x}
-            y1={children[0].y + 20}
+            y1={children[0].y + 120}
             x2={grandchildren[0].x}
-            y2={grandchildren[0].y - 20}
+            y2={grandchildren[0].y + 80}
             stroke="#5E5CE6"
             strokeWidth="1.5"
             strokeDasharray="5,5"
@@ -300,71 +292,81 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
   }
 
   return (
-    <ScrollView 
-      horizontal={true} 
-      contentContainerStyle={{width: Math.max(windowWidth, 800)}}
+    <ScrollView
+      horizontal={true}
+      showsVerticalScrollIndicator={false}
+      showsHorizontalScrollIndicator={true}
+      contentContainerStyle={styles.scrollContent}
+      style={styles.scrollContainer}
     >
-      <ScrollView>
-        <View style={styles.container}>
-          <Svg height="500" width="100%">
-            {/* Draw connector lines first so they appear behind the nodes */}
-            {getConnectorLines()}
-            
-            {/* Draw nodes */}
-            {treeLayout.map((member, index) => (
-              <React.Fragment key={member.id || index}>
-                {/* Node circle */}
-                <Circle
-                  cx={member.x}
-                  cy={member.y}
-                  r={30}
-                  fill={getNodeColor(member.relationship)}
-                  onPress={() => onMemberPress(member)}
-                />
-                
-                {/* Node label */}
-                <SvgText
-                  x={member.x}
-                  y={member.y + 50}
-                  textAnchor="middle"
-                  fill="#333"
-                  fontSize="12"
-                >
-                  {member.name?.split(' ')[0] || 'Unknown'}
-                </SvgText>
-                
-                <SvgText
-                  x={member.x}
-                  y={member.y + 65}
-                  textAnchor="middle"
-                  fill="#666"
-                  fontSize="10"
-                >
-                  {member.relationship}
-                </SvgText>
-              </React.Fragment>
-            ))}
-          </Svg>
-        </View>
+      <ScrollView
+        showsVerticalScrollIndicator={true}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.verticalScrollContent}
+      >
+        <Svg height="600" width={Math.max(windowWidth * 1.5, 1000)}>
+          {getConnectorLines()}
+          {treeLayout.map((member, index) => (
+            <React.Fragment key={member.id || index}>
+              <Circle
+                cx={member.x}
+                cy={member.y + 100}
+                r={30}
+                fill={getNodeColor(member.relationship)}
+                onPress={() => onMemberPress(member)}
+              />
+              <SvgText
+                x={member.x}
+                y={member.y + 150}
+                textAnchor="middle"
+                fill="#333"
+                fontSize="12"
+                fontWeight="600"
+              >
+                {member.name?.split(' ')[0] || 'Unknown'}
+              </SvgText>
+              <SvgText
+                x={member.x}
+                y={member.y + 165}
+                textAnchor="middle"
+                fill="#666"
+                fontSize="10"
+              >
+                {getGenderSpecificRelationship(member.relationship, member.gender)}
+              </SvgText>
+            </React.Fragment>
+          ))}
+        </Svg>
       </ScrollView>
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  scrollContainer: {
+    flex: 1,
+  },
+  scrollContent: {
+    minWidth: 1000,
+    alignItems: 'center',
+  },
+  verticalScrollContent: {
     paddingVertical: 20,
-    minHeight: 500,
+    paddingHorizontal: 20,
+    minHeight: 600,
+    justifyContent: 'center',
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     padding: 50,
+    flex: 1,
   },
   emptyText: {
     fontSize: 16,
     color: '#666',
     marginTop: 10,
+    textAlign: 'center',
   },
 });
 

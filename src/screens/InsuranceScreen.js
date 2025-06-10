@@ -17,6 +17,7 @@ import offlineStorageService from '../services/offlineStorage';
 import networkService from '../services/networkService';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
+import InsuranceRecommendationModal from '../components/InsuranceRecommendationModal';
 import { getProviderDisplayName } from '../utils/recordTypes';
 
 const InsuranceScreen = ({ navigation }) => {
@@ -25,6 +26,7 @@ const InsuranceScreen = ({ navigation }) => {
   const [insuranceRecords, setInsuranceRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(true);
+  const [showRecommendationModal, setShowRecommendationModal] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -191,10 +193,10 @@ const InsuranceScreen = ({ navigation }) => {
                 color="#8b5cf6"
               />
               <QuickAction
-                icon="search"
+                icon="paper-plane"
                 title="Recommend a Provider"
-                subtitle="Find insurance options"
-                onPress={() => Alert.alert('Coming Soon', 'Provider recommendations will be available soon')}
+                subtitle="Suggest providers to our team"
+                onPress={() => setShowRecommendationModal(true)}
                 color="#10b981"
               />
             </View>
@@ -206,6 +208,27 @@ const InsuranceScreen = ({ navigation }) => {
           <EmptyStateComponent />
         ) : (
           <View style={styles.section}>
+            {/* Insurance Statistics */}
+            <View style={styles.statsContainer}>
+              <Text style={styles.sectionTitle}>Your Coverage Overview</Text>
+              <View style={styles.statsGrid}>
+                <View style={styles.statCard}>
+                  <Text style={styles.statNumber}>{insuranceRecords.length}</Text>
+                  <Text style={styles.statLabel}>Insurance Cards</Text>
+                </View>
+                <View style={styles.statCard}>
+                  <Text style={styles.statNumber}>{getUniqueProviders().length}</Text>
+                  <Text style={styles.statLabel}>Providers</Text>
+                </View>
+                <View style={styles.statCard}>
+                  <Text style={styles.statNumber}>
+                    {insuranceRecords.filter(r => r.expiryDate && new Date(r.expiryDate) > new Date()).length}
+                  </Text>
+                  <Text style={styles.statLabel}>Active Cards</Text>
+                </View>
+              </View>
+            </View>
+
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Your Insurance Cards</Text>
               <TouchableOpacity onPress={() => navigation.navigate('AddRecord', { type: 'insurance' })}>
@@ -273,6 +296,12 @@ const InsuranceScreen = ({ navigation }) => {
       >
         <Ionicons name="add" size={24} color="#ffffff" />
       </TouchableOpacity>
+
+      {/* Insurance Recommendation Modal */}
+      <InsuranceRecommendationModal
+        visible={showRecommendationModal}
+        onClose={() => setShowRecommendationModal(false)}
+      />
     </View>
   );
 };
@@ -303,6 +332,36 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6366f1',
     fontWeight: '600',
+  },
+  statsContainer: {
+    marginBottom: 32,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  statNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#8b5cf6',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    textAlign: 'center',
   },
   quickActions: {
     gap: 12,

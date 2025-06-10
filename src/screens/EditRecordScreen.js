@@ -28,6 +28,7 @@ import networkService from '../services/networkService';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import ValidationError from '../components/ValidationError';
 import { validateForm, getFieldError, hasFieldError } from '../utils/validation';
+import { getGenderSpecificRelationship } from '../utils/genderBasedRelationships';
 import { placeholderTextColor, getStandardTextInputProps } from '../utils/inputStyles';
 import { 
   COUNTRIES, 
@@ -908,7 +909,9 @@ const EditRecordScreen = ({ route, navigation }) => {
               }}
             >
               <Text style={styles.memberOptionText}>{member.name}</Text>
-              <Text style={styles.memberOptionSubtext}>{member.relationship}</Text>
+              <Text style={styles.memberOptionSubtext}>
+                {getGenderSpecificRelationship(member.relationship, member.gender)}
+              </Text>
             </TouchableOpacity>
           ))}
           <TouchableOpacity
@@ -1053,7 +1056,9 @@ const EditRecordScreen = ({ route, navigation }) => {
                 {selectedMember ? (
                   <View style={styles.selectedOption}>
                     <Text style={styles.selectedText}>{selectedMember.name}</Text>
-                    <Text style={styles.selectedSubtext}>{selectedMember.relationship}</Text>
+                    <Text style={styles.selectedSubtext}>
+                      {getGenderSpecificRelationship(selectedMember.relationship, selectedMember.gender)}
+                    </Text>
                   </View>
                 ) : (
                   <Text style={styles.placeholderText}>Select family member</Text>
