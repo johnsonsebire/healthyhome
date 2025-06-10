@@ -211,20 +211,22 @@ const InsuranceScreen = ({ navigation }) => {
             {/* Insurance Statistics */}
             <View style={styles.statsContainer}>
               <Text style={styles.sectionTitle}>Your Coverage Overview</Text>
-              <View style={styles.statsGrid}>
-                <View style={styles.statCard}>
-                  <Text style={styles.statNumber}>{insuranceRecords.length}</Text>
-                  <Text style={styles.statLabel}>Insurance Cards</Text>
-                </View>
-                <View style={styles.statCard}>
-                  <Text style={styles.statNumber}>{getUniqueProviders().length}</Text>
-                  <Text style={styles.statLabel}>Providers</Text>
-                </View>
-                <View style={styles.statCard}>
-                  <Text style={styles.statNumber}>
-                    {insuranceRecords.filter(r => r.expiryDate && new Date(r.expiryDate) > new Date()).length}
-                  </Text>
-                  <Text style={styles.statLabel}>Active Cards</Text>
+              <View style={styles.statsGridContainer}>
+                <View style={styles.statsGrid}>
+                  <View style={styles.statCard}>
+                    <Text style={styles.statNumber}>{insuranceRecords.length}</Text>
+                    <Text style={styles.statLabel}>Insurance Cards</Text>
+                  </View>
+                  <View style={styles.statCard}>
+                    <Text style={styles.statNumber}>{getUniqueProviders().length}</Text>
+                    <Text style={styles.statLabel}>Providers</Text>
+                  </View>
+                  <View style={styles.statCard}>
+                    <Text style={styles.statNumber}>
+                      {insuranceRecords.filter(r => r.expiryDate && new Date(r.expiryDate) > new Date()).length}
+                    </Text>
+                    <Text style={styles.statLabel}>Active Cards</Text>
+                  </View>
                 </View>
               </View>
             </View>
@@ -335,6 +337,9 @@ const styles = StyleSheet.create({
   },
   statsContainer: {
     marginBottom: 32,
+  },
+  statsGridContainer: {
+    marginTop: 16, // Add spacing between title and stats grid
   },
   statsGrid: {
     flexDirection: 'row',

@@ -5,7 +5,8 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  TextInput
+  TextInput,
+  Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -18,14 +19,14 @@ const HelpFaqScreen = ({ navigation }) => {
       id: '1',
       category: 'Account',
       question: 'How do I create a family member profile?',
-      answer: 'To create a family member profile, go to the Settings tab, tap on "Family Members", and then tap the "+" button in the top right corner. Fill in the required information and tap "Save" to add the family member.'
+      answer: 'To create a family member profile, go to the Settings tab, tap on "Family Members", and then tap the floating "+" button in the bottom right corner of the app. Fill in the required information and tap "Save" to add the family member.'
     },
-    {
+    /*{
       id: '2',
       category: 'Account',
       question: 'How do I change my password?',
       answer: 'To change your password, go to the Settings tab, tap on "Profile", then tap "Security", and select "Change Password". You will need to enter your current password and then your new password twice to confirm the change.'
-    },
+    },*/
     {
       id: '3',
       category: 'Records',
@@ -159,7 +160,10 @@ const HelpFaqScreen = ({ navigation }) => {
           <Text style={styles.contactText}>
             If you couldn't find the answer you're looking for, feel free to contact our support team.
           </Text>
-          <TouchableOpacity style={styles.contactButton}>
+          <TouchableOpacity 
+            style={styles.contactButton}
+            onPress={() => Alert.alert('Contact Support', 'Email: support@manifestghana.com')}
+          >
             <Ionicons name="mail-outline" size={20} color="#ffffff" />
             <Text style={styles.contactButtonText}>Contact Support</Text>
           </TouchableOpacity>

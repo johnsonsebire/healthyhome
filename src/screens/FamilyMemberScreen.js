@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { useError, ERROR_TYPES, ERROR_SEVERITY } from '../contexts/ErrorContext';
+import WrappedDateTimePicker from '../components/WrappedDateTimePicker';
 import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, where } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
 import * as ImagePicker from 'expo-image-picker';
@@ -463,7 +464,9 @@ const FamilyMemberScreen = ({ route, navigation }) => {
       {/* Offline Indicator */}
       {!isOnline && (
         <View style={styles.offlineIndicator}>
-          <Ionicons name="cloud-offline" size={16} color="#ef4444" />
+          <Text>
+            <Ionicons name="cloud-offline" size={16} color="#ef4444" />
+          </Text>
           <Text style={styles.offlineText}>Offline - Data may not be current</Text>
         </View>
       )}
@@ -528,7 +531,9 @@ const FamilyMemberScreen = ({ route, navigation }) => {
                     handleEditMember(member);
                   }}
                 >
-                  <Ionicons name="pencil" size={20} color="#007AFF" />
+                  <Text>
+                    <Ionicons name="pencil" size={20} color="#007AFF" />
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.actionButton}
@@ -537,7 +542,9 @@ const FamilyMemberScreen = ({ route, navigation }) => {
                     handleDeleteMember(member.id);
                   }}
                 >
-                  <Ionicons name="trash" size={20} color="#FF3B30" />
+                  <Text>
+                    <Ionicons name="trash" size={20} color="#FF3B30" />
+                  </Text>
                 </TouchableOpacity>
               </View>
             </TouchableOpacity>
@@ -546,7 +553,9 @@ const FamilyMemberScreen = ({ route, navigation }) => {
 
         {(!familyMembers || familyMembers.length === 0) && (
           <View style={styles.emptyState}>
-            <Ionicons name="people" size={64} color="#DDD" />
+            <Text>
+              <Ionicons name="people" size={64} color="#DDD" />
+            </Text>
             <Text style={styles.emptyStateText}>No family members added yet</Text>
             <Text style={styles.emptyStateSubtext}>
               Start by adding yourself and your family members to manage medical records
@@ -569,7 +578,9 @@ const FamilyMemberScreen = ({ route, navigation }) => {
           setShowAddModal(true);
         }}
       >
-        <Ionicons name="add" size={24} color="white" />
+        <Text>
+          <Ionicons name="add" size={24} color="white" />
+        </Text>
       </TouchableOpacity>
 
       <Modal
@@ -612,7 +623,9 @@ const FamilyMemberScreen = ({ route, navigation }) => {
                   />
                 ) : (
                   <View style={styles.photoPlaceholder}>
-                    <Ionicons name="camera" size={30} color="#666" />
+                    <Text>
+                      <Ionicons name="camera" size={30} color="#666" />
+                    </Text>
                     <Text style={styles.photoText}>Add Photo</Text>
                   </View>
                 )}
@@ -707,7 +720,9 @@ const FamilyMemberScreen = ({ route, navigation }) => {
                 ]}>
                   {formData.dateOfBirth || 'Select date of birth'}
                 </Text>
-                <Ionicons name="calendar" size={20} color="#666" />
+                <Text>
+                  <Ionicons name="calendar" size={20} color="#666" />
+                </Text>
               </TouchableOpacity>
             </View>
 
@@ -808,7 +823,7 @@ const FamilyMemberScreen = ({ route, navigation }) => {
                   </TouchableOpacity>
                 </View>
               )}
-              <DateTimePicker
+              <WrappedDateTimePicker
                 value={selectedDate}
                 mode="date"
                 display={Platform.OS === 'ios' ? 'spinner' : 'default'}

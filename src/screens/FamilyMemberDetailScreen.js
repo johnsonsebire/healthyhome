@@ -191,11 +191,12 @@ const FamilyMemberDetailScreen = ({ route, navigation }) => {
     setRecordsLoading(false);
   };
 
-  const renderOfflineBanner = () => {
-    if (!isOnline) {
+  const renderOfflineBanner = () => {      if (!isOnline) {
       return (
         <View style={styles.offlineIndicator}>
-          <Ionicons name="cloud-offline" size={16} color="#ef4444" />
+          <Text>
+            <Ionicons name="cloud-offline" size={16} color="#ef4444" />
+          </Text>
           <Text style={styles.offlineText}>Offline - Data may not be current</Text>
         </View>
       );
@@ -225,7 +226,9 @@ const FamilyMemberDetailScreen = ({ route, navigation }) => {
   if (!familyMember) {
     return (
       <View style={styles.errorContainer}>
-        <Ionicons name="alert-circle" size={64} color="#DDD" />
+        <Text>
+          <Ionicons name="alert-circle" size={64} color="#DDD" />
+        </Text>
         <Text style={styles.errorText}>Family member not found</Text>
         <TouchableOpacity 
           style={styles.backButton}
@@ -273,13 +276,19 @@ const FamilyMemberDetailScreen = ({ route, navigation }) => {
               
               {familyMember.gender && (
                 <Text style={styles.profileDetail}>
-                  <Ionicons name="person" size={16} color="#666" /> {familyMember.gender}
+                  <Text>
+                    <Ionicons name="person" size={16} color="#666" />
+                  </Text>
+                  {' '}{familyMember.gender}
                 </Text>
               )}
               
               {familyMember.email && (
                 <Text style={styles.profileDetail}>
-                  <Ionicons name="mail" size={16} color="#666" /> {familyMember.email}
+                  <Text>
+                    <Ionicons name="mail" size={16} color="#666" />
+                  </Text>
+                  {' '}{familyMember.email}
                 </Text>
               )}
             </View>
@@ -288,7 +297,9 @@ const FamilyMemberDetailScreen = ({ route, navigation }) => {
               style={styles.editButton}
               onPress={() => navigation.navigate('FamilyMember', { editMemberId: memberId })}
             >
-              <Ionicons name="pencil" size={20} color="#007AFF" />
+              <Text>
+                <Ionicons name="pencil" size={20} color="#007AFF" />
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -341,7 +352,9 @@ const FamilyMemberDetailScreen = ({ route, navigation }) => {
           
           {!hasAccess ? (
             <View style={styles.accessDeniedContainer}>
-              <Ionicons name="lock-closed" size={40} color="#DDD" />
+              <Text>
+                <Ionicons name="lock-closed" size={40} color="#DDD" />
+              </Text>
               <Text style={styles.accessDeniedText}>
                 This family member has not shared their medical records with you.
               </Text>
@@ -353,7 +366,9 @@ const FamilyMemberDetailScreen = ({ route, navigation }) => {
             </View>
           ) : medicalRecords.length === 0 ? (
             <View style={styles.emptyRecordsContainer}>
-              <Ionicons name="document" size={40} color="#DDD" />
+              <Text>
+                <Ionicons name="document" size={40} color="#DDD" />
+              </Text>
               <Text style={styles.emptyRecordsText}>No medical records found</Text>
               <TouchableOpacity
                 style={styles.addFirstRecordButton}
@@ -370,7 +385,9 @@ const FamilyMemberDetailScreen = ({ route, navigation }) => {
                 onPress={() => navigation.navigate('RecordDetail', { recordId: record.id })}
               >
                 <View style={[styles.recordIcon, { backgroundColor: getRecordTypeColor(record.type) + '20' }]}>
-                  <Ionicons name={getRecordTypeIcon(record.type)} size={24} color={getRecordTypeColor(record.type)} />
+                  <Text>
+                    <Ionicons name={getRecordTypeIcon(record.type)} size={24} color={getRecordTypeColor(record.type)} />
+                  </Text>
                 </View>
                 <View style={styles.recordInfo}>
                   <Text style={styles.recordTitle}>
@@ -383,7 +400,9 @@ const FamilyMemberDetailScreen = ({ route, navigation }) => {
                     {record.date ? formatDate(record.date) : 'No date'}
                   </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color="#999" />
+                <Text>
+                  <Ionicons name="chevron-forward" size={20} color="#999" />
+                </Text>
               </TouchableOpacity>
             ))
           )}
@@ -394,7 +413,9 @@ const FamilyMemberDetailScreen = ({ route, navigation }) => {
         style={styles.backButton}
         onPress={() => navigation.goBack()}
       >
-        <Ionicons name="arrow-back" size={20} color="white" />
+        <Text>
+          <Ionicons name="arrow-back" size={20} color="white" />
+        </Text>
         <Text style={styles.backButtonText}>Back</Text>
       </TouchableOpacity>
     </View>

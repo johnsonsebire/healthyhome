@@ -279,7 +279,7 @@ const SettingsScreen = ({ navigation }) => {
           icon="mail-outline"
           title="Contact Support"
           subtitle="Get help from our team"
-          onPress={() => Alert.alert('Contact Support', 'Email: support@familymedical.com')}
+          onPress={() => Alert.alert('Contact Support', 'Email: support@manifestghana.com')}
         />
         <SettingItem
           icon="star-outline"

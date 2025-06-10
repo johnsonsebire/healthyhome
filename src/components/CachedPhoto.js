@@ -17,7 +17,8 @@ const CachedPhoto = ({
   style, 
   placeholderStyle,
   showEmoji = true,
-  fallbackIcon = "person"
+  fallbackIcon = "person",
+  placeholderText
 }) => {
   const [displayUri, setDisplayUri] = useState(photoUri);
   const [loading, setLoading] = useState(!!photoUri);
@@ -76,16 +77,22 @@ const CachedPhoto = ({
   if (!displayUri || failed || loading) {
     return (
       <View style={[style, placeholderStyle]}>
-        {showEmoji && relationship && gender ? (
+        {placeholderText ? (
+          <Text style={{ fontSize: style?.width ? style.width * 0.4 : 24 }}>
+            {placeholderText}
+          </Text>
+        ) : showEmoji && relationship && gender ? (
           <Text style={{ fontSize: style?.width ? style.width * 0.4 : 24 }}>
             {getRelationshipEmoji(relationship, gender)}
           </Text>
         ) : (
-          <Ionicons 
-            name={fallbackIcon} 
-            size={style?.width ? style.width * 0.6 : 30} 
-            color="#666" 
-          />
+          <Text style={{ textAlign: 'center' }}>
+            <Ionicons 
+              name={fallbackIcon} 
+              size={style?.width ? style.width * 0.6 : 30} 
+              color="#666" 
+            />
+          </Text>
         )}
       </View>
     );

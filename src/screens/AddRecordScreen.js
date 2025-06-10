@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import WrappedDateTimePicker from '../components/WrappedDateTimePicker';
 import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../firebaseConfig';
@@ -948,7 +949,7 @@ const AddRecordScreen = ({ navigation, route }) => {
               </TouchableOpacity>
             </View>
           )}
-          <DateTimePicker
+          <WrappedDateTimePicker
             value={selectedDate}
             mode="date"
             display={Platform.OS === 'ios' ? 'spinner' : 'default'}

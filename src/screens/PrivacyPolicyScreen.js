@@ -19,9 +19,9 @@ const PrivacyPolicyScreen = ({ navigation }) => {
       <View style={styles.content}>
         <Text style={styles.sectionTitle}>Introduction</Text>
         <Text style={styles.paragraph}>
-          At Family Medical App, we take your privacy seriously. This Privacy Policy describes how we collect,
+          At Healthy Home, we take your privacy seriously. This Privacy Policy describes how we collect,
           use, process, and disclose your information, including personal information, in conjunction with your
-          access to and use of the Family Medical App.
+          access to and use of the Healthy Home.
         </Text>
 
         <Text style={styles.sectionTitle}>Information We Collect</Text>
@@ -90,8 +90,8 @@ const PrivacyPolicyScreen = ({ navigation }) => {
         <Text style={styles.paragraph}>
           If you have any questions about this Privacy Policy, please contact us at:
         </Text>
-        <Text style={styles.contactInfo}>Email: privacy@familymedical.app</Text>
-        <Text style={styles.contactInfo}>Address: 123 Health Street, Medical City, MC 12345</Text>
+        <Text style={styles.contactInfo}>Email: legal@manifestghana.com</Text>
+        <Text style={styles.contactInfo}>Address: Manifest Digital, Pawpaw Street, East Legon, Ghana, West Africa</Text>
       </View>
       
       <TouchableOpacity 

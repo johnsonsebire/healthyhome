@@ -19,13 +19,13 @@ const TermsOfServiceScreen = ({ navigation }) => {
       <View style={styles.content}>
         <Text style={styles.sectionTitle}>1. Acceptance of Terms</Text>
         <Text style={styles.paragraph}>
-          By accessing or using the Family Medical App, you agree to be bound by these Terms of Service and our Privacy Policy.
+          By accessing or using the Healthy Home, you agree to be bound by these Terms of Service and our Privacy Policy.
           If you disagree with any part of the terms, you do not have permission to access the service.
         </Text>
 
         <Text style={styles.sectionTitle}>2. Description of Service</Text>
         <Text style={styles.paragraph}>
-          Family Medical App provides tools for managing and storing personal and family health information, including medical
+          Healthy Home provides tools for managing and storing personal and family health information, including medical
           records, prescriptions, appointments, and insurance details. The app is designed for personal use and is not intended
           to replace professional medical advice, diagnosis, or treatment.
         </Text>
@@ -101,8 +101,8 @@ const TermsOfServiceScreen = ({ navigation }) => {
         <Text style={styles.paragraph}>
           If you have any questions about these Terms, please contact us at:
         </Text>
-        <Text style={styles.contactInfo}>Email: legal@familymedical.app</Text>
-        <Text style={styles.contactInfo}>Address: 123 Health Street, Medical City, MC 12345</Text>
+        <Text style={styles.contactInfo}>Email: legal@manifestghana.com</Text>
+        <Text style={styles.contactInfo}>Address: Manifest Digital, Pawpaw Street, East Legon, Ghana, West Africa</Text>
       </View>
       
       <TouchableOpacity 

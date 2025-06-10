@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import WrappedDateTimePicker from '../components/WrappedDateTimePicker';
 import { doc, updateDoc, query, where, getDocs, collection } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '../../firebaseConfig';
@@ -565,7 +566,9 @@ const EditRecordScreen = ({ route, navigation }) => {
             ]}>
               {selectedProvider ? selectedProvider.name : 'Select insurance provider'}
             </Text>
-            <Ionicons name="chevron-down" size={20} color="#6b7280" />
+            <Text>
+              <Ionicons name="chevron-down" size={20} color="#6b7280" />
+            </Text>
           </TouchableOpacity>
           {formData.provider === 'other' && (
             <TextInput
@@ -606,7 +609,9 @@ const EditRecordScreen = ({ route, navigation }) => {
           ]}>
             {formData.dateOfIssue || 'Select issue date'}
           </Text>
-          <Ionicons name="calendar" size={20} color="#666" />
+          <Text>
+            <Ionicons name="calendar" size={20} color="#666" />
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -627,7 +632,9 @@ const EditRecordScreen = ({ route, navigation }) => {
           ]}>
             {formData.expiryDate || 'Select expiry date'}
           </Text>
-          <Ionicons name="calendar" size={20} color="#666" />
+          <Text>
+            <Ionicons name="calendar" size={20} color="#666" />
+          </Text>
         </TouchableOpacity>
       </View>
     </>
@@ -683,11 +690,13 @@ const EditRecordScreen = ({ route, navigation }) => {
             getPaymentStatusStyle(calculatePaymentStatus())
           ]}>
             <View style={styles.statusBadge}>
-              <Ionicons 
-                name={getPaymentStatusIcon(calculatePaymentStatus())} 
-                size={16} 
-                color={getPaymentStatusColor(calculatePaymentStatus())} 
-              />
+              <Text>
+                <Ionicons 
+                  name={getPaymentStatusIcon(calculatePaymentStatus())} 
+                  size={16} 
+                  color={getPaymentStatusColor(calculatePaymentStatus())} 
+                />
+              </Text>
             </View>
             <Text style={[
               styles.statusText,
@@ -749,7 +758,10 @@ const EditRecordScreen = ({ route, navigation }) => {
   const renderModernAttachments = () => (
     <View style={styles.attachmentsSection}>
       <Text style={styles.sectionTitle}>
-        <Ionicons name="attach" size={20} color="#6366f1" /> Attachments
+        <Text>
+          <Ionicons name="attach" size={20} color="#6366f1" />
+        </Text>
+        {' Attachments'}
       </Text>
       <Text style={styles.sectionSubtitle}>
         {formData.type === 'insurance' 
@@ -764,7 +776,9 @@ const EditRecordScreen = ({ route, navigation }) => {
           onPress={pickImage}
         >
           <View style={styles.attachmentIconContainer}>
-            <Ionicons name="camera" size={24} color="#6366f1" />
+            <Text>
+              <Ionicons name="camera" size={24} color="#6366f1" />
+            </Text>
           </View>
           <Text style={styles.modernAttachmentTitle}>Add Photo</Text>
           <Text style={styles.modernAttachmentSubtitle}>Camera or Gallery</Text>
@@ -945,7 +959,7 @@ const EditRecordScreen = ({ route, navigation }) => {
               </TouchableOpacity>
             </View>
           )}
-          <DateTimePicker
+          <WrappedDateTimePicker
             value={selectedDate}
             mode="date"
             display={Platform.OS === 'ios' ? 'spinner' : 'default'}

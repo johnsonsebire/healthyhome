@@ -7,7 +7,9 @@ const ValidationError = ({ error, style }) => {
 
   return (
     <View style={[styles.container, style]}>
-      <Ionicons name="alert-circle" size={16} color="#ef4444" />
+      <Text>
+        <Ionicons name="alert-circle" size={16} color="#ef4444" />
+      </Text>
       <Text style={styles.errorText}>{error}</Text>
     </View>
   );
