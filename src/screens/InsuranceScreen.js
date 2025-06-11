@@ -19,6 +19,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
 import InsuranceRecommendationModal from '../components/InsuranceRecommendationModal';
 import { getProviderDisplayName } from '../utils/recordTypes';
+import { getProviderByName, getAllProviders, getApprovedProviders } from '../utils/insuranceProviders';
 
 const InsuranceScreen = ({ navigation }) => {
   const { user } = useAuth();
@@ -244,21 +245,75 @@ const InsuranceScreen = ({ navigation }) => {
             {/* Provider Information Section */}
             <View style={styles.providerInfoSection}>
               <Text style={styles.providerInfoTitle}>Insurance Provider Information</Text>
-              {getUniqueProviders().map(provider => (
-                <View key={provider} style={styles.providerCard}>
-                  <View style={styles.providerHeader}>
-                    <Ionicons name="shield-checkmark" size={20} color="#8b5cf6" />
-                    <Text style={styles.providerName}>{provider}</Text>
+              
+              {/* Show all the user's providers first */}
+              {getUniqueProviders().map(providerName => {
+                // Find the provider data in our utility
+                const providerData = getProviderByName(providerName);
+                
+                return (
+                  <View key={providerName} style={styles.providerCard}>
+                    <View style={styles.providerHeader}>
+                      <View style={styles.providerIconContainer}>
+                        <Ionicons name="shield-checkmark" size={20} color="#8b5cf6" />
+                      </View>
+                      <Text style={styles.providerName}>{providerName}</Text>
+                      {providerData && providerData.isApproved && (
+                        <View style={styles.availableBadge}>
+                          <Text style={styles.availableText}>Active</Text>
+                        </View>
+                      )}
+                    </View>
+                    <TouchableOpacity 
+                      style={styles.providerLink}
+                      onPress={() => {
+                        if (providerData) {
+                          // If we have data for this provider, navigate to the detail screen
+                          navigation.navigate('ProviderDetail', { provider: providerData });
+                        } else {
+                          // Otherwise, show a message that we don't have detailed info yet
+                          Alert.alert(
+                            'Provider Information', 
+                            `Detailed information for ${providerName} is not available yet. We're working on adding more provider details soon.`
+                          );
+                        }
+                      }}
+                    >
+                      <Text style={styles.providerLinkText}>View Provider Details</Text>
+                      <Ionicons name="chevron-forward" size={16} color="#6366f1" />
+                    </TouchableOpacity>
                   </View>
-                  <TouchableOpacity 
-                    style={styles.providerLink}
-                    onPress={() => Alert.alert('Provider Info', `Learn more about ${provider} - Coming soon`)}
-                  >
-                    <Text style={styles.providerLinkText}>Read About This Provider</Text>
-                    <Ionicons name="chevron-forward" size={16} color="#6366f1" />
-                  </TouchableOpacity>
-                </View>
-              ))}
+                );
+              })}
+              
+              {/* Additional Available Providers that aren't being used yet */}
+              {getApprovedProviders()
+                .filter(provider => 
+                  !getUniqueProviders().some(name => 
+                    getProviderByName(name)?.id === provider.id
+                  )
+                )
+                .map(provider => (
+                  <View key={provider.id} style={styles.providerCard}>
+                    <View style={styles.providerHeader}>
+                      <View style={styles.providerIconContainer}>
+                        <Ionicons name="shield-checkmark" size={20} color="#8b5cf6" />
+                      </View>
+                      <Text style={styles.providerName}>{provider.name}</Text>
+                      <View style={styles.availableBadge}>
+                        <Text style={styles.availableText}>Available</Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity 
+                      style={styles.providerLink}
+                      onPress={() => navigation.navigate('ProviderDetail', { provider })}
+                    >
+                      <Text style={styles.providerLinkText}>View Provider Details</Text>
+                      <Ionicons name="chevron-forward" size={16} color="#6366f1" />
+                    </TouchableOpacity>
+                  </View>
+                ))
+              }
             </View>
           </View>
         )}
@@ -527,11 +582,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
+  providerIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#ede9fe',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
   providerName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1f2937',
+    flex: 1,
+  },
+  availableBadge: {
+    backgroundColor: '#10b981',
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 12,
     marginLeft: 8,
+  },
+  availableText: {
+    fontSize: 12,
+    color: '#ffffff',
+    fontWeight: '500',
   },
   providerLink: {
     flexDirection: 'row',

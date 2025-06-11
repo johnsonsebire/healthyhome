@@ -13,7 +13,11 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.manifestghana.HealthyHome"
+      "bundleIdentifier": "com.manifestghana.HealthyHome",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses the camera to capture photos for medical records and family member profiles.",
+        "NSPhotoLibraryUsageDescription": "This app requires access to your photo library to attach images to medical records and set profile photos."
+      }
     },
     "android": {
       "adaptiveIcon": {

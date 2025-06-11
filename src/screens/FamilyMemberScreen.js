@@ -356,7 +356,42 @@ const FamilyMemberScreen = ({ route, navigation }) => {
     }
   };
 
-  const pickImage = async () => {
+  // Function to take photo with camera
+  const takePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please grant camera permissions to take photos.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+
+    if (!result.canceled) {
+      const imageUri = result.assets[0].uri;
+      setFormData({ ...formData, photo: imageUri });
+      
+      // Try to cache the photo immediately for offline access
+      if (user?.uid) {
+        try {
+          const cachedUri = await photoStorage.cachePhoto(imageUri, user.uid, 'temp_' + Date.now());
+          if (cachedUri && cachedUri !== imageUri) {
+            console.log('Photo cached successfully for offline use');
+            setFormData({ ...formData, photo: cachedUri });
+          }
+        } catch (error) {
+          console.log('Could not cache photo immediately, will use original:', error.message);
+        }
+      }
+    }
+  };
+
+  // Function to choose from gallery
+  const chooseFromGallery = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
@@ -378,10 +413,31 @@ const FamilyMemberScreen = ({ route, navigation }) => {
           }
         } catch (error) {
           console.log('Could not cache photo immediately, will use original:', error.message);
-          // Continue with original URI - photo will still work online
         }
       }
     }
+  };
+
+  // Modified pickImage to show options
+  const pickImage = async () => {
+    Alert.alert(
+      'Choose Photo Source',
+      'Where would you like to get the photo from?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        },
+        {
+          text: 'Camera',
+          onPress: takePhoto
+        },
+        {
+          text: 'Photo Gallery',
+          onPress: chooseFromGallery
+        }
+      ]
+    );
   };
 
   const handleRelationshipSelect = (relationship) => {

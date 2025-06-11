@@ -50,8 +50,37 @@ const ProfileScreen = ({ navigation }) => {
     }
   }, [userProfile, user]);
 
-  const pickImage = async () => {
+  // Function to take photo with camera
+  const takePhoto = async () => {
     if (!isEditing) return;
+
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please grant camera permissions to take photos.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
+
+    if (!result.canceled) {
+      setFormData({ ...formData, profilePhoto: result.assets[0].uri });
+    }
+  };
+
+  // Function to choose from gallery
+  const chooseFromGallery = async () => {
+    if (!isEditing) return;
+    
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please grant gallery permissions to select images.');
+      return;
+    }
     
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -63,6 +92,30 @@ const ProfileScreen = ({ navigation }) => {
     if (!result.canceled) {
       setFormData({ ...formData, profilePhoto: result.assets[0].uri });
     }
+  };
+
+  // Modified pickImage to show options
+  const pickImage = async () => {
+    if (!isEditing) return;
+
+    Alert.alert(
+      'Choose Photo Source',
+      'Where would you like to get your profile photo from?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        },
+        {
+          text: 'Camera',
+          onPress: takePhoto
+        },
+        {
+          text: 'Photo Gallery',
+          onPress: chooseFromGallery
+        }
+      ]
+    );
   };
 
   const handleSave = async () => {

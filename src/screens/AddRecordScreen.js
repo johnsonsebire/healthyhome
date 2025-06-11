@@ -179,7 +179,62 @@ const AddRecordScreen = ({ navigation, route }) => {
     });
   };
 
+  // Adding a new function to open camera
+  const openCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please grant camera permissions to take photos.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      if (!canUploadFile(asset.fileSize || 0)) {
+        Alert.alert('Storage Limit', 'This file exceeds your storage limit. Please upgrade your plan or free up space.');
+        return;
+      }
+      
+      setAttachments(prev => [...prev, {
+        id: Date.now().toString(),
+        uri: asset.uri,
+        type: 'image',
+        name: `camera_${Date.now()}.jpg`,
+        size: asset.fileSize || 0
+      }]);
+    }
+  };
+
+  // Modifying pickImage to open photo selection options
   const pickImage = async () => {
+    Alert.alert(
+      'Select Photo Source',
+      'Choose where you want to get your photo from',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Camera',
+          onPress: openCamera,
+        },
+        {
+          text: 'Gallery',
+          onPress: selectFromGallery,
+        },
+      ]
+    );
+  };
+
+  // Existing pickImage function renamed to selectFromGallery
+  const selectFromGallery = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission needed', 'Please grant camera roll permissions to upload images.');

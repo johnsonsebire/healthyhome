@@ -30,6 +30,7 @@ import HelpFaqScreen from '../screens/HelpFaqScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import PrivacySecurityScreen from '../screens/PrivacySecurityScreen';
 import DataExportScreen from '../screens/DataExportScreen';
+import ProviderDetailScreen from '../screens/ProviderDetailScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -223,6 +224,16 @@ const AppStack = () => (
         title: 'Data Export',
         headerStyle: { backgroundColor: '#6366f1' },
         headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="ProviderDetail" 
+      component={ProviderDetailScreen}
+      options={{ 
+        title: 'Provider Details',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff',
+        headerShown: false
       }}
     />
   </Stack.Navigator>

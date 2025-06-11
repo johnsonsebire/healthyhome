@@ -172,7 +172,7 @@ export const formatProviderForCard = (provider) => {
   
   const providerLower = provider.toLowerCase();
   
-  if (providerLower.includes('nhis') || providerLower === 'nhis') {
+  if (providerLower.includes('nhis') || providerLower.includes('national health insurance')) {
     return {
       country: 'REPUBLIC OF GHANA',
       organization: 'NATIONAL HEALTH INSURANCE SCHEME',
@@ -194,7 +194,7 @@ export const getProviderDisplayName = (providerId, customProvider = null) => {
   }
   
   const providerMap = {
-    'nhis': 'NHIS (National Health Insurance Scheme)',
+    'nhis': 'National Health Insurance Scheme (NHIS)',
     'other': 'Other'
   };
   
