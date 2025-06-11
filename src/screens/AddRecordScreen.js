@@ -420,7 +420,8 @@ const AddRecordScreen = ({ navigation, route }) => {
 
         // Get family member name
         const familyMember = familyMembers.find(m => m.id === formData.familyMemberId);
-        recordData.familyMemberName = familyMember ? familyMember.name : '';
+        recordData.familyMemberName = familyMember ? 
+          (familyMember.title ? `${familyMember.title} ${familyMember.name}` : familyMember.name) : '';
 
         // Add to offline sync queue
         await offlineStorageService.addToSyncQueue({
@@ -456,7 +457,8 @@ const AddRecordScreen = ({ navigation, route }) => {
       // Create record
       const recordData = {
         ...formData,
-        familyMemberName: familyMember ? familyMember.name : '',
+        familyMemberName: familyMember ? 
+          (familyMember.title ? `${familyMember.title} ${familyMember.name}` : familyMember.name) : '',
         attachments: uploadedAttachments,
         userId: user.uid,
         createdAt: new Date(),
@@ -967,7 +969,9 @@ const AddRecordScreen = ({ navigation, route }) => {
                 setShowMemberPicker(false);
               }}
             >
-              <Text style={styles.memberOptionText}>{member.name}</Text>
+              <Text style={styles.memberOptionText}>
+                {member.title ? `${member.title} ${member.name}` : member.name}
+              </Text>
               <Text style={styles.memberOptionSubtext}>
                 {getGenderSpecificRelationship(member.relationship, member.gender)}
               </Text>
@@ -1228,7 +1232,9 @@ const AddRecordScreen = ({ navigation, route }) => {
           >
             {selectedMember ? (
               <View style={styles.selectedOption}>
-                <Text style={styles.selectedText}>{selectedMember.name}</Text>
+                <Text style={styles.selectedText}>
+                  {selectedMember.title ? `${selectedMember.title} ${selectedMember.name}` : selectedMember.name}
+                </Text>
                 <Text style={styles.selectedSubtext}>
                   {getGenderSpecificRelationship(selectedMember.relationship, selectedMember.gender)}
                 </Text>

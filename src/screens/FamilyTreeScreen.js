@@ -144,8 +144,10 @@ const FamilyTreeScreen = ({ navigation }) => {
           </Text>
           <Text style={styles.instructionsText}>
             • Tap on any family member to view their details{'\n'}
-            • Blue circles represent your nuclear family{'\n'}
-            • Purple circles represent extended family{'\n'}
+            • Blue circles represent your nuclear family (you, your spouse, and your children){'\n'}
+            • Purple circles represent extended family (parents, siblings, grandparents, etc.){'\n'}
+            • Solid lines connect nuclear family members{'\n'}
+            • Dashed lines connect extended family members{'\n'}
             • Add more family members to expand your tree
           </Text>
         </View>

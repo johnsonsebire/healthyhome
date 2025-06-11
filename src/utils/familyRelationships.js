@@ -33,9 +33,11 @@ export const SHARING_PREFERENCES = {
 };
 
 /**
- * Categorizes a relationship as nuclear or extended
+ * Categorizes a relationship as nuclear or extended based on static rules
+ * This is the original implementation and is kept for backwards compatibility
  * @param {string} relationship - The relationship type
  * @returns {string} The family category (nuclear or extended)
+ * @deprecated Use getFamilyCategoryByPerspective instead
  */
 export const getRelationshipCategory = (relationship) => {
   switch (relationship) {
@@ -47,6 +49,67 @@ export const getRelationshipCategory = (relationship) => {
     default:
       return FAMILY_CATEGORIES.EXTENDED;
   }
+};
+
+/**
+ * Categorizes a family member as nuclear or extended from the perspective of the primary user
+ * A Nuclear Family includes the user, their spouse, and their direct children
+ * An Extended Family includes all other relatives (parents, siblings, grandparents, etc.)
+ * 
+ * @param {string} relationship - The relationship type of the family member to the primary user
+ * @param {string} primaryUserRelationship - The relationship type of the primary user (typically 'Self')
+ * @returns {string} The family category (nuclear or extended)
+ */
+export const getFamilyCategoryByPerspective = (relationship, primaryUserRelationship = RELATIONSHIP_TYPES.SELF) => {
+  // If viewing from the primary user's perspective (the usual case)
+  if (primaryUserRelationship === RELATIONSHIP_TYPES.SELF) {
+    switch (relationship) {
+      case RELATIONSHIP_TYPES.SELF:    // The user themselves
+      case RELATIONSHIP_TYPES.SPOUSE:  // The user's spouse
+      case RELATIONSHIP_TYPES.CHILD:   // The user's children
+        return FAMILY_CATEGORIES.NUCLEAR;
+      default:
+        return FAMILY_CATEGORIES.EXTENDED;
+    }
+  }
+  
+  // If viewing from another family member's perspective (e.g., father's view)
+  // This is for future functionality where users might want to see the tree from different perspectives
+  switch (primaryUserRelationship) {
+    case RELATIONSHIP_TYPES.PARENT:
+      // From a parent's perspective, their nuclear family includes their spouse and children
+      if (relationship === RELATIONSHIP_TYPES.PARENT ||         // The parent themselves
+          relationship === RELATIONSHIP_TYPES.SPOUSE ||         // The parent's spouse
+          relationship === RELATIONSHIP_TYPES.SELF ||           // The user (child of the parent)
+          relationship === RELATIONSHIP_TYPES.SIBLING) {        // The user's siblings (other children of the parent)
+        return FAMILY_CATEGORIES.NUCLEAR;
+      }
+      return FAMILY_CATEGORIES.EXTENDED;
+      
+    case RELATIONSHIP_TYPES.CHILD:
+      // From a child's perspective, their nuclear family includes their spouse and their own children
+      if (relationship === RELATIONSHIP_TYPES.CHILD ||          // The child themselves
+          relationship === RELATIONSHIP_TYPES.SPOUSE ||         // The child's spouse
+          relationship === RELATIONSHIP_TYPES.GRANDCHILD) {     // The child's children (user's grandchildren)
+        return FAMILY_CATEGORIES.NUCLEAR;
+      }
+      return FAMILY_CATEGORIES.EXTENDED;
+      
+    default:
+      // Default to the standard nuclear family definition
+      return getRelationshipCategory(relationship);
+  }
+};
+
+/**
+ * Gets the family category name for display
+ * @param {string} relationship - The relationship type
+ * @param {string} primaryUserRelationship - The relationship type of the primary user (typically 'Self')
+ * @returns {string} The family category name for display
+ */
+export const getFamilyCategory = (relationship, primaryUserRelationship = RELATIONSHIP_TYPES.SELF) => {
+  const category = getFamilyCategoryByPerspective(relationship, primaryUserRelationship);
+  return category === FAMILY_CATEGORIES.NUCLEAR ? 'Nuclear' : 'Extended';
 };
 
 /**

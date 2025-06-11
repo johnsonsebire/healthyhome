@@ -45,6 +45,7 @@ const FamilyMemberScreen = ({ route, navigation }) => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [validationErrors, setValidationErrors] = useState({});
   const [formData, setFormData] = useState({
+    title: '',
     name: '',
     relationship: '',
     gender: '',
@@ -55,6 +56,10 @@ const FamilyMemberScreen = ({ route, navigation }) => {
     email: '',
     photo: null,
   });
+
+  const titles = [
+    'Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Prof.', 'Rev.', 'Engr.', 'Capt.', 'Other'
+  ];
 
   const relationships = [
     'Self', 'Spouse', 'Child', 'Parent', 'Sibling', 'Grandparent', 'Grandchild', 'Other'
@@ -140,6 +145,7 @@ const FamilyMemberScreen = ({ route, navigation }) => {
   const handleAddMember = async () => {
     // Validate form data
     const validation = validateForm(formData, {
+      title: { required: false, message: 'Please select a title (if applicable)' },
       name: { required: true, minLength: 2, message: 'Name must be at least 2 characters' },
       relationship: { required: true, message: 'Please select a relationship' },
       emergencyContact: { 
@@ -253,19 +259,7 @@ const FamilyMemberScreen = ({ route, navigation }) => {
     const isSuccess = result.success || (result.data && result.data.success);
     
     if (isSuccess) {
-      setShowAddModal(false);
-      setEditingMember(null);
-      setFormData({
-        name: '',
-        relationship: '',
-        gender: '',
-        dateOfBirth: '',
-        bloodType: '',
-        allergies: '',
-        emergencyContact: '',
-        email: '',
-        photo: null,
-      });
+      handleCloseModal();
       
       // Reload family members if online or if it was an offline save that needs UI update
       if (networkService.isOnline() || (result.data && result.data.offline)) {
@@ -277,6 +271,7 @@ const FamilyMemberScreen = ({ route, navigation }) => {
   const handleEditMember = (member) => {
     setEditingMember(member);
     setFormData({
+      title: member.title || '',
       name: member.name || '',
       relationship: member.relationship || '',
       gender: member.gender || '',
@@ -507,6 +502,30 @@ const FamilyMemberScreen = ({ route, navigation }) => {
     loadFamilyMembers();
   };
 
+  // Function to reset form data
+  const resetForm = () => {
+    setFormData({
+      title: '',
+      name: '',
+      relationship: '',
+      gender: '',
+      dateOfBirth: '',
+      bloodType: '',
+      allergies: '',
+      emergencyContact: '',
+      email: '',
+      photo: null,
+    });
+    setEditingMember(null);
+    setValidationErrors({});
+  };
+
+  // Function to handle modal close
+  const handleCloseModal = () => {
+    setShowAddModal(false);
+    resetForm();
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -562,7 +581,9 @@ const FamilyMemberScreen = ({ route, navigation }) => {
                   showEmoji={true}
                 />
                 <View style={styles.memberDetails}>
-                  <Text style={styles.memberName}>{member.name || 'Unknown'}</Text>
+                  <Text style={styles.memberName}>
+                    {member.title ? `${member.title} ${member.name || 'Unknown'}` : member.name || 'Unknown'}
+                  </Text>
                   <Text style={styles.memberRelationship}>
                     {getGenderSpecificRelationship(member.relationship, member.gender)}
                   </Text>
@@ -646,7 +667,7 @@ const FamilyMemberScreen = ({ route, navigation }) => {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setShowAddModal(false)}>
+            <TouchableOpacity onPress={handleCloseModal}>
               <Text style={styles.cancelButton}>Cancel</Text>
             </TouchableOpacity>
             <Text style={styles.modalTitle}>
@@ -686,6 +707,33 @@ const FamilyMemberScreen = ({ route, navigation }) => {
                   </View>
                 )}
               </TouchableOpacity>
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Title</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.titleButtons}>
+                  {titles.map((title) => (
+                    <TouchableOpacity
+                      key={title}
+                      style={[
+                        styles.titleButton,
+                        formData.title === title && styles.titleButtonActive,
+                      ]}
+                      onPress={() => setFormData({ ...formData, title })}
+                    >
+                      <Text
+                        style={[
+                          styles.titleButtonText,
+                          formData.title === title && styles.titleButtonTextActive,
+                        ]}
+                      >
+                        {title}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
             </View>
 
             <View style={styles.formGroup}>
@@ -1225,6 +1273,29 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   relationshipButtonTextActive: {
+    color: 'white',
+  },
+  titleButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  titleButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    backgroundColor: 'white',
+  },
+  titleButtonActive: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  titleButtonText: {
+    color: '#333',
+    fontSize: 14,
+  },
+  titleButtonTextActive: {
     color: 'white',
   },
   genderButtons: {

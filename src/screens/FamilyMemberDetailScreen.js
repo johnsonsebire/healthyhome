@@ -15,7 +15,7 @@ import { db } from '../../firebaseConfig';
 import { useAuth } from '../contexts/AuthContext';
 import { useFamilySharing } from '../contexts/FamilySharingContext';
 import { useError, ERROR_TYPES, ERROR_SEVERITY } from '../contexts/ErrorContext';
-import { hasAccessToRecords, getRelationshipCategory, FAMILY_CATEGORIES } from '../utils/familyRelationships';
+import { hasAccessToRecords, getRelationshipCategory, getFamilyCategoryByPerspective, getFamilyCategory, FAMILY_CATEGORIES } from '../utils/familyRelationships';
 import { getGenderSpecificRelationship, getRelationshipEmoji } from '../utils/genderBasedRelationships';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import networkService from '../services/networkService';
@@ -36,6 +36,7 @@ const FamilyMemberDetailScreen = ({ route, navigation }) => {
   const [recordsLoading, setRecordsLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
+  const [showFamilyTooltip, setShowFamilyTooltip] = useState(false);
 
   useEffect(() => {
     if (user && memberId) {
@@ -204,15 +205,53 @@ const FamilyMemberDetailScreen = ({ route, navigation }) => {
     return null;
   };
 
-  const getFamilyCategory = (relationship) => {
-    return getRelationshipCategory(relationship) === FAMILY_CATEGORIES.NUCLEAR 
-      ? 'Nuclear Family' 
-      : 'Extended Family';
-  };
-
   const formatDate = (dateString) => {
     if (!dateString) return 'Not provided';
     return new Date(dateString).toLocaleDateString();
+  };
+
+  // Family Category Tooltip Modal
+  const renderFamilyTooltip = () => {
+    if (!showFamilyTooltip) return null;
+    
+    return (
+      <View style={styles.tooltipOverlay}>
+        <TouchableOpacity 
+          style={styles.tooltipBackground}
+          onPress={() => setShowFamilyTooltip(false)}
+          activeOpacity={1}
+        />
+        <View style={styles.tooltipContainer}>
+          <View style={styles.tooltipHeader}>
+            <Text style={styles.tooltipTitle}>Family Categories</Text>
+            <TouchableOpacity onPress={() => setShowFamilyTooltip(false)}>
+              <Ionicons name="close" size={24} color="#999" />
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.tooltipContent}>
+            <Text style={styles.tooltipSectionTitle}>Nuclear Family</Text>
+            <Text style={styles.tooltipText}>
+              Your nuclear family consists of you, your spouse (if any), and your direct children. 
+              These are your immediate family members who form the core of your family structure.
+            </Text>
+            
+            <Text style={styles.tooltipSectionTitle}>Extended Family</Text>
+            <Text style={styles.tooltipText}>
+              Your extended family includes all other relatives, such as your parents, siblings, 
+              grandparents, aunts, uncles, and cousins.
+            </Text>
+            
+            <Text style={styles.tooltipSectionTitle}>Perspective Matters</Text>
+            <Text style={styles.tooltipText}>
+              The classification of family members as Nuclear or Extended depends on your perspective as the logged-in user. 
+              For example, from your perspective, your parents are part of your extended family. 
+              But from your father's perspective, you would be part of his nuclear family, and his parents would be in his extended family.
+            </Text>
+          </ScrollView>
+        </View>
+      </View>
+    );
   };
 
   if (loading || isLoading) {
@@ -243,6 +282,7 @@ const FamilyMemberDetailScreen = ({ route, navigation }) => {
   return (
     <View style={styles.container}>
       {renderOfflineBanner()}
+      {renderFamilyTooltip()}
       
       <ScrollView contentContainerStyle={{ paddingBottom: 90 }}>
         <View style={styles.header}>
@@ -257,19 +297,33 @@ const FamilyMemberDetailScreen = ({ route, navigation }) => {
             />
             
             <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>{familyMember.name || 'Unknown'}</Text>
+              <Text style={styles.profileName}>
+                {familyMember.title ? `${familyMember.title} ${familyMember.name || 'Unknown'}` : familyMember.name || 'Unknown'}
+              </Text>
               <View style={styles.relationshipContainer}>
                 <Text style={styles.relationshipText}>
                   {getGenderSpecificRelationship(familyMember.relationship, familyMember.gender)}
                 </Text>
                 <View style={[
                   styles.categoryBadge, 
-                  getRelationshipCategory(familyMember.relationship) === FAMILY_CATEGORIES.NUCLEAR
+                  getFamilyCategoryByPerspective(familyMember.relationship) === FAMILY_CATEGORIES.NUCLEAR
                     ? styles.nuclearBadge
                     : styles.extendedBadge
                 ]}>
-                  <Text style={styles.categoryText}>
+                  <Text style={[
+                    styles.categoryText,
+                    getFamilyCategoryByPerspective(familyMember.relationship) === FAMILY_CATEGORIES.NUCLEAR
+                      ? styles.nuclearCategoryText
+                      : styles.extendedCategoryText
+                  ]}>
                     {getFamilyCategory(familyMember.relationship)}
+                    {' '}
+                    <Ionicons 
+                      name="information-circle" 
+                      size={12} 
+                      color={getFamilyCategoryByPerspective(familyMember.relationship) === FAMILY_CATEGORIES.NUCLEAR ? '#007AFF' : '#5E5CE6'} 
+                      onPress={() => setShowFamilyTooltip(true)}
+                    />
                   </Text>
                 </View>
               </View>
@@ -514,13 +568,23 @@ const styles = StyleSheet.create({
   },
   nuclearBadge: {
     backgroundColor: '#e1f0ff',
+    borderWidth: 1,
+    borderColor: '#007AFF',
   },
   extendedBadge: {
     backgroundColor: '#e6e6ff',
+    borderWidth: 1,
+    borderColor: '#5E5CE6',
   },
   categoryText: {
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '600',
+  },
+  nuclearCategoryText: {
+    color: '#007AFF',
+  },
+  extendedCategoryText: {
+    color: '#5E5CE6',
   },
   profileDetail: {
     fontSize: 14,
@@ -701,6 +765,122 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     top: 0,
+  },
+  // Tooltip styles
+  tooltipOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  tooltipBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  tooltipContainer: {
+    width: '85%',
+    maxHeight: '70%',
+    backgroundColor: 'white',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    overflow: 'hidden',
+  },
+  tooltipHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  tooltipTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+  },
+  tooltipContent: {
+    padding: 16,
+    maxHeight: '80%',
+  },
+  tooltipSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  tooltipText: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  // Tooltip styles
+  tooltipOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  tooltipBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  tooltipContainer: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    overflow: 'hidden',
+    width: '90%',
+    maxWidth: 400,
+    elevation: 4,
+  },
+  tooltipHeader: {
+    backgroundColor: '#f1f1f1',
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  tooltipTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+  },
+  tooltipContent: {
+    maxHeight: 300,
+  },
+  tooltipSectionTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#007AFF',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  tooltipText: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 20,
+    marginBottom: 12,
   },
 });
 

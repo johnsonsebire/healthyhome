@@ -8,7 +8,7 @@ import {
   TouchableOpacity
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getRelationshipCategory, FAMILY_CATEGORIES } from '../utils/familyRelationships';
+import { getRelationshipCategory, getFamilyCategoryByPerspective, FAMILY_CATEGORIES } from '../utils/familyRelationships';
 import { getGenderSpecificRelationship } from '../utils/genderBasedRelationships';
 import Svg, { Line, Circle, Text as SvgText } from 'react-native-svg';
 
@@ -131,8 +131,40 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
   };
 
   const getNodeColor = (relationship) => {
-    const category = getRelationshipCategory(relationship);
+    const category = getFamilyCategoryByPerspective(relationship);
     return category === FAMILY_CATEGORIES.NUCLEAR ? '#007AFF' : '#5E5CE6';
+  };
+
+  const getLineColor = (relationship1, relationship2) => {
+    // If both relationships are nuclear, use nuclear color
+    const isNuclear1 = getFamilyCategoryByPerspective(relationship1) === FAMILY_CATEGORIES.NUCLEAR;
+    const isNuclear2 = relationship2 ? 
+      getFamilyCategoryByPerspective(relationship2) === FAMILY_CATEGORIES.NUCLEAR : 
+      false;
+    
+    // If both are nuclear or we're only checking one relationship that is nuclear
+    if ((relationship2 && isNuclear1 && isNuclear2) || (!relationship2 && isNuclear1)) {
+      return '#007AFF'; // Nuclear family line color
+    }
+    
+    // For extended family connections
+    return '#5E5CE6';
+  };
+
+  const getLineStyle = (relationship1, relationship2) => {
+    // If both relationships are nuclear, use solid line
+    const isNuclear1 = getFamilyCategoryByPerspective(relationship1) === FAMILY_CATEGORIES.NUCLEAR;
+    const isNuclear2 = relationship2 ? 
+      getFamilyCategoryByPerspective(relationship2) === FAMILY_CATEGORIES.NUCLEAR : 
+      false;
+    
+    // If both are nuclear or we're only checking one relationship that is nuclear
+    if ((relationship2 && isNuclear1 && isNuclear2) || (!relationship2 && isNuclear1)) {
+      return {}; // No dashed line for nuclear family
+    }
+    
+    // For extended family connections, use dashed lines
+    return { strokeDasharray: "5,5" };
   };
 
   const getConnectorLines = () => {
@@ -163,7 +195,7 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
             y1={parentLevelY}
             x2={spouse.x}
             y2={parentLevelY}
-            stroke="#007AFF"
+            stroke={getLineColor(self.relationship, spouse.relationship)}
             strokeWidth="2"
           />
         );
@@ -176,7 +208,7 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
             y1={parentLevelY}
             x2={familyMidpointX}
             y2={connectorY}
-            stroke="#007AFF"
+            stroke={getLineColor(self.relationship, spouse.relationship)}
             strokeWidth="2"
           />
         );
@@ -190,7 +222,7 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
               y1={connectorY}
               x2={children[children.length - 1].x}
               y2={connectorY}
-              stroke="#007AFF"
+              stroke={getLineColor(self.relationship, spouse.relationship)}
               strokeWidth="2"
             />
           );
@@ -205,7 +237,7 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
               y1={connectorY}
               x2={child.x}
               y2={childrenTopY}
-              stroke="#007AFF"
+              stroke={getLineColor(self.relationship, spouse.relationship)}
               strokeWidth="2"
             />
           );
@@ -223,7 +255,7 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
             y1={selfBottomY}
             x2={self.x}
             y2={connectorY}
-            stroke="#007AFF"
+            stroke={getLineColor(self.relationship)}
             strokeWidth="2"
           />
         );
@@ -236,7 +268,7 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
               y1={connectorY}
               x2={children[children.length - 1].x}
               y2={connectorY}
-              stroke="#007AFF"
+              stroke={getLineColor(self.relationship)}
               strokeWidth="2"
             />
           );
@@ -250,7 +282,7 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
               y1={connectorY}
               x2={child.x}
               y2={childrenTopY}
-              stroke="#007AFF"
+              stroke={getLineColor(self.relationship)}
               strokeWidth="2"
             />
           );
@@ -272,7 +304,7 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
           y1={selfTopY}
           x2={self.x}
           y2={connectorY}
-          stroke="#007AFF"
+          stroke={getLineColor(self.relationship)}
           strokeWidth="2"
         />
       );
@@ -285,7 +317,7 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
             y1={connectorY}
             x2={parents[parents.length - 1].x}
             y2={connectorY}
-            stroke="#007AFF"
+            stroke={getLineColor(parents[0].relationship, parents[parents.length - 1].relationship)}
             strokeWidth="2"
           />
         );
@@ -299,7 +331,7 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
             y1={connectorY}
             x2={parent.x}
             y2={parentBottomY}
-            stroke="#007AFF"
+            stroke={getLineColor(self.relationship, parent.relationship)}
             strokeWidth="2"
           />
         );
@@ -320,9 +352,9 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
             y1={parentTopY}
             x2={grandparents[0].x}
             y2={grandparentBottomY}
-            stroke="#5E5CE6"
+            stroke={getLineColor(parents[0].relationship, grandparents[0].relationship)}
             strokeWidth="1.5"
-            strokeDasharray="5,5"
+            {...getLineStyle(parents[0].relationship, grandparents[0].relationship)}
           />
         );
       }
@@ -342,9 +374,9 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
             y1={childBottomY}
             x2={grandchildren[0].x}
             y2={grandchildTopY}
-            stroke="#5E5CE6"
+            stroke={getLineColor(children[0].relationship, grandchildren[0].relationship)}
             strokeWidth="1.5"
-            strokeDasharray="5,5"
+            {...getLineStyle(children[0].relationship, grandchildren[0].relationship)}
           />
         );
       }
@@ -394,7 +426,9 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
                 fontSize="13"  // Slightly larger text
                 fontWeight="bold"  // Make text more visible
               >
-                {member.name?.split(' ')[0] || 'Unknown'}
+                {member.title ? 
+                  `${member.title} ${member.name?.split(' ')[0] || 'Unknown'}` : 
+                  member.name?.split(' ')[0] || 'Unknown'}
               </SvgText>
               <SvgText
                 x={member.x}

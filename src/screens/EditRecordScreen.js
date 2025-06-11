@@ -417,7 +417,8 @@ const EditRecordScreen = ({ route, navigation }) => {
 
         // Get family member name
         const familyMember = familyMembers.find(m => m.id === formData.familyMemberId);
-        recordData.familyMemberName = familyMember ? familyMember.name : '';
+        recordData.familyMemberName = familyMember ? 
+          (familyMember.title ? `${familyMember.title} ${familyMember.name}` : familyMember.name) : '';
 
         // Add to offline sync queue
         await offlineStorageService.addToSyncQueue({
@@ -461,7 +462,8 @@ const EditRecordScreen = ({ route, navigation }) => {
       // Update record
       const recordData = {
         ...formData,
-        familyMemberName: familyMember ? familyMember.name : '',
+        familyMemberName: familyMember ? 
+          (familyMember.title ? `${familyMember.title} ${familyMember.name}` : familyMember.name) : '',
         attachments: [...attachments, ...uploadedAttachments],
         userId: user.uid,
         updatedAt: new Date(),
