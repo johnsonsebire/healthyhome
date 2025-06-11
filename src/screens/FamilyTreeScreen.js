@@ -236,13 +236,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     margin: 16,
     borderRadius: 12,
-    padding: 16,
+    padding: 8, // Reduced padding
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    minHeight: 300, // Ensure minimum height for tree
+    minHeight: 400, // Increased minimum height for tree
+    overflow: 'hidden', // Ensure content stays within borders
   },
   instructionsContainer: {
     backgroundColor: '#f8f9fa',

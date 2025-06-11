@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Dimensions,
-  TouchableOpacity
+  TouchableOpacity,
+  Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getRelationshipCategory, getFamilyCategoryByPerspective, FAMILY_CATEGORIES } from '../utils/familyRelationships';
@@ -14,13 +15,39 @@ import Svg, { Line, Circle, Text as SvgText, Path } from 'react-native-svg';
 
 const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
   const [treeLayout, setTreeLayout] = useState([]);
+  const [scrollReady, setScrollReady] = useState(false);
+  const horizontalScrollViewRef = useRef(null);
   const windowWidth = Dimensions.get('window').width;
+  const windowHeight = Dimensions.get('window').height;
   
   useEffect(() => {
     if (familyMembers && familyMembers.length > 0) {
       generateTreeLayout();
     }
   }, [familyMembers]);
+  
+  // Effect to center the tree after layout is calculated
+  useEffect(() => {
+    if (treeLayout.length > 0 && horizontalScrollViewRef.current) {
+      // Find the self node to center on
+      const self = treeLayout.find(member => member.relationship === 'Self');
+      
+      if (self) {
+        // Calculate center position - we want self to be centered on screen
+        // Add a slight delay to ensure the scroll view is fully rendered
+        setTimeout(() => {
+          const scrollToX = Math.max(0, self.x - (windowWidth / 2) + 100); // 100px offset for better centering
+          
+          horizontalScrollViewRef.current.scrollTo({
+            x: scrollToX,
+            y: 0,
+            animated: false // Initial position without animation
+          });
+          setScrollReady(true);
+        }, 100);
+      }
+    }
+  }, [treeLayout]);
 
   const generateTreeLayout = () => {
     // Find self
@@ -37,11 +64,10 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
       return;
     }
     
-    // Start with self at the center of the diagram
-    // Position more to the right to leave space for siblings
+    // Position self in a more centered position
     const layout = [{
       ...self,
-      x: windowWidth + 500, // Position self more to the right to leave space for siblings
+      x: windowWidth * 1.5, // Position more towards the center of the available space
       y: 150  // Increased vertical spacing
     }];
     
@@ -92,10 +118,10 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
     // Find siblings
     const siblings = familyMembers.filter(member => member.relationship === 'Sibling');
     
-    // Position siblings far to the left of self with clear spacing
+    // Position siblings to the left of self with proper spacing
     siblings.forEach((sibling, index) => {
-      // Position siblings with ample space from self
-      const siblingX = layout[0].x - (400 + (index * 200)); // Much more space between siblings
+      // Position siblings with less space to stay within container
+      const siblingX = layout[0].x - (250 + (index * 150)); // Reduced spacing to keep within container
       layout.push({
         ...sibling,
         x: siblingX,
@@ -176,7 +202,7 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
     // Position other relatives
     const others = familyMembers.filter(member => member.relationship === 'Other');
     others.forEach((other, index) => {
-      const otherX = windowWidth / 2 + 220 + index * 110;  // More space for other relatives
+      const otherX = layout[0].x + 220 + index * 110;  // Position relative to self instead of window
       layout.push({
         ...other,
         x: otherX,
@@ -538,19 +564,20 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
 
   return (
     <ScrollView
+      ref={horizontalScrollViewRef}
       horizontal={true}
       showsVerticalScrollIndicator={false}
       showsHorizontalScrollIndicator={true}
       contentContainerStyle={styles.scrollContent}
       style={styles.scrollContainer}
-      // No initial contentOffset to show everything from left to right
+      onLayout={() => setScrollReady(true)}
     >
       <ScrollView
         showsVerticalScrollIndicator={true}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.verticalScrollContent}
       >
-        <Svg height="1200" width={Math.max(windowWidth * 4.0, 3000)}>
+        <Svg height="800" width="2400">
           {getConnectorLines()}
           {treeLayout.map((member, index) => (
             <React.Fragment key={member.id || index}>
@@ -607,20 +634,18 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flex: 1,
     maxHeight: '100%',
-    overflow: 'visible', // Allow content to be visible outside the container
+    overflow: 'hidden', // Contain content within the container
   },
   scrollContent: {
-    minWidth: 3000,  // Significantly increased to ensure siblings are fully visible
+    minWidth: 2400, // Reduced to match SVG width
     alignItems: 'center',
-    paddingHorizontal: 200, // Substantially increased horizontal padding
-    paddingLeft: 800, // Extra padding on the left for siblings
+    paddingHorizontal: 20, // Reduced horizontal padding
   },
   verticalScrollContent: {
-    paddingVertical: 100,  // Increased vertical padding
-    paddingHorizontal: 200,  // Increased horizontal padding
-    minHeight: 1200,  // Large enough for vertical content
+    paddingVertical: 20, // Reduced vertical padding
+    minHeight: 800, // Match SVG height
     justifyContent: 'center',
-    overflow: 'visible', // Allow content to be visible outside the container
+    overflow: 'hidden', // Contain content within the container
   },
   emptyContainer: {
     alignItems: 'center',
