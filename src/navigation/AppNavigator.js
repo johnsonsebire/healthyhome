@@ -71,15 +71,15 @@ const MainTabs = () => (
         let iconName;
 
         if (route.name === 'Home') {
-          iconName = focused ? 'home' : 'home-outline';
+          iconName = focused ? 'home-sharp' : 'home-outline';
         } else if (route.name === 'Records') {
           iconName = focused ? 'documents' : 'documents-outline';
         } else if (route.name === 'Menu') {
-          iconName = focused ? 'menu' : 'menu-outline';
+          iconName = focused ? 'apps' : 'apps-outline';
         } else if (route.name === 'Insurance') {
           iconName = focused ? 'shield-checkmark' : 'shield-checkmark-outline';
         } else if (route.name === 'Settings') {
-          iconName = focused ? 'settings' : 'settings-outline';
+          iconName = focused ? 'options' : 'options-outline';
         }
 
         return <Ionicons name={iconName} size={size} color={color} />;
