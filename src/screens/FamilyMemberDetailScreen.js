@@ -59,7 +59,11 @@ const FamilyMemberDetailScreen = ({ route, navigation }) => {
     if (familyMember) {
       // Check if the user has access to this member's records
       const self = { id: user.uid, relationship: 'Self' };
-      const canAccess = hasAccessToRecords(self, familyMember, sharingPreferences);
+      
+      // For extended family members, always deny access to records
+      const isExtendedFamily = getFamilyCategoryByPerspective(familyMember.relationship) === FAMILY_CATEGORIES.EXTENDED;
+      const canAccess = !isExtendedFamily && hasAccessToRecords(self, familyMember, sharingPreferences);
+      
       setHasAccess(canAccess);
       
       if (canAccess) {
@@ -395,7 +399,7 @@ const FamilyMemberDetailScreen = ({ route, navigation }) => {
           <View style={styles.recordsHeader}>
             <Text style={styles.sectionTitle}>Medical Records</Text>
             
-            {hasAccess ? (
+            {hasAccess && getFamilyCategoryByPerspective(familyMember.relationship) === FAMILY_CATEGORIES.NUCLEAR ? (
               <TouchableOpacity
                 onPress={() => navigation.navigate('AddRecord', { familyMemberId: memberId })}
               >
@@ -404,7 +408,7 @@ const FamilyMemberDetailScreen = ({ route, navigation }) => {
             ) : null}
           </View>
           
-          {!hasAccess ? (
+          {!hasAccess || (getFamilyCategoryByPerspective(familyMember.relationship) === FAMILY_CATEGORIES.EXTENDED) ? (
             <View style={styles.accessDeniedContainer}>
               <Text>
                 <Ionicons name="lock-closed" size={40} color="#DDD" />

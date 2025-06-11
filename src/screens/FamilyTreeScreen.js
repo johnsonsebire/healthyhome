@@ -6,7 +6,8 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ScrollView,
-  Alert
+  Alert,
+  RefreshControl
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { collection, query, where, getDocs } from 'firebase/firestore';
@@ -25,6 +26,7 @@ const FamilyTreeScreen = ({ navigation }) => {
   const [familyMembers, setFamilyMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -87,6 +89,12 @@ const FamilyTreeScreen = ({ navigation }) => {
       }
     }
     setLoading(false);
+    setRefreshing(false);
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadFamilyMembers();
   };
 
   const handleMemberPress = (member) => {
@@ -130,6 +138,14 @@ const FamilyTreeScreen = ({ navigation }) => {
         style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh}
+            colors={['#007AFF']} 
+            tintColor={'#007AFF'}
+          />
+        }
       >
         <View style={styles.treeContainer}>
           <FamilyTreeView 
@@ -148,6 +164,8 @@ const FamilyTreeScreen = ({ navigation }) => {
             • Purple circles represent extended family (parents, siblings, grandparents, etc.){'\n'}
             • Solid lines connect nuclear family members{'\n'}
             • Dashed lines connect extended family members{'\n'}
+            • Extended family members' medical records are not shared by default{'\n'}
+            • Pull down to refresh the family tree{'\n'}
             • Add more family members to expand your tree
           </Text>
         </View>

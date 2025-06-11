@@ -37,10 +37,11 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
       return;
     }
     
-    // Start with self at the center
+    // Start with self at the center of the diagram
+    // Position more to the right to leave space for siblings
     const layout = [{
       ...self,
-      x: windowWidth / 2,
+      x: windowWidth + 500, // Position self more to the right to leave space for siblings
       y: 150  // Increased vertical spacing
     }];
     
@@ -49,7 +50,7 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
     if (spouse) {
       layout.push({
         ...spouse,
-        x: windowWidth / 2 + 150,  // Increased horizontal spacing
+        x: layout[0].x + 150,  // Position relative to updated self position
         y: 150
       });
     }
@@ -60,8 +61,8 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
     // Position children relative to both parents if spouse exists
     if (children.length > 0) {
       const childrenStartX = spouse 
-        ? (windowWidth / 2 + 75) - (children.length * 80) / 2  // Center children between self and spouse with more space
-        : windowWidth / 2 - (children.length - 1) * 80 / 2;    // Center children under self if no spouse
+        ? (layout[0].x + 75) - (children.length * 80) / 2  // Center children between self and spouse with more space
+        : layout[0].x - (children.length - 1) * 80 / 2;    // Center children under self if no spouse
         
       children.forEach((child, index) => {
         layout.push({
@@ -78,8 +79,8 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
       // If there's only one parent, center it above self
       // Otherwise, space them apart evenly
       const parentX = parents.length === 1 
-        ? windowWidth / 2  // Center the single parent above self
-        : windowWidth / 2 - 80 + index * 160;  // Increased spacing between parents
+        ? layout[0].x  // Center the single parent above updated self position
+        : layout[0].x - 80 + index * 160;  // Increased spacing between parents
       
       layout.push({
         ...parent,
@@ -91,10 +92,10 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
     // Find siblings
     const siblings = familyMembers.filter(member => member.relationship === 'Sibling');
     
-    // Position siblings to the left of self
-    const siblingStartX = windowWidth / 2 - 220;
+    // Position siblings far to the left of self with clear spacing
     siblings.forEach((sibling, index) => {
-      const siblingX = siblingStartX - index * 110;  // Increased spacing for siblings
+      // Position siblings with ample space from self
+      const siblingX = layout[0].x - (400 + (index * 200)); // Much more space between siblings
       layout.push({
         ...sibling,
         x: siblingX,
@@ -208,6 +209,16 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
   };
 
   const getLineStyle = (relationship1, relationship2) => {
+    // Handle parent connections specifically - always dashed from self to parent
+    if (relationship1 === 'Self' && relationship2 === 'Parent') {
+      return { strokeDasharray: "5,5" };
+    }
+    
+    // Handle parent connections specifically - always dashed from parent to self
+    if (relationship1 === 'Parent' && relationship2 === 'Self') {
+      return { strokeDasharray: "5,5" };
+    }
+    
     // If both relationships are nuclear, use solid line
     const isNuclear1 = getFamilyCategoryByPerspective(relationship1) === FAMILY_CATEGORIES.NUCLEAR;
     const isNuclear2 = relationship2 ? 
@@ -363,9 +374,7 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
       const connectorY = (selfTopY + parentBottomY) / 2; // Midpoint between self and parents
       
       if (parents.length === 1) {
-        // When there's only one parent, draw a curved path
-        const selfTopY = self.y + 70; // Above self circle
-        const parentBottomY = parents[0].y + 130; // Below parent circle
+        // When there's only one parent, draw a direct line
         const pathData = createCurvedPath(self.x, selfTopY, parents[0].x, parentBottomY);
         
         lines.push(
@@ -387,8 +396,9 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
             y1={selfTopY}
             x2={self.x}
             y2={connectorY}
-            stroke={getLineColor(self.relationship)}
+            stroke={getLineColor(self.relationship, parents[0].relationship)}
             strokeWidth="2"
+            {...getLineStyle(self.relationship, parents[0].relationship)}
           />
         );
         
@@ -402,6 +412,7 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
               y2={connectorY}
               stroke={getLineColor(parents[0].relationship, parents[parents.length - 1].relationship)}
               strokeWidth="2"
+              {...getLineStyle(self.relationship, parents[0].relationship)}
             />
           );
         }
@@ -416,6 +427,7 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
               y2={parentBottomY}
               stroke={getLineColor(self.relationship, parent.relationship)}
               strokeWidth="2"
+              {...getLineStyle(self.relationship, parent.relationship)}
             />
           );
         });
@@ -531,13 +543,14 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
       showsHorizontalScrollIndicator={true}
       contentContainerStyle={styles.scrollContent}
       style={styles.scrollContainer}
+      // No initial contentOffset to show everything from left to right
     >
       <ScrollView
         showsVerticalScrollIndicator={true}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.verticalScrollContent}
       >
-        <Svg height="800" width={Math.max(windowWidth * 2, 1200)}>
+        <Svg height="1200" width={Math.max(windowWidth * 4.0, 3000)}>
           {getConnectorLines()}
           {treeLayout.map((member, index) => (
             <React.Fragment key={member.id || index}>
@@ -581,6 +594,7 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
                   {getFamilyCategoryByPerspective(member.relationship) === FAMILY_CATEGORIES.NUCLEAR ? "Nuclear" : "Extended"}
                 </SvgText>
               )}
+              {/* No text label for sharing status in the tree view */}
             </React.Fragment>
           ))}
         </Svg>
@@ -592,16 +606,21 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
 const styles = StyleSheet.create({
   scrollContainer: {
     flex: 1,
+    maxHeight: '100%',
+    overflow: 'visible', // Allow content to be visible outside the container
   },
   scrollContent: {
-    minWidth: 1200,  // Increased to accommodate wider spacing
+    minWidth: 3000,  // Significantly increased to ensure siblings are fully visible
     alignItems: 'center',
+    paddingHorizontal: 200, // Substantially increased horizontal padding
+    paddingLeft: 800, // Extra padding on the left for siblings
   },
   verticalScrollContent: {
-    paddingVertical: 40,  // More vertical padding
-    paddingHorizontal: 30,  // More horizontal padding
-    minHeight: 800,  // Increased to match SVG height
+    paddingVertical: 100,  // Increased vertical padding
+    paddingHorizontal: 200,  // Increased horizontal padding
+    minHeight: 1200,  // Large enough for vertical content
     justifyContent: 'center',
+    overflow: 'visible', // Allow content to be visible outside the container
   },
   emptyContainer: {
     alignItems: 'center',

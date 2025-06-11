@@ -135,8 +135,8 @@ export const hasAccessToRecords = (viewer, target, sharingPreferences) => {
     return false;
   }
   
-  // Check relationship category
-  const relationshipCategory = getRelationshipCategory(target.relationship);
+  // Check relationship category using perspective-based categorization
+  const relationshipCategory = getFamilyCategoryByPerspective(target.relationship);
   
   // If sharing with all, everyone in the family has access
   if (preference === SHARING_PREFERENCES.ALL) {
@@ -146,6 +146,11 @@ export const hasAccessToRecords = (viewer, target, sharingPreferences) => {
   // If sharing with nuclear family only, only nuclear family members have access
   if (preference === SHARING_PREFERENCES.NUCLEAR) {
     return relationshipCategory === FAMILY_CATEGORIES.NUCLEAR;
+  }
+  
+  // Self should always have access to their own records
+  if (viewer.relationship === RELATIONSHIP_TYPES.SELF && target.relationship === RELATIONSHIP_TYPES.SELF) {
+    return true;
   }
   
   return false;
