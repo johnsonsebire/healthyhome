@@ -243,7 +243,7 @@ const FamilyMemberDetailScreen = ({ route, navigation }) => {
             </Text>
             
             <Text style={styles.tooltipSectionTitle}>Perspective Matters</Text>
-            <Text style={styles.tooltipText}>
+            <Text style={[styles.tooltipText, styles.lastTooltipText]}>
               The classification of family members as Nuclear or Extended depends on your perspective as the logged-in user. 
               For example, from your perspective, your parents are part of your extended family. 
               But from your father's perspective, you would be part of his nuclear family, and his parents would be in his extended family.
@@ -811,7 +811,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   tooltipContent: {
-    padding: 16,
+    padding: 20,
     maxHeight: '80%',
   },
   tooltipSectionTitle: {
@@ -824,8 +824,10 @@ const styles = StyleSheet.create({
   tooltipText: {
     fontSize: 14,
     color: '#666',
-    lineHeight: 20,
-    marginBottom: 12,
+    lineHeight: 22,
+    marginBottom: 16,
+    paddingLeft: 4,
+    paddingRight: 4,
   },
   // Tooltip styles
   tooltipOverlay: {
@@ -848,15 +850,19 @@ const styles = StyleSheet.create({
   },
   tooltipContainer: {
     backgroundColor: 'white',
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: 'hidden',
-    width: '90%',
-    maxWidth: 400,
-    elevation: 4,
+    width: '92%',
+    maxWidth: 420,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
   tooltipHeader: {
-    backgroundColor: '#f1f1f1',
-    padding: 16,
+    backgroundColor: '#f5f5f7',
+    padding: 18,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -867,20 +873,29 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   tooltipContent: {
-    maxHeight: 300,
+    paddingLeft: 20,
+    paddingRight:20,
+    paddingBottom: 30, // Added extra padding at the bottom
+    maxHeight: 400,
   },
   tooltipSectionTitle: {
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 17,
+    fontWeight: '600',
     color: '#007AFF',
-    marginTop: 12,
-    marginBottom: 8,
+    marginTop: 16,
+    marginBottom: 10,
+    paddingLeft: 2,
   },
   tooltipText: {
     fontSize: 14,
     color: '#333',
-    lineHeight: 20,
-    marginBottom: 12,
+    lineHeight: 22,
+    marginBottom: 16,
+    paddingLeft: 4,
+    paddingRight: 4,
+  },
+  lastTooltipText: {
+    marginBottom: 50, // Extra margin at the bottom of the last tooltip text
   },
 });
 

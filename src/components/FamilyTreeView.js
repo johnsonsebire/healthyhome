@@ -10,7 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { getRelationshipCategory, getFamilyCategoryByPerspective, FAMILY_CATEGORIES } from '../utils/familyRelationships';
 import { getGenderSpecificRelationship } from '../utils/genderBasedRelationships';
-import Svg, { Line, Circle, Text as SvgText } from 'react-native-svg';
+import Svg, { Line, Circle, Text as SvgText, Path } from 'react-native-svg';
 
 const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
   const [treeLayout, setTreeLayout] = useState([]);
@@ -75,7 +75,12 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
     // Find parents
     const parents = familyMembers.filter(member => member.relationship === 'Parent');
     parents.forEach((parent, index) => {
-      const parentX = windowWidth / 2 - 80 + index * 160;  // Increased spacing between parents
+      // If there's only one parent, center it above self
+      // Otherwise, space them apart evenly
+      const parentX = parents.length === 1 
+        ? windowWidth / 2  // Center the single parent above self
+        : windowWidth / 2 - 80 + index * 160;  // Increased spacing between parents
+      
       layout.push({
         ...parent,
         x: parentX,
@@ -85,8 +90,11 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
     
     // Find siblings
     const siblings = familyMembers.filter(member => member.relationship === 'Sibling');
+    
+    // Position siblings to the left of self
+    const siblingStartX = windowWidth / 2 - 220;
     siblings.forEach((sibling, index) => {
-      const siblingX = windowWidth / 2 - 220 - index * 110;  // Increased spacing for siblings
+      const siblingX = siblingStartX - index * 110;  // Increased spacing for siblings
       layout.push({
         ...sibling,
         x: siblingX,
@@ -96,23 +104,71 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
     
     // Position grandparents
     const grandparents = familyMembers.filter(member => member.relationship === 'Grandparent');
-    grandparents.forEach((grandparent, index) => {
-      const grandparentX = windowWidth / 2 - 150 + index * 100;  // Increased spacing
-      layout.push({
-        ...grandparent,
-        x: grandparentX,
-        y: -60  // More space at the top
+    
+    // Group grandparents by pairs (assuming each parent has two grandparents)
+    const groupedGrandparents = [];
+    for (let i = 0; i < grandparents.length; i += 2) {
+      const pair = grandparents.slice(i, i + 2);
+      groupedGrandparents.push(pair);
+    }
+    
+    // Determine how many parents we have
+    const parentCount = parents.length;
+    
+    // Position each grandparent relative to their child (parent)
+    let grandparentIndex = 0;
+    groupedGrandparents.forEach((pair, groupIndex) => {
+      // Position relative to a parent if possible
+      const parentX = groupIndex < parentCount 
+        ? parents[groupIndex].x 
+        : windowWidth / 2;
+        
+      pair.forEach((grandparent, pairIndex) => {
+        // Offset to left or right of the parent
+        const offsetX = pairIndex === 0 ? -70 : 70;
+        
+        layout.push({
+          ...grandparent,
+          x: parentX + offsetX,
+          y: -60  // More space at the top
+        });
+        
+        grandparentIndex++;
       });
     });
     
     // Position grandchildren
     const grandchildren = familyMembers.filter(member => member.relationship === 'Grandchild');
-    grandchildren.forEach((grandchild, index) => {
-      const grandchildX = windowWidth / 2 - (grandchildren.length - 1) * 50 / 2 + index * 50;
-      layout.push({
-        ...grandchild,
-        x: grandchildX,
-        y: 450  // More vertical space for grandchildren
+    
+    // Group grandchildren by pairs (assuming each child has two grandchildren)
+    const groupedGrandchildren = [];
+    for (let i = 0; i < grandchildren.length; i += 2) {
+      const pair = grandchildren.slice(i, i + 2);
+      groupedGrandchildren.push(pair);
+    }
+    
+    // Determine how many children we have
+    const childCount = children.length;
+    
+    // Position each grandchild relative to their parent (child)
+    let grandchildIndex = 0;
+    groupedGrandchildren.forEach((pair, groupIndex) => {
+      // Position relative to a child if possible
+      const childX = groupIndex < childCount 
+        ? children[groupIndex].x 
+        : windowWidth / 2;
+        
+      pair.forEach((grandchild, pairIndex) => {
+        // Offset to left or right of the child
+        const offsetX = pairIndex === 0 ? -40 : 40;
+        
+        layout.push({
+          ...grandchild,
+          x: childX + offsetX,
+          y: 450  // More vertical space for grandchildren
+        });
+        
+        grandchildIndex++;
       });
     });
     
@@ -165,6 +221,15 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
     
     // For extended family connections, use dashed lines
     return { strokeDasharray: "5,5" };
+  };
+  
+  // Create a curved path for a single-parent connection
+  const createCurvedPath = (x1, y1, x2, y2) => {
+    // Control point for the curve - halfway between the two points horizontally
+    const cpX = (x1 + x2) / 2;
+    
+    // Create path data for an SVG path element
+    return `M${x1},${y1} C${cpX},${y1} ${cpX},${y2} ${x2},${y2}`;
   };
 
   const getConnectorLines = () => {
@@ -297,89 +362,154 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
       const parentBottomY = parents[0].y + 130; // Below parent circle
       const connectorY = (selfTopY + parentBottomY) / 2; // Midpoint between self and parents
       
-      lines.push(
-        <Line
-          key="self-parents-line"
-          x1={self.x}
-          y1={selfTopY}
-          x2={self.x}
-          y2={connectorY}
-          stroke={getLineColor(self.relationship)}
-          strokeWidth="2"
-        />
-      );
-      
-      if (parents.length > 1) {
+      if (parents.length === 1) {
+        // When there's only one parent, draw a curved path
+        const selfTopY = self.y + 70; // Above self circle
+        const parentBottomY = parents[0].y + 130; // Below parent circle
+        const pathData = createCurvedPath(self.x, selfTopY, parents[0].x, parentBottomY);
+        
+        lines.push(
+          <Path
+            key="single-parent-path"
+            d={pathData}
+            fill="none"
+            stroke={getLineColor(self.relationship, parents[0].relationship)}
+            strokeWidth="2"
+            {...getLineStyle(self.relationship, parents[0].relationship)}
+          />
+        );
+      } else {
+        // When there are multiple parents, use the standard tree structure
         lines.push(
           <Line
-            key="parents-connector"
-            x1={parents[0].x}
-            y1={connectorY}
-            x2={parents[parents.length - 1].x}
+            key="self-parents-line"
+            x1={self.x}
+            y1={selfTopY}
+            x2={self.x}
             y2={connectorY}
-            stroke={getLineColor(parents[0].relationship, parents[parents.length - 1].relationship)}
+            stroke={getLineColor(self.relationship)}
             strokeWidth="2"
           />
         );
+        
+        if (parents.length > 1) {
+          lines.push(
+            <Line
+              key="parents-connector"
+              x1={parents[0].x}
+              y1={connectorY}
+              x2={parents[parents.length - 1].x}
+              y2={connectorY}
+              stroke={getLineColor(parents[0].relationship, parents[parents.length - 1].relationship)}
+              strokeWidth="2"
+            />
+          );
+        }
+        
+        parents.forEach((parent, index) => {
+          lines.push(
+            <Line
+              key={`parent-line-${index}`}
+              x1={parent.x}
+              y1={connectorY}
+              x2={parent.x}
+              y2={parentBottomY}
+              stroke={getLineColor(self.relationship, parent.relationship)}
+              strokeWidth="2"
+            />
+          );
+        });
       }
-      
-      parents.forEach((parent, index) => {
-        lines.push(
-          <Line
-            key={`parent-line-${index}`}
-            x1={parent.x}
-            y1={connectorY}
-            x2={parent.x}
-            y2={parentBottomY}
-            stroke={getLineColor(self.relationship, parent.relationship)}
-            strokeWidth="2"
-          />
-        );
-      });
     }
     
     // Connect parents to grandparents
     const grandparents = treeLayout.filter(member => member.relationship === 'Grandparent');
     if (parents.length > 0 && grandparents.length > 0) {
-      if (parents[0] && grandparents[0]) {
-        const parentTopY = parents[0].y + 70; // Above parent circle
-        const grandparentBottomY = grandparents[0].y + 130; // Below grandparent circle
+      // For simplicity, we'll match parents to grandparents based on their index
+      // In a real app, you might want to use a more sophisticated matching based on specific relationships
+      parents.forEach((parent, pIndex) => {
+        // Match at most one grandparent per parent
+        const matchedGrandparents = grandparents.filter((gp, gpIndex) => {
+          // Simple algorithm: first parent connects to first and second grandparent
+          // second parent connects to third and fourth grandparent, etc.
+          return Math.floor(gpIndex / 2) === pIndex;
+        });
         
-        lines.push(
-          <Line
-            key="parent-grandparent-line"
-            x1={parents[0].x}
-            y1={parentTopY}
-            x2={grandparents[0].x}
-            y2={grandparentBottomY}
-            stroke={getLineColor(parents[0].relationship, grandparents[0].relationship)}
-            strokeWidth="1.5"
-            {...getLineStyle(parents[0].relationship, grandparents[0].relationship)}
-          />
-        );
-      }
+        if (matchedGrandparents.length > 0) {
+          matchedGrandparents.forEach(grandparent => {
+            const parentTopY = parent.y + 70; // Above parent circle
+            const grandparentBottomY = grandparent.y + 130; // Below grandparent circle
+            const pathData = createCurvedPath(parent.x, parentTopY, grandparent.x, grandparentBottomY);
+            
+            lines.push(
+              <Path
+                key={`parent-${parent.id}-grandparent-${grandparent.id}-path`}
+                d={pathData}
+                fill="none"
+                stroke={getLineColor(parent.relationship, grandparent.relationship)}
+                strokeWidth="1.5"
+                {...getLineStyle(parent.relationship, grandparent.relationship)}
+              />
+            );
+          });
+        }
+      });
     }
     
     // Connect children to grandchildren
     const grandchildren = treeLayout.filter(member => member.relationship === 'Grandchild');
     if (children.length > 0 && grandchildren.length > 0) {
-      if (children[0] && grandchildren[0]) {
-        const childBottomY = children[0].y + 130; // Below child circle
-        const grandchildTopY = grandchildren[0].y + 70; // Above grandchild circle
+      // Similar to parents-grandparents, match children to grandchildren
+      children.forEach((child, cIndex) => {
+        // Match at most one grandchild per child
+        const matchedGrandchildren = grandchildren.filter((gc, gcIndex) => {
+          // Simple algorithm: first child connects to first and second grandchild
+          // second child connects to third and fourth grandchild, etc.
+          return Math.floor(gcIndex / 2) === cIndex;
+        });
+        
+        if (matchedGrandchildren.length > 0) {
+          matchedGrandchildren.forEach(grandchild => {
+            const childBottomY = child.y + 130; // Below child circle
+            const grandchildTopY = grandchild.y + 70; // Above grandchild circle
+            const pathData = createCurvedPath(child.x, childBottomY, grandchild.x, grandchildTopY);
+            
+            lines.push(
+              <Path
+                key={`child-${child.id}-grandchild-${grandchild.id}-path`}
+                d={pathData}
+                fill="none"
+                stroke={getLineColor(child.relationship, grandchild.relationship)}
+                strokeWidth="1.5"
+                {...getLineStyle(child.relationship, grandchild.relationship)}
+              />
+            );
+          });
+        }
+      });
+    }
+    
+    // Connect self to siblings (if any)
+    const siblings = treeLayout.filter(member => member.relationship === 'Sibling');
+    if (self && siblings.length > 0) {
+      // Position to start connecting siblings
+      const selfMiddleY = self.y + 100; // Middle of self circle
+      
+      siblings.forEach((sibling) => {
+        const siblingMiddleY = sibling.y + 100; // Middle of sibling circle
+        const pathData = createCurvedPath(self.x, selfMiddleY, sibling.x, siblingMiddleY);
         
         lines.push(
-          <Line
-            key="child-grandchild-line"
-            x1={children[0].x}
-            y1={childBottomY}
-            x2={grandchildren[0].x}
-            y2={grandchildTopY}
-            stroke={getLineColor(children[0].relationship, grandchildren[0].relationship)}
+          <Path
+            key={`self-sibling-${sibling.id}-path`}
+            d={pathData}
+            fill="none"
+            stroke={getLineColor(self.relationship, sibling.relationship)}
             strokeWidth="1.5"
-            {...getLineStyle(children[0].relationship, grandchildren[0].relationship)}
+            {...getLineStyle(self.relationship, sibling.relationship)}
           />
         );
-      }
+      });
     }
     
     return lines;
@@ -439,6 +569,18 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
               >
                 {getGenderSpecificRelationship(member.relationship, member.gender)}
               </SvgText>
+              {member.relationship !== 'Self' && (
+                <SvgText
+                  x={member.x}
+                  y={member.y + 190}  // Below relationship text
+                  textAnchor="middle"
+                  fill={getFamilyCategoryByPerspective(member.relationship) === FAMILY_CATEGORIES.NUCLEAR ? "#007AFF" : "#5E5CE6"}
+                  fontSize="9"
+                  fontWeight="500"
+                >
+                  {getFamilyCategoryByPerspective(member.relationship) === FAMILY_CATEGORIES.NUCLEAR ? "Nuclear" : "Extended"}
+                </SvgText>
+              )}
             </React.Fragment>
           ))}
         </Svg>
