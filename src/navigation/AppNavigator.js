@@ -24,6 +24,27 @@ import FamilySharingScreen from '../screens/FamilySharingScreen';
 import SubscriptionScreen from '../screens/SubscriptionScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import PersonalFinanceScreen from '../screens/finance/PersonalFinanceScreen';
+import FamilyFinanceScreen from '../screens/finance/FamilyFinanceScreen';
+import ExtendedFamilyProjectsScreen from '../screens/finance/ExtendedFamilyProjectsScreen';
+import AddAccountScreen from '../screens/finance/AddAccountScreen';
+import AddTransactionScreen from '../screens/finance/AddTransactionScreen';
+import AddProjectScreen from '../screens/finance/AddProjectScreen';
+import AccountDetailsScreen from '../screens/finance/AccountDetailsScreen';
+import TransactionDetailsScreen from '../screens/finance/TransactionDetailsScreen';
+import EditAccountScreen from '../screens/finance/EditAccountScreen';
+import EditTransactionScreen from '../screens/finance/EditTransactionScreen';
+import ReportsScreen from '../screens/finance/ReportsScreen';
+import LoansScreen from '../screens/finance/LoansScreen';
+import AddLoanScreen from '../screens/finance/AddLoanScreen';
+import LoanDetailsScreen from '../screens/finance/LoanDetailsScreen';
+import RecordLoanPaymentScreen from '../screens/finance/RecordLoanPaymentScreen';
+import WelfareAccountsScreen from '../screens/finance/WelfareAccountsScreen';
+import WelfareAccountDetailsScreen from '../screens/finance/WelfareAccountDetailsScreen';
+import AddWelfareAccountScreen from '../screens/finance/AddWelfareAccountScreen';
+import ContributeToWelfareScreen from '../screens/finance/ContributeToWelfareScreen';
+import WelfareContributionHistoryScreen from '../screens/finance/WelfareContributionHistoryScreen';
+import AddWelfareMemberScreen from '../screens/finance/AddWelfareMemberScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import TermsOfServiceScreen from '../screens/TermsOfServiceScreen';
 import HelpFaqScreen from '../screens/HelpFaqScreen';
@@ -31,6 +52,7 @@ import NotificationsScreen from '../screens/NotificationsScreen';
 import PrivacySecurityScreen from '../screens/PrivacySecurityScreen';
 import DataExportScreen from '../screens/DataExportScreen';
 import ProviderDetailScreen from '../screens/ProviderDetailScreen';
+import MenuScreen from '../screens/MenuScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -52,8 +74,8 @@ const MainTabs = () => (
           iconName = focused ? 'home' : 'home-outline';
         } else if (route.name === 'Records') {
           iconName = focused ? 'documents' : 'documents-outline';
-        } else if (route.name === 'Schedule') {
-          iconName = focused ? 'calendar' : 'calendar-outline';
+        } else if (route.name === 'Menu') {
+          iconName = focused ? 'menu' : 'menu-outline';
         } else if (route.name === 'Insurance') {
           iconName = focused ? 'shield-checkmark' : 'shield-checkmark-outline';
         } else if (route.name === 'Settings') {
@@ -75,7 +97,7 @@ const MainTabs = () => (
   >
     <Tab.Screen name="Home" component={HomeScreen} />
     <Tab.Screen name="Records" component={RecordsScreen} />
-    <Tab.Screen name="Schedule" component={ScheduleScreen} />
+    <Tab.Screen name="Menu" component={MenuScreen} />
     <Tab.Screen name="Insurance" component={InsuranceScreen} />
     <Tab.Screen name="Settings" component={SettingsScreen} />
   </Tab.Navigator>
@@ -168,6 +190,204 @@ const AppStack = () => (
       component={ProfileScreen}
       options={{ 
         title: 'My Profile',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="Schedule" 
+      component={ScheduleScreen}
+      options={{ 
+        title: 'Schedule',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="Finance" 
+      component={PersonalFinanceScreen}
+      options={{ 
+        title: 'Finance',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="FamilyFinance" 
+      component={FamilyFinanceScreen}
+      options={{ 
+        title: 'Family Finance',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="ExtendedFamilyProjects" 
+      component={ExtendedFamilyProjectsScreen}
+      options={{ 
+        title: 'Extended Family Projects',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="AddAccount" 
+      component={AddAccountScreen}
+      options={{ 
+        title: 'Add Account',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="AddTransaction" 
+      component={AddTransactionScreen}
+      options={{ 
+        title: 'Add Transaction',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="AddProject" 
+      component={AddProjectScreen}
+      options={{ 
+        title: 'Add Project',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="AccountDetails" 
+      component={AccountDetailsScreen}
+      options={{ 
+        title: 'Account Details',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="TransactionDetails" 
+      component={TransactionDetailsScreen}
+      options={{ 
+        title: 'Transaction Details',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="EditAccount" 
+      component={EditAccountScreen}
+      options={{ 
+        title: 'Edit Account',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="EditTransaction" 
+      component={EditTransactionScreen}
+      options={{ 
+        title: 'Edit Transaction',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="Reports" 
+      component={ReportsScreen}
+      options={{ 
+        title: 'Financial Reports',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="Loans" 
+      component={LoansScreen}
+      options={{ 
+        title: 'Loans',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="AddLoan" 
+      component={AddLoanScreen}
+      options={{ 
+        title: 'Add Loan',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="LoanDetails" 
+      component={LoanDetailsScreen}
+      options={{ 
+        title: 'Loan Details',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="RecordLoanPayment" 
+      component={RecordLoanPaymentScreen}
+      options={{ 
+        title: 'Record Payment',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="WelfareAccounts" 
+      component={WelfareAccountsScreen}
+      options={{ 
+        title: 'Welfare Accounts',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="WelfareAccountDetails" 
+      component={WelfareAccountDetailsScreen}
+      options={{ 
+        title: 'Welfare Account Details',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="AddWelfareAccount" 
+      component={AddWelfareAccountScreen}
+      options={{ 
+        title: 'Add Welfare Account',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="ContributeToWelfare" 
+      component={ContributeToWelfareScreen}
+      options={{ 
+        title: 'Make Contribution',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="WelfareContributionHistory" 
+      component={WelfareContributionHistoryScreen}
+      options={{ 
+        title: 'Contribution History',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="AddWelfareMember" 
+      component={AddWelfareMemberScreen}
+      options={{ 
+        title: 'Add Members',
         headerStyle: { backgroundColor: '#6366f1' },
         headerTintColor: '#fff'
       }}

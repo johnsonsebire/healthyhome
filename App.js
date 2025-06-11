@@ -7,6 +7,7 @@ import { AuthProvider } from './src/contexts/AuthContext';
 import { SubscriptionProvider } from './src/contexts/SubscriptionContext';
 import { ErrorProvider, ErrorBoundary } from './src/contexts/ErrorContext';
 import FamilySharingProvider from './src/contexts/FamilySharingContext';
+import { FinanceProvider } from './src/contexts/FinanceContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import * as SplashScreen from 'expo-splash-screen';
 
@@ -97,10 +98,12 @@ export default function App() {
             <AuthProvider>
               <SubscriptionProvider>
                 <FamilySharingProvider>
-                  <View style={{flex: 1}}>
-                    <AppNavigator />
-                    <StatusBar style="auto" />
-                  </View>
+                  <FinanceProvider>
+                    <View style={{flex: 1}}>
+                      <AppNavigator />
+                      <StatusBar style="auto" />
+                    </View>
+                  </FinanceProvider>
                 </FamilySharingProvider>
               </SubscriptionProvider>
             </AuthProvider>

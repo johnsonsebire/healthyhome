@@ -15,6 +15,13 @@ module.exports = function (api) {
           verbose: false,
         },
       ],
+      ['module-resolver', {
+        root: ['./'],
+        alias: {
+          'react': './node_modules/react',
+          'react-native': './node_modules/react-native',
+        }
+      }]
     ],
   };
 };
