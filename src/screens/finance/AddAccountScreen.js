@@ -11,6 +11,7 @@ import {
 import { Button, Divider, Menu, Icon } from 'react-native-paper';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFinance, FINANCE_SCOPE } from '../../contexts/FinanceContext';
+import currencyService from '../../services/currencyService';
 
 // Custom components for menu items
 const ColorMenuItem = ({ color, label }) => (
@@ -55,17 +56,11 @@ const AddAccountScreen = ({ navigation, route }) => {
     { value: 'other', label: 'Other' },
   ];
   
-  // Currencies
-  const currencies = [
-    { value: 'GHS', label: 'GHS (₵)' },
-    { value: 'USD', label: 'USD ($)' },
-    { value: 'EUR', label: 'EUR (€)' },
-    { value: 'GBP', label: 'GBP (£)' },
-    { value: 'JPY', label: 'JPY (¥)' },
-    { value: 'CAD', label: 'CAD ($)' },
-    { value: 'AUD', label: 'AUD ($)' },
-    { value: 'NGN', label: 'NGN (₦)' },
-  ];
+  // Currencies - Use currency service
+  const currencies = currencyService.getSupportedCurrencies().map(currency => ({
+    value: currency.code,
+    label: `${currency.code} (${currency.symbol})`
+  }));
   
   // Colors
   const colors = [
@@ -192,11 +187,7 @@ const AddAccountScreen = ({ navigation, route }) => {
         <Text style={styles.inputLabel}>Initial Balance</Text>
         <View style={styles.amountInputContainer}>
           <Text style={styles.currencySymbol}>
-            {formData.currency === 'USD' ? '$' : 
-             formData.currency === 'EUR' ? '€' : 
-             formData.currency === 'GBP' ? '£' : 
-             formData.currency === 'JPY' ? '¥' : 
-             formData.currency === 'NGN' ? '₦' : '$'}
+            {currencyService.getCurrencySymbol(formData.currency)}
           </Text>
           <TextInput
             style={styles.amountInput}
@@ -328,13 +319,7 @@ const AddAccountScreen = ({ navigation, route }) => {
             </View>
             <View style={styles.previewBalanceContainer}>
               <Text style={[styles.previewBalance, { color: formData.color }]}>
-                {formData.currency === 'GHS' ? '₵' :
-                 formData.currency === 'USD' ? '$' : 
-                 formData.currency === 'EUR' ? '€' : 
-                 formData.currency === 'GBP' ? '£' : 
-                 formData.currency === 'JPY' ? '¥' : 
-                 formData.currency === 'NGN' ? '₦' : '₵'}
-                {formData.balance || '0.00'}
+                {currencyService.formatCurrency(parseFloat(formData.balance) || 0, formData.currency)}
               </Text>
             </View>
           </View>

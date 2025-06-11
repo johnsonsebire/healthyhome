@@ -37,6 +37,7 @@ import EditTransactionScreen from '../screens/finance/EditTransactionScreen';
 import ReportsScreen from '../screens/finance/ReportsScreen';
 import LoansScreen from '../screens/finance/LoansScreen';
 import AddLoanScreen from '../screens/finance/AddLoanScreen';
+import EditLoanScreen from '../screens/finance/EditLoanScreen';
 import LoanDetailsScreen from '../screens/finance/LoanDetailsScreen';
 import RecordLoanPaymentScreen from '../screens/finance/RecordLoanPaymentScreen';
 import WelfareAccountsScreen from '../screens/finance/WelfareAccountsScreen';
@@ -45,6 +46,8 @@ import AddWelfareAccountScreen from '../screens/finance/AddWelfareAccountScreen'
 import ContributeToWelfareScreen from '../screens/finance/ContributeToWelfareScreen';
 import WelfareContributionHistoryScreen from '../screens/finance/WelfareContributionHistoryScreen';
 import AddWelfareMemberScreen from '../screens/finance/AddWelfareMemberScreen';
+import AccountsScreen from '../screens/finance/AccountsScreen';
+import TransactionsScreen from '../screens/finance/TransactionsScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import TermsOfServiceScreen from '../screens/TermsOfServiceScreen';
 import HelpFaqScreen from '../screens/HelpFaqScreen';
@@ -75,7 +78,7 @@ const MainTabs = () => (
         } else if (route.name === 'Records') {
           iconName = focused ? 'documents' : 'documents-outline';
         } else if (route.name === 'Menu') {
-          iconName = focused ? 'apps' : 'apps-outline';
+          iconName = focused ? 'grid' : 'grid-outline';
         } else if (route.name === 'Insurance') {
           iconName = focused ? 'shield-checkmark' : 'shield-checkmark-outline';
         } else if (route.name === 'Settings') {
@@ -321,6 +324,15 @@ const AppStack = () => (
       }}
     />
     <Stack.Screen 
+      name="EditLoan" 
+      component={EditLoanScreen}
+      options={{ 
+        title: 'Edit Loan',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
       name="LoanDetails" 
       component={LoanDetailsScreen}
       options={{ 
@@ -388,6 +400,24 @@ const AppStack = () => (
       component={AddWelfareMemberScreen}
       options={{ 
         title: 'Add Members',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="Accounts" 
+      component={AccountsScreen}
+      options={{ 
+        title: 'Accounts',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="Transactions" 
+      component={TransactionsScreen}
+      options={{ 
+        title: 'Transactions',
         headerStyle: { backgroundColor: '#6366f1' },
         headerTintColor: '#fff'
       }}

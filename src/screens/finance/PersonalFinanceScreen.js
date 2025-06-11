@@ -9,9 +9,11 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFinance, FINANCE_SCOPE } from '../../contexts/FinanceContext';
+import { useAuth } from '../../contexts/AuthContext';
 import AccountCard from '../../components/finance/AccountCard';
 import FinancialReportChart from '../../components/finance/FinancialReportChart';
 import TransactionList from '../../components/finance/TransactionList';
+import currencyService from '../../services/currencyService';
 
 const PersonalFinanceScreen = ({ navigation }) => {
   const { 
@@ -22,15 +24,41 @@ const PersonalFinanceScreen = ({ navigation }) => {
     changeScope
   } = useFinance();
   
+  const { user } = useAuth();
+  
   const [refreshing, setRefreshing] = useState(false);
   const [recentTransactions, setRecentTransactions] = useState([]);
   const [reportData, setReportData] = useState(null);
+  const [userCurrencySettings, setUserCurrencySettings] = useState(null);
+  const [displayCurrency, setDisplayCurrency] = useState('GHS');
   
   // Set scope to personal when component mounts
   useEffect(() => {
     if (currentScope !== FINANCE_SCOPE.PERSONAL) {
       changeScope(FINANCE_SCOPE.PERSONAL);
     }
+  }, []);
+
+  // Load user currency settings
+  useEffect(() => {
+    const loadCurrencySettings = async () => {
+      if (user) {
+        try {
+          const settings = await currencyService.loadUserCurrencySettings(user.uid);
+          setUserCurrencySettings(settings);
+          setDisplayCurrency(settings.displayCurrency || 'GHS');
+        } catch (error) {
+          console.error('Error loading currency settings:', error);
+        }
+      }
+    };
+
+    loadCurrencySettings();
+  }, [user]);
+
+  // Initialize currency service
+  useEffect(() => {
+    currencyService.initializeExchangeRates();
   }, []);
   
   // Update recent transactions when transactions change
@@ -147,17 +175,13 @@ const PersonalFinanceScreen = ({ navigation }) => {
   };
   
   // Format currency
-  const formatCurrency = (amount, currency = 'USD') => {
-    return new Intl.NumberFormat('en-US', { 
-      style: 'currency', 
-      currency: currency,
-      minimumFractionDigits: 2 
-    }).format(amount);
+  const formatCurrency = (amount, currency) => {
+    return currencyService.formatCurrency(amount, currency || displayCurrency);
   };
   
-  // Calculate total balance across all accounts
+  // Calculate total balance across all accounts in display currency
   const calculateTotalBalance = () => {
-    return accounts.reduce((sum, account) => sum + (parseFloat(account.balance) || 0), 0);
+    return currencyService.getTotalBalanceInCurrency(accounts, displayCurrency, userCurrencySettings);
   };
   
   return (
@@ -171,8 +195,11 @@ const PersonalFinanceScreen = ({ navigation }) => {
       <View style={styles.balanceSummary}>
         <Text style={styles.balanceLabel}>Total Balance</Text>
         <Text style={styles.balanceAmount}>
-          {formatCurrency(calculateTotalBalance())}
+          {formatCurrency(calculateTotalBalance(), displayCurrency)}
         </Text>
+        {userCurrencySettings?.autoConvert && (
+          <Text style={styles.currencyNote}>in {displayCurrency}</Text>
+        )}
       </View>
       
       {/* Quick Actions */}
@@ -306,6 +333,11 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
     color: 'white',
+  },
+  currencyNote: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: 4,
   },
   quickActionsContainer: {
     flexDirection: 'row',

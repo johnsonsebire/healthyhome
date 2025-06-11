@@ -20,6 +20,7 @@ import { useAuth } from './AuthContext';
 import { useFamilySharing } from './FamilySharingContext';
 import networkService from '../services/networkService';
 import offlineStorageService from '../services/offlineStorage';
+import currencyService from '../services/currencyService';
 
 // Create the context
 const FinanceContext = createContext();
@@ -767,17 +768,32 @@ export const FinanceProvider = ({ children }) => {
         }
       }
       
-      // Only load personal loans, as loans are always personal
-      if (currentScope !== FINANCE_SCOPE.PERSONAL) {
+      // Load loans based on current scope
+      let loansQuery;
+      
+      if (currentScope === FINANCE_SCOPE.PERSONAL) {
+        loansQuery = query(
+          collection(db, 'finance_loans'),
+          where('userId', '==', user.uid),
+          where('scope', '==', FINANCE_SCOPE.PERSONAL)
+        );
+      } else if (currentScope === FINANCE_SCOPE.NUCLEAR) {
+        loansQuery = query(
+          collection(db, 'finance_loans'),
+          where('userId', '==', user.uid),
+          where('scope', '==', FINANCE_SCOPE.NUCLEAR)
+        );
+      } else if (currentScope === FINANCE_SCOPE.EXTENDED) {
+        loansQuery = query(
+          collection(db, 'finance_loans'),
+          where('userId', '==', user.uid),
+          where('scope', '==', FINANCE_SCOPE.EXTENDED)
+        );
+      } else {
         setLoans([]);
         setIsLoading(false);
         return;
       }
-      
-      const loansQuery = query(
-        collection(db, 'finance_loans'),
-        where('userId', '==', user.uid)
-      );
       
       const querySnapshot = await getDocs(loansQuery);
       const loansList = querySnapshot.docs.map(doc => ({
@@ -1419,6 +1435,24 @@ export const FinanceProvider = ({ children }) => {
     }
   };
 
+  // Currency management functions
+  const formatCurrency = (amount, currency = 'GHS') => {
+    return currencyService.formatCurrency(amount, currency);
+  };
+
+  const convertCurrency = (amount, fromCurrency, toCurrency) => {
+    return currencyService.convertCurrency(amount, fromCurrency, toCurrency);
+  };
+
+  const getTotalBalance = (accountsList = accounts, displayCurrency = 'GHS') => {
+    return currencyService.getTotalBalanceInCurrency(accountsList, displayCurrency);
+  };
+
+  const getScopedBalance = (scope, displayCurrency = 'GHS') => {
+    const scopedAccounts = accounts.filter(account => account.scope === scope);
+    return getTotalBalance(scopedAccounts, displayCurrency);
+  };
+
   // Update context value whenever state changes
   useEffect(() => {
     setContextValue({
@@ -1462,6 +1496,12 @@ export const FinanceProvider = ({ children }) => {
       
       // Reports
       generateIncomeExpenseReport,
+      
+      // Currency functions
+      formatCurrency,
+      convertCurrency,
+      getTotalBalance,
+      getScopedBalance,
       
       // Offline sync
       syncOfflineData

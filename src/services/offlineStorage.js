@@ -55,6 +55,36 @@ class OfflineStorageService {
     return Date.now() - timestamp > oneHour;
   }
 
+  // Generic getItem and setItem methods for compatibility
+  async getItem(key) {
+    try {
+      return await AsyncStorage.getItem(key);
+    } catch (error) {
+      console.error('Error getting item from storage:', error);
+      return null;
+    }
+  }
+
+  async setItem(key, value) {
+    try {
+      await AsyncStorage.setItem(key, value);
+      return true;
+    } catch (error) {
+      console.error('Error setting item in storage:', error);
+      return false;
+    }
+  }
+
+  async removeItem(key) {
+    try {
+      await AsyncStorage.removeItem(key);
+      return true;
+    } catch (error) {
+      console.error('Error removing item from storage:', error);
+      return false;
+    }
+  }
+
   // Medical Records caching
   async cacheMedicalRecords(records) {
     return this.saveToCache(CACHE_KEYS.MEDICAL_RECORDS, records);

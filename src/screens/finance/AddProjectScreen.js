@@ -13,6 +13,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFinance, FINANCE_SCOPE } from '../../contexts/FinanceContext';
 import { useFamilySharing } from '../../contexts/FamilySharingContext';
+import currencyService from '../../services/currencyService';
 
 // Custom component for member menu items
 const MemberMenuItem = ({ isSelected, color = '#2196F3' }) => (
@@ -193,7 +194,7 @@ const AddProjectScreen = ({ navigation, route }) => {
         {/* Target Amount */}
         <Text style={styles.inputLabel}>Target Amount</Text>
         <View style={styles.amountInputContainer}>
-          <Text style={styles.currencySymbol}>$</Text>
+          <Text style={styles.currencySymbol}>{currencyService.getCurrencySymbol('GHS')}</Text>
           <TextInput
             style={styles.amountInput}
             placeholder="0.00"

@@ -5,14 +5,17 @@ import {
   StyleSheet, 
   ScrollView, 
   TouchableOpacity, 
-  RefreshControl 
+  RefreshControl,
+  Alert 
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFinance, FINANCE_SCOPE } from '../../contexts/FinanceContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { useFamilySharing } from '../../contexts/FamilySharingContext';
 import AccountCard from '../../components/finance/AccountCard';
 import FinancialReportChart from '../../components/finance/FinancialReportChart';
 import ProjectContributionTracker from '../../components/finance/ProjectContributionTracker';
+import currencyService from '../../services/currencyService';
 
 const FamilyFinanceScreen = ({ navigation }) => {
   const { 
@@ -23,16 +26,41 @@ const FamilyFinanceScreen = ({ navigation }) => {
     changeScope
   } = useFinance();
   
+  const { user } = useAuth();
   const { nuclearFamilyMembers } = useFamilySharing();
   
   const [refreshing, setRefreshing] = useState(false);
   const [reportData, setReportData] = useState(null);
+  const [userCurrencySettings, setUserCurrencySettings] = useState(null);
+  const [displayCurrency, setDisplayCurrency] = useState('GHS');
   
   // Set scope to nuclear when component mounts
   useEffect(() => {
     if (currentScope !== FINANCE_SCOPE.NUCLEAR) {
       changeScope(FINANCE_SCOPE.NUCLEAR);
     }
+  }, []);
+
+  // Load user currency settings
+  useEffect(() => {
+    const loadCurrencySettings = async () => {
+      if (user) {
+        try {
+          const settings = await currencyService.loadUserCurrencySettings(user.uid);
+          setUserCurrencySettings(settings);
+          setDisplayCurrency(settings.displayCurrency || 'GHS');
+        } catch (error) {
+          console.error('Error loading currency settings:', error);
+        }
+      }
+    };
+
+    loadCurrencySettings();
+  }, [user]);
+
+  // Initialize currency service
+  useEffect(() => {
+    currencyService.initializeExchangeRates();
   }, []);
   
   // Generate report data for the current month
@@ -127,19 +155,14 @@ const FamilyFinanceScreen = ({ navigation }) => {
   };
   
   // Format currency
-  const formatCurrency = (amount, currency = 'USD') => {
-    return new Intl.NumberFormat('en-US', { 
-      style: 'currency', 
-      currency: currency,
-      minimumFractionDigits: 2 
-    }).format(amount);
+  const formatCurrency = (amount, currency) => {
+    return currencyService.formatCurrency(amount, currency || displayCurrency);
   };
   
-  // Calculate total balance across all accounts
+  // Calculate total balance across all accounts in display currency
   const calculateTotalBalance = () => {
-    return accounts
-      .filter(account => account.scope === FINANCE_SCOPE.NUCLEAR)
-      .reduce((sum, account) => sum + (parseFloat(account.balance) || 0), 0);
+    const familyAccounts = accounts.filter(account => account.scope === FINANCE_SCOPE.NUCLEAR);
+    return currencyService.getTotalBalanceInCurrency(familyAccounts, displayCurrency, userCurrencySettings);
   };
   
   // Filter projects for the nuclear family
@@ -167,8 +190,11 @@ const FamilyFinanceScreen = ({ navigation }) => {
       <View style={styles.balanceSummary}>
         <Text style={styles.balanceLabel}>Family Balance</Text>
         <Text style={styles.balanceAmount}>
-          {formatCurrency(calculateTotalBalance())}
+          {formatCurrency(calculateTotalBalance(), displayCurrency)}
         </Text>
+        {userCurrencySettings?.autoConvert && (
+          <Text style={styles.currencyNote}>in {displayCurrency}</Text>
+        )}
       </View>
       
       {/* Quick Actions */}
@@ -345,6 +371,11 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
     color: 'white',
+  },
+  currencyNote: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: 4,
   },
   quickActionsContainer: {
     flexDirection: 'row',

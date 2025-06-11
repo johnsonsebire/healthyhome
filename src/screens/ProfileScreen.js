@@ -18,6 +18,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useError, ERROR_TYPES, ERROR_SEVERITY } from '../contexts/ErrorContext';
 import { validateForm, getFieldError, hasFieldError } from '../utils/validation';
 import ValidationError from '../components/ValidationError';
+import CurrencySettings from '../components/finance/CurrencySettings';
 
 const ProfileScreen = ({ navigation }) => {
   const { user, userProfile, refreshUserProfile } = useAuth();
@@ -26,6 +27,7 @@ const ProfileScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
+  const [showCurrencySettings, setShowCurrencySettings] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -328,7 +330,31 @@ const ProfileScreen = ({ navigation }) => {
             editable={isEditing}
           />
         </View>
+
+        {/* User Preferences Section */}
+        <View style={styles.preferencesContainer}>
+          <Text style={styles.sectionTitle}>Preferences</Text>
+          
+          <TouchableOpacity 
+            style={styles.preferenceItem}
+            onPress={() => setShowCurrencySettings(true)}
+          >
+            <View style={styles.preferenceInfo}>
+              <Text style={styles.preferenceTitle}>Currency Settings</Text>
+              <Text style={styles.preferenceDescription}>
+                Manage your currency preferences and conversion settings
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#666" />
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {/* Currency Settings Modal */}
+      <CurrencySettings
+        visible={showCurrencySettings}
+        onClose={() => setShowCurrencySettings(false)}
+      />
     </ScrollView>
   );
 };
@@ -449,6 +475,43 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
     marginTop: 4,
+  },
+  preferencesContainer: {
+    marginTop: 24,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e7ff',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 16,
+  },
+  preferenceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  preferenceInfo: {
+    flex: 1,
+  },
+  preferenceTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#374151',
+  },
+  preferenceDescription: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginTop: 2,
   },
 });
 

@@ -14,32 +14,58 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFinance, FINANCE_SCOPE } from '../../contexts/FinanceContext';
 import currencyService from '../../services/currencyService';
 
-const AddLoanScreen = ({ navigation, route }) => {
-  const { createLoan } = useFinance();
+const EditLoanScreen = ({ navigation, route }) => {
+  const { updateLoan } = useFinance();
+  const { loan: initialLoan } = route.params;
   
-  // Get scope if passed from route params
-  const scope = route.params?.scope || FINANCE_SCOPE.PERSONAL;
+  // Helper function to safely convert dates
+  const safelyConvertDate = (dateValue) => {
+    if (!dateValue) return new Date();
+    
+    // If it's a Firestore timestamp with toDate method
+    if (dateValue.toDate && typeof dateValue.toDate === 'function') {
+      return dateValue.toDate();
+    }
+    
+    // If it's already a Date object
+    if (dateValue instanceof Date) {
+      return dateValue;
+    }
+    
+    // If it's a string or number, try to convert
+    const convertedDate = new Date(dateValue);
+    return isNaN(convertedDate.getTime()) ? new Date() : convertedDate;
+  };
   
   // State for the form
   const [formData, setFormData] = useState({
-    name: '',
-    amount: '',
-    interestRate: '0',
-    term: '12', // Default to 12 months
-    startDate: new Date(),
-    dueDate: new Date(new Date().setMonth(new Date().getMonth() + 12)), // Default to 12 months from now
-    type: 'borrowed', // borrowed or lent
-    lender: '', // If borrowed
-    borrower: '', // If lent
-    paymentFrequency: 'monthly', // monthly, bi-weekly, weekly
-    scope: scope,
-    status: 'active'
+    name: initialLoan.name || '',
+    amount: initialLoan.amount?.toString() || '',
+    interestRate: initialLoan.interestRate?.toString() || '0',
+    term: initialLoan.term?.toString() || '12',
+    startDate: safelyConvertDate(initialLoan.startDate),
+    dueDate: safelyConvertDate(initialLoan.dueDate),
+    type: initialLoan.type || 'borrowed',
+    lender: initialLoan.lender || '',
+    borrower: initialLoan.borrower || '',
+    paymentFrequency: initialLoan.paymentFrequency || 'monthly',
+    scope: initialLoan.scope || FINANCE_SCOPE.PERSONAL,
+    status: initialLoan.status || 'active',
+    notes: initialLoan.notes || ''
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showDueDatePicker, setShowDueDatePicker] = useState(false);
-  const [paymentSchedule, setPaymentSchedule] = useState([]);
+  const [paymentSchedule, setPaymentSchedule] = useState(initialLoan.paymentSchedule || []);
+  
+  // Set navigation title
+  useEffect(() => {
+    navigation.setOptions({
+      title: 'Edit Loan',
+      headerBackTitle: 'Back'
+    });
+  }, [navigation]);
   
   // Update payment schedule when relevant fields change
   useEffect(() => {
@@ -93,11 +119,33 @@ const AddLoanScreen = ({ navigation, route }) => {
   
   // Format date for display
   const formatDate = (date) => {
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    if (!date) return 'Invalid Date';
+    
+    // Handle different date formats
+    let dateObj;
+    try {
+      if (date.toDate && typeof date.toDate === 'function') {
+        dateObj = date.toDate();
+      } else if (date instanceof Date) {
+        dateObj = date;
+      } else {
+        dateObj = new Date(date);
+      }
+      
+      // Check if date is valid
+      if (isNaN(dateObj.getTime())) {
+        return 'Invalid Date';
+      }
+      
+      return dateObj.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error, date);
+      return 'Invalid Date';
+    }
   };
   
   // Generate payment schedule
@@ -107,7 +155,8 @@ const AddLoanScreen = ({ navigation, route }) => {
     const interestRate = parseFloat(formData.interestRate) || 0;
     const startDate = new Date(formData.startDate);
     
-    if (amount <= 0 || term <= 0) {
+    // Validate startDate is a valid date
+    if (amount <= 0 || term <= 0 || isNaN(startDate.getTime())) {
       setPaymentSchedule([]);
       return;
     }
@@ -119,8 +168,9 @@ const AddLoanScreen = ({ navigation, route }) => {
     // Calculate payment amount per period
     const paymentAmount = totalAmount / term;
     
-    // Generate schedule
+    // Generate schedule (preserve existing payment statuses)
     const schedule = [];
+    const existingSchedule = initialLoan.paymentSchedule || [];
     
     for (let i = 0; i < term; i++) {
       const dueDate = new Date(startDate);
@@ -133,11 +183,21 @@ const AddLoanScreen = ({ navigation, route }) => {
         dueDate.setDate(dueDate.getDate() + ((i + 1) * 7));
       }
       
+      // Ensure dueDate is valid before adding to schedule
+      if (isNaN(dueDate.getTime())) {
+        console.error('Invalid due date generated for payment', i + 1);
+        continue;
+      }
+      
+      // Preserve existing payment status if available
+      const existingPayment = existingSchedule[i];
+      const status = existingPayment ? existingPayment.status : 'pending';
+      
       schedule.push({
         paymentNumber: i + 1,
         dueDate,
         amount: paymentAmount,
-        status: 'pending'
+        status: status
       });
     }
     
@@ -184,20 +244,20 @@ const AddLoanScreen = ({ navigation, route }) => {
         paymentSchedule
       };
       
-      // Create loan
-      const loan = await createLoan(loanData);
+      // Update loan
+      const success = await updateLoan(initialLoan.id, loanData);
       
-      if (loan) {
+      if (success) {
         Alert.alert(
           'Success', 
-          'Loan added successfully', 
+          'Loan updated successfully', 
           [{ text: 'OK', onPress: () => navigation.goBack() }]
         );
       } else {
-        Alert.alert('Error', 'Failed to add loan. Please try again.');
+        Alert.alert('Error', 'Failed to update loan. Please try again.');
       }
     } catch (error) {
-      console.error('Error adding loan:', error);
+      console.error('Error updating loan:', error);
       Alert.alert('Error', 'An unexpected error occurred. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -346,6 +406,19 @@ const AddLoanScreen = ({ navigation, route }) => {
           )}
         </View>
         
+        {/* Notes */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Notes (Optional)</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            value={formData.notes}
+            onChangeText={(text) => handleInputChange('notes', text)}
+            placeholder="Additional notes about this loan"
+            multiline
+            numberOfLines={3}
+          />
+        </View>
+        
         {/* Payment Schedule Preview */}
         {paymentSchedule.length > 0 && (
           <View style={styles.scheduleContainer}>
@@ -355,22 +428,35 @@ const AddLoanScreen = ({ navigation, route }) => {
               <Text style={[styles.scheduleCell, styles.scheduleHeaderText]}>Payment</Text>
               <Text style={[styles.scheduleCell, styles.scheduleHeaderText]}>Due Date</Text>
               <Text style={[styles.scheduleCell, styles.scheduleHeaderText]}>Amount</Text>
+              <Text style={[styles.scheduleCell, styles.scheduleHeaderText]}>Status</Text>
             </View>
             
             {/* Display first 3 payments */}
-            {paymentSchedule.slice(0, 3).map((payment, index) => (
-              <View key={index} style={styles.scheduleRow}>
-                <Text style={styles.scheduleCell}>#{payment.paymentNumber}</Text>
-                <Text style={styles.scheduleCell}>{formatDate(payment.dueDate)}</Text>
-                <Text style={styles.scheduleCell}>
-                  {currencyService.formatCurrency(payment.amount, 'GHS')}
-                </Text>
-              </View>
-            ))}
+            {paymentSchedule.slice(0, 3).map((payment, index) => {
+              // Ensure payment object is valid
+              if (!payment || !payment.dueDate) {
+                return null;
+              }
+              
+              return (
+                <View key={index} style={styles.scheduleRow}>
+                  <Text style={styles.scheduleCell}>#{payment.paymentNumber || (index + 1)}</Text>
+                  <Text style={styles.scheduleCell}>{formatDate(payment.dueDate)}</Text>
+                  <Text style={styles.scheduleCell}>
+                    {currencyService.formatCurrency(payment.amount || 0, 'GHS')}
+                  </Text>
+                  <Text style={[styles.scheduleCell, { 
+                    color: payment.status === 'paid' ? '#4CAF50' : payment.status === 'overdue' ? '#F44336' : '#666' 
+                  }]}>
+                    {payment.status === 'paid' ? 'Paid' : payment.status === 'overdue' ? 'Overdue' : 'Pending'}
+                  </Text>
+                </View>
+              );
+            })}
             
             {/* Indicator for more payments */}
             {paymentSchedule.length > 3 && (
-              <Text style={styles.morePagmentsText}>
+              <Text style={styles.morePaymentsText}>
                 +{paymentSchedule.length - 3} more payments
               </Text>
             )}
@@ -407,18 +493,18 @@ const AddLoanScreen = ({ navigation, route }) => {
         <Button
           mode="contained"
           onPress={handleSubmit}
-          style={styles.submitButton}
-          disabled={isSubmitting}
           loading={isSubmitting}
+          disabled={isSubmitting}
+          style={styles.submitButton}
         >
-          Add Loan
+          {isSubmitting ? 'Updating...' : 'Update Loan'}
         </Button>
         
         <Button
           mode="outlined"
           onPress={() => navigation.goBack()}
-          style={styles.cancelButton}
           disabled={isSubmitting}
+          style={styles.cancelButton}
         >
           Cancel
         </Button>
@@ -440,62 +526,70 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 16,
+    fontWeight: '500',
     marginBottom: 8,
-    color: '#444',
+    color: '#333',
   },
   input: {
-    backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 4,
+    borderRadius: 8,
     padding: 12,
     fontSize: 16,
+    backgroundColor: '#fff',
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
   },
   dateSelector: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    justifyContent: 'space-between',
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 4,
+    borderRadius: 8,
     padding: 12,
+    backgroundColor: '#fff',
   },
   dateText: {
     fontSize: 16,
-  },
-  scheduleContainer: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 4,
-    padding: 12,
-    marginBottom: 16,
+    color: '#333',
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 12,
+    color: '#333',
+  },
+  scheduleContainer: {
+    marginTop: 24,
+    padding: 16,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   scheduleHeader: {
     flexDirection: 'row',
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#ddd',
-    paddingBottom: 8,
     marginBottom: 8,
-  },
-  scheduleHeaderText: {
-    fontWeight: 'bold',
   },
   scheduleRow: {
     flexDirection: 'row',
-    paddingVertical: 4,
+    paddingVertical: 6,
   },
   scheduleCell: {
     flex: 1,
     fontSize: 14,
   },
-  morePagmentsText: {
+  scheduleHeaderText: {
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  morePaymentsText: {
     fontSize: 14,
     color: '#666',
     fontStyle: 'italic',
@@ -524,4 +618,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default AddLoanScreen;
+export default EditLoanScreen;
