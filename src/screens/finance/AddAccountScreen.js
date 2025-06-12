@@ -33,6 +33,7 @@ const AddAccountScreen = ({ navigation, route }) => {
     name: '',
     type: 'checking',
     balance: '',
+    initialBalance: '', // Added initialBalance
     currency: 'GHS',
     icon: 'account-balance',
     color: '#2196F3',
@@ -108,9 +109,15 @@ const AddAccountScreen = ({ navigation, route }) => {
     setIsSubmitting(true);
     
     try {
+      const parsedBalance = parseFloat(formData.balance);
+      // Use the balance as initialBalance if none is provided
+      const parsedInitialBalance = formData.initialBalance ? 
+        parseFloat(formData.initialBalance) : parsedBalance;
+      
       await createAccount({
         ...formData,
-        balance: parseFloat(formData.balance)
+        balance: parsedBalance,
+        initialBalance: parsedInitialBalance
       });
       
       Alert.alert(
@@ -193,7 +200,13 @@ const AddAccountScreen = ({ navigation, route }) => {
             style={styles.amountInput}
             placeholder="0.00"
             value={formData.balance}
-            onChangeText={(value) => handleInputChange('balance', value)}
+            onChangeText={(value) => {
+              handleInputChange('balance', value);
+              // Automatically set initial balance to match balance if not manually set
+              if (!formData.initialBalance) {
+                handleInputChange('initialBalance', value);
+              }
+            }}
             keyboardType="decimal-pad"
             placeholderTextColor="#999"
           />

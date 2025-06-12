@@ -20,7 +20,9 @@ const AccountDetailsScreen = ({ route, navigation }) => {
     transactions, 
     isLoading, 
     deleteAccount,
-    updateAccount 
+    updateAccount,
+    recalculateAccountBalance,
+    loadTransactions
   } = useFinance();
   
   const [account, setAccount] = useState(initialAccount);
@@ -58,34 +60,120 @@ const AccountDetailsScreen = ({ route, navigation }) => {
   
   // Filter transactions for this account
   useEffect(() => {
+    console.log(`Total transactions in state: ${transactions.length}`);
     if (transactions.length > 0) {
-      const filteredTransactions = transactions.filter(t => t.accountId === account.id);
+      // Filter transactions that belong to this account and are not empty/undefined
+      const filteredTransactions = transactions.filter(t => t && t.accountId === account.id);
+      console.log(`Filtered transactions for account ${account.id}: ${filteredTransactions.length}`);
+      
+      // Log transaction IDs for debugging
+      filteredTransactions.forEach(t => {
+        console.log(`Transaction: ${t.id}, Type: ${t.type}, Amount: ${t.amount}, Date: ${t.date}`);
+      });
+      
       setAccountTransactions(filteredTransactions);
       
-      // Calculate stats
-      const income = filteredTransactions
-        .filter(t => t.type === 'income')
-        .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+      // Calculate stats with enhanced precision and error handling
+      let income = 0;
+      let expense = 0;
+      
+      // Process each transaction carefully
+      filteredTransactions.forEach(t => {
+        if (!t) {
+          console.warn('Skipping undefined transaction');
+          return;
+        }
         
-      const expense = filteredTransactions
-        .filter(t => t.type === 'expense')
-        .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
-        
+        try {
+          // Ensure we're working with a valid number
+          let amount = 0;
+          
+          if (typeof t.amount === 'number') {
+            amount = t.amount;
+          } else if (typeof t.amount === 'string') {
+            amount = parseFloat(t.amount);
+          } else if (t.amount) {
+            amount = parseFloat(t.amount);
+          }
+          
+          if (isNaN(amount)) {
+            console.warn(`Skipping transaction with NaN amount: ${t.id}, ${t.amount}`);
+            return;
+          }
+          
+          // Round to avoid floating point errors
+          amount = Math.round(amount * 100) / 100;
+          
+          // Add to the appropriate total
+          if (t.type === 'income') {
+            income += amount;
+            console.log(`Added income transaction: +${amount} (ID: ${t.id})`);
+          } else if (t.type === 'expense') {
+            expense += amount;
+            console.log(`Added expense transaction: -${amount} (ID: ${t.id})`);
+          } else {
+            console.warn(`Skipping transaction with unknown type: ${t.id}, ${t.type}`);
+          }
+        } catch (error) {
+          console.error(`Error processing transaction: ${t.id}`, error);
+        }
+      });
+      
+      // Round totals to avoid floating point errors
+      income = Math.round(income * 100) / 100;
+      expense = Math.round(expense * 100) / 100;
+      const netIncome = Math.round((income - expense) * 100) / 100;
+      
+      console.log(`Account ${account.id} - Income total: ${income}, Expense total: ${expense}, Net: ${netIncome}`);
+      
       setStats({
         totalIncome: income,
         totalExpense: expense,
-        netIncome: income - expense
+        netIncome: netIncome
       });
+    } else {
+      setAccountTransactions([]);
+      setStats({
+        totalIncome: 0,
+        totalExpense: 0,
+        netIncome: 0
+      });
+      console.log(`No transactions available for account ${account.id}`);
     }
-  }, [transactions, account]);
+  }, [transactions, account.id]);
   
-  // Format currency
+  // Format currency with enhanced error handling
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', { 
-      style: 'currency', 
-      currency: account.currency || 'USD',
-      minimumFractionDigits: 2 
-    }).format(amount);
+    try {
+      // First ensure we have a valid number to work with
+      let validAmount = 0;
+      
+      if (typeof amount === 'number') {
+        validAmount = amount;
+      } else if (typeof amount === 'string') {
+        validAmount = parseFloat(amount);
+      } else if (amount) {
+        validAmount = parseFloat(amount);
+      }
+      
+      if (isNaN(validAmount)) {
+        console.warn('Invalid amount for currency formatting:', amount);
+        return '0.00';
+      }
+      
+      // Round to 2 decimal places to avoid floating point issues
+      validAmount = Math.round(validAmount * 100) / 100;
+      
+      return new Intl.NumberFormat('en-US', { 
+        style: 'currency', 
+        currency: account.currency || 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(validAmount);
+    } catch (error) {
+      console.error('Error formatting currency:', error, amount);
+      return '0.00';
+    }
   };
   
   // Get account color based on type
@@ -127,11 +215,16 @@ const AccountDetailsScreen = ({ route, navigation }) => {
   // Handle refresh
   const onRefresh = async () => {
     setRefreshing(true);
-    // Reload data
-    await Promise.all([
-      // Reload accounts and transactions
-    ]);
-    setRefreshing(false);
+    try {
+      // Force a reload of transactions
+      if (loadTransactions) {
+        await loadTransactions();
+      }
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setRefreshing(false);
+    }
   };
   
   // Navigate to transaction details
@@ -148,6 +241,51 @@ const AccountDetailsScreen = ({ route, navigation }) => {
   const navigateToEditAccount = () => {
     setMenuVisible(false);
     navigation.navigate('EditAccount', { account });
+  };
+  
+  // Handle balance recalculation
+  const handleRecalculateBalance = () => {
+    setMenuVisible(false);
+    
+    Alert.alert(
+      'Recalculate Balance',
+      'This will recalculate the account balance based on all transactions. Proceed?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        },
+        {
+          text: 'Recalculate',
+          onPress: async () => {
+            try {
+              setRefreshing(true);
+              
+              // Call the recalculate function from context
+              console.log(`Initiating balance recalculation for account ${account.id}`);
+              const success = await recalculateAccountBalance(account.id);
+              
+              // Briefly wait to ensure any Firebase operations complete
+              await new Promise(resolve => setTimeout(resolve, 500));
+              
+              if (success) {
+                Alert.alert(
+                  'Success', 
+                  'Account balance has been recalculated based on all transactions.'
+                );
+              } else {
+                Alert.alert('Error', 'Failed to recalculate balance. Please try again.');
+              }
+            } catch (error) {
+              console.error('Error recalculating balance:', error, error.stack);
+              Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+            } finally {
+              setRefreshing(false);
+            }
+          }
+        }
+      ]
+    );
   };
   
   // Handle account deletion
@@ -189,12 +327,7 @@ const AccountDetailsScreen = ({ route, navigation }) => {
   };
   
   return (
-    <ScrollView 
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
+    <View style={styles.container}>
       {/* Account options menu */}
       <Menu
         visible={menuVisible}
@@ -208,6 +341,11 @@ const AccountDetailsScreen = ({ route, navigation }) => {
           title="Edit Account" 
         />
         <Menu.Item 
+          icon="refresh" 
+          onPress={handleRecalculateBalance} 
+          title="Recalculate Balance" 
+        />
+        <Menu.Item 
           icon="delete" 
           onPress={handleDeleteAccount} 
           title="Delete Account" 
@@ -215,100 +353,105 @@ const AccountDetailsScreen = ({ route, navigation }) => {
         />
       </Menu>
       
-      {/* Account overview card */}
-      <Card style={styles.overviewCard}>
-        <View style={styles.accountHeader}>
-          <View style={styles.iconContainer}>
-            <MaterialIcons 
-              name={getAccountIcon()} 
-              size={40} 
-              color={getAccountColor()} 
-            />
-          </View>
-          <View style={styles.accountInfo}>
-            <Text style={styles.accountName}>{account.name}</Text>
-            <Text style={styles.accountType}>{account.type}</Text>
-          </View>
-        </View>
-        
-        <Divider style={styles.divider} />
-        
-        <View style={styles.balanceSection}>
-          <Text style={styles.balanceLabel}>Current Balance</Text>
-          <Text style={[styles.balanceAmount, { color: getAccountColor() }]}>
-            {formatCurrency(account.balance || 0)}
-          </Text>
-        </View>
-        
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Income</Text>
-            <Text style={[styles.statValue, { color: '#4CAF50' }]}>
-              {formatCurrency(stats.totalIncome)}
-            </Text>
-          </View>
-          
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Expenses</Text>
-            <Text style={[styles.statValue, { color: '#F44336' }]}>
-              {formatCurrency(stats.totalExpense)}
-            </Text>
-          </View>
-          
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Net</Text>
-            <Text style={[styles.statValue, { 
-              color: stats.netIncome >= 0 ? '#4CAF50' : '#F44336' 
-            }]}>
-              {formatCurrency(stats.netIncome)}
-            </Text>
-          </View>
-        </View>
-        
-        {account.description && (
-          <View style={styles.descriptionSection}>
-            <Text style={styles.descriptionLabel}>Description</Text>
-            <Text style={styles.descriptionText}>{account.description}</Text>
-          </View>
+      {/* Use FlatList with header components to avoid nesting */}
+      <TransactionList 
+        transactions={accountTransactions} 
+        onTransactionPress={navigateToTransactionDetails} 
+        formatCurrency={(val) => formatCurrency(val)}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        ListHeaderComponent={() => (
+          <>
+            {/* Account overview card */}
+            <Card style={styles.overviewCard}>
+              <View style={styles.accountHeader}>
+                <View style={styles.iconContainer}>
+                  <MaterialIcons 
+                    name={getAccountIcon()} 
+                    size={40} 
+                    color={getAccountColor()} 
+                  />
+                </View>
+                <View style={styles.accountInfo}>
+                  <Text style={styles.accountName}>{account.name}</Text>
+                  <Text style={styles.accountType}>{account.type}</Text>
+                </View>
+              </View>
+              
+              <Divider style={styles.divider} />
+              
+              <View style={styles.balanceSection}>
+                <Text style={styles.balanceLabel}>Current Balance</Text>
+                <Text style={[styles.balanceAmount, { color: getAccountColor() }]}>
+                  {formatCurrency(account.balance || 0)}
+                </Text>
+              </View>
+              
+              <View style={styles.statsRow}>
+                <View style={styles.statItem}>
+                  <Text style={styles.statLabel}>Income</Text>
+                  <Text style={[styles.statValue, { color: '#4CAF50' }]}>
+                    {formatCurrency(stats.totalIncome)}
+                  </Text>
+                </View>
+                
+                <View style={styles.statItem}>
+                  <Text style={styles.statLabel}>Expenses</Text>
+                  <Text style={[styles.statValue, { color: '#F44336' }]}>
+                    {formatCurrency(stats.totalExpense)}
+                  </Text>
+                </View>
+                
+                <View style={styles.statItem}>
+                  <Text style={styles.statLabel}>Net</Text>
+                  <Text style={[styles.statValue, { 
+                    color: stats.netIncome >= 0 ? '#4CAF50' : '#F44336' 
+                  }]}>
+                    {formatCurrency(stats.netIncome)}
+                  </Text>
+                </View>
+              </View>
+              
+              {account.description && (
+                <View style={styles.descriptionSection}>
+                  <Text style={styles.descriptionLabel}>Description</Text>
+                  <Text style={styles.descriptionText}>{account.description}</Text>
+                </View>
+              )}
+              
+              <View style={styles.metaSection}>
+                <Text style={styles.metaText}>
+                  Created: {formatDate(account.createdAt)}
+                </Text>
+                {account.updatedAt && (
+                  <Text style={styles.metaText}>
+                    Last updated: {formatDate(account.updatedAt)}
+                  </Text>
+                )}
+              </View>
+            </Card>
+            
+            {/* Action buttons */}
+            <View style={styles.actionButtonsContainer}>
+              <Button 
+                mode="contained" 
+                icon="plus" 
+                onPress={navigateToAddTransaction}
+                style={styles.addButton}
+              >
+                Add Transaction
+              </Button>
+            </View>
+            
+            {/* Transactions header */}
+            <View style={styles.transactionsSection}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Transactions</Text>
+              </View>
+            </View>
+          </>
         )}
-        
-        <View style={styles.metaSection}>
-          <Text style={styles.metaText}>
-            Created: {formatDate(account.createdAt)}
-          </Text>
-          {account.updatedAt && (
-            <Text style={styles.metaText}>
-              Last updated: {formatDate(account.updatedAt)}
-            </Text>
-          )}
-        </View>
-      </Card>
-      
-      {/* Action buttons */}
-      <View style={styles.actionButtonsContainer}>
-        <Button 
-          mode="contained" 
-          icon="plus" 
-          onPress={navigateToAddTransaction}
-          style={styles.addButton}
-        >
-          Add Transaction
-        </Button>
-      </View>
-      
-      {/* Transactions section */}
-      <View style={styles.transactionsSection}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Transactions</Text>
-        </View>
-        
-        <TransactionList 
-          transactions={accountTransactions} 
-          onTransactionPress={navigateToTransactionDetails} 
-          formatCurrency={(val) => formatCurrency(val)}
-        />
-      </View>
-    </ScrollView>
+      />
+    </View>
   );
 };
 

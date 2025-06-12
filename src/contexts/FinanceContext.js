@@ -237,11 +237,29 @@ export const FinanceProvider = ({ children }) => {
     try {
       const accountRef = collection(db, 'finance_accounts');
       
+      // Parse balance with error handling
+      let balance = 0;
+      try {
+        balance = typeof accountData.balance === 'number' 
+          ? accountData.balance 
+          : parseFloat(accountData.balance || 0);
+        
+        if (isNaN(balance)) {
+          console.warn('Invalid balance provided, using 0 instead');
+          balance = 0;
+        }
+      } catch (error) {
+        console.error('Error parsing balance:', error);
+        balance = 0;
+      }
+      
       // Prepare account data
       const newAccount = {
         ...accountData,
         owner: user.uid,
-        balance: parseFloat(accountData.balance) || 0,
+        balance: balance,
+        // Store initial balance explicitly for future recalculations
+        initialBalance: balance,
         sharedWith: accountData.sharedWith || [],
         // Ensure scope is always explicitly set
         scope: accountData.scope || FINANCE_SCOPE.PERSONAL,
@@ -376,15 +394,7 @@ export const FinanceProvider = ({ children }) => {
     setError(null);
     
     try {
-      // Try to load from cache if offline
-      if (!networkService.isOnline()) {
-        const cachedTransactions = await offlineStorageService.getItem(`finance_transactions_${currentScope}`);
-        if (cachedTransactions) {
-          setTransactions(JSON.parse(cachedTransactions));
-          setIsLoading(false);
-          return;
-        }
-      }
+      console.log(`Loading transactions for scope: ${currentScope}`);
       
       // Get account IDs for the current scope, including accounts that might be missing the scope property
       let accountIds = [];
@@ -407,9 +417,24 @@ export const FinanceProvider = ({ children }) => {
       }
       
       if (accountIds.length === 0) {
+        console.log('No accounts found for this scope, setting empty transactions list');
         setTransactions([]);
         setIsLoading(false);
         return;
+      }
+      
+      console.log(`Found ${accountIds.length} accounts for scope ${currentScope}`);
+      
+      // Try to load from cache if offline
+      if (!networkService.isOnline()) {
+        const cachedTransactions = await offlineStorageService.getItem(`finance_transactions_${currentScope}`);
+        if (cachedTransactions) {
+          const parsedTransactions = JSON.parse(cachedTransactions);
+          console.log(`Loaded ${parsedTransactions.length} cached transactions for scope: ${currentScope}`);
+          setTransactions(parsedTransactions);
+          setIsLoading(false);
+          return;
+        }
       }
       
       // Query transactions for the accounts
@@ -426,6 +451,8 @@ export const FinanceProvider = ({ children }) => {
         id: doc.id,
         ...doc.data()
       }));
+      
+      console.log(`Loaded ${transactionsList.length} transactions from Firestore for scope: ${currentScope}`);
       
       setTransactions(transactionsList);
       
@@ -445,53 +472,64 @@ export const FinanceProvider = ({ children }) => {
     try {
       const transactionRef = collection(db, 'finance_transactions');
       
-      // Prepare transaction data
+      // Parse and validate amount before storing
+      let validAmount = 0;
+      try {
+        if (typeof transactionData.amount === 'number') {
+          validAmount = transactionData.amount;
+        } else if (typeof transactionData.amount === 'string') {
+          validAmount = parseFloat(transactionData.amount);
+        } else if (transactionData.amount) {
+          validAmount = parseFloat(transactionData.amount);
+        }
+        
+        if (isNaN(validAmount)) {
+          console.warn(`Invalid amount provided: ${transactionData.amount}, using 0 instead`);
+          validAmount = 0;
+        }
+        
+        // Round to 2 decimal places
+        validAmount = Math.round(validAmount * 100) / 100;
+      } catch (error) {
+        console.error('Error parsing transaction amount:', error);
+        validAmount = 0;
+      }
+      
+      // Prepare transaction data with sanitized amount
       const newTransaction = {
         ...transactionData,
-        amount: parseFloat(transactionData.amount) || 0,
+        amount: validAmount,
         createdBy: user.uid,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
       
-      // Add the transaction to Firestore
-      const docRef = await addDoc(transactionRef, newTransaction);
-      
-      // Update account balance
+      // Verify account exists before adding transaction
       const accountRef = doc(db, 'finance_accounts', transactionData.accountId);
       const accountSnapshot = await getDoc(accountRef);
       
-      if (accountSnapshot.exists()) {
-        const accountData = accountSnapshot.data();
-        let newBalance = accountData.balance;
-        
-        if (transactionData.type === 'income') {
-          newBalance += parseFloat(transactionData.amount);
-        } else if (transactionData.type === 'expense') {
-          newBalance -= parseFloat(transactionData.amount);
-        }
-        
-        await updateDoc(accountRef, {
-          balance: newBalance,
-          updatedAt: serverTimestamp()
-        });
-        
-        // Update accounts in state
-        setAccounts(prev => 
-          prev.map(account => 
-            account.id === transactionData.accountId 
-              ? { ...account, balance: newBalance, updatedAt: new Date() } 
-              : account
-          )
-        );
+      if (!accountSnapshot.exists()) {
+        throw new Error(`Account with ID ${transactionData.accountId} not found`);
       }
       
-      // Update local state
+      // Add the transaction to Firestore
+      const docRef = await addDoc(transactionRef, newTransaction);
+      
+      console.log(`Created new transaction ${docRef.id} for account ${transactionData.accountId} (${validAmount}, ${newTransaction.type})`);
+      
+      // Recalculate the account balance after adding transaction
+      await recalculateAccountBalance(transactionData.accountId);
+      
+      // Create transaction object with ID for state update
       const createdTransaction = {
         id: docRef.id,
-        ...newTransaction
+        ...newTransaction,
+        // Replace serverTimestamp with a Date object for local state
+        createdAt: new Date(),
+        updatedAt: new Date()
       };
       
+      // Update local state
       setTransactions(prev => [createdTransaction, ...prev]);
       
       // Update cache
@@ -537,20 +575,97 @@ export const FinanceProvider = ({ children }) => {
         throw new Error('You do not have permission to update this transaction');
       }
       
-      // Update the transaction in Firestore
-      await updateDoc(transactionRef, {
+      // Parse and validate amount if provided
+      let validAmount = null;
+      if (transactionData.amount !== undefined) {
+        try {
+          if (typeof transactionData.amount === 'number') {
+            validAmount = transactionData.amount;
+          } else if (typeof transactionData.amount === 'string') {
+            validAmount = parseFloat(transactionData.amount);
+          } else if (transactionData.amount) {
+            validAmount = parseFloat(transactionData.amount);
+          }
+          
+          if (isNaN(validAmount)) {
+            console.warn(`Invalid amount provided for update: ${transactionData.amount}, using original amount instead`);
+            validAmount = parseFloat(originalTransaction.amount) || 0;
+          }
+          
+          // Round to 2 decimal places
+          validAmount = Math.round(validAmount * 100) / 100;
+        } catch (error) {
+          console.error('Error parsing updated transaction amount:', error);
+          validAmount = parseFloat(originalTransaction.amount) || 0;
+        }
+      }
+      
+      // Create the update data object with validated amount
+      const updateData = {
         ...transactionData,
         updatedAt: serverTimestamp()
-      });
+      };
       
-      // Update local state
-      setTransactions(prev => 
-        prev.map(transaction => 
-          transaction.id === transactionId 
-            ? { ...transaction, ...transactionData, updatedAt: new Date() } 
-            : transaction
-        )
-      );
+      // Only set amount if it was provided and is valid
+      if (validAmount !== null) {
+        updateData.amount = validAmount;
+      }
+      
+      // Track if we need to update balances for specific accounts
+      const isAccountChanged = updateData.accountId && updateData.accountId !== originalTransaction.accountId;
+      const isAmountChanged = validAmount !== null && validAmount !== parseFloat(originalTransaction.amount || 0);
+      const isTypeChanged = updateData.type && updateData.type !== originalTransaction.type;
+      
+      // If the account is changing, verify the new account exists
+      if (isAccountChanged) {
+        const newAccountRef = doc(db, 'finance_accounts', updateData.accountId);
+        const newAccountSnapshot = await getDoc(newAccountRef);
+        
+        if (!newAccountSnapshot.exists()) {
+          throw new Error(`New account with ID ${updateData.accountId} not found`);
+        }
+      }
+      
+      // Update the transaction in Firestore
+      await updateDoc(transactionRef, updateData);
+      
+      console.log(`Updated transaction ${transactionId}`);
+      
+      // If balance-affecting fields changed, recalculate balances
+      if (isAccountChanged || isAmountChanged || isTypeChanged) {
+        // Recalculate the original account's balance
+        console.log(`Recalculating balance for original account ${originalTransaction.accountId} after transaction update`);
+        await recalculateAccountBalance(originalTransaction.accountId);
+        
+        // If account changed, also recalculate the new account's balance
+        if (isAccountChanged) {
+          console.log(`Recalculating balance for new account ${updateData.accountId} after transaction moved`);
+          await recalculateAccountBalance(updateData.accountId);
+        }
+      }
+      
+      // Update local state with the updated transaction
+      const updatedTransaction = {
+        id: transactionId,
+        ...originalTransaction,
+        ...updateData,
+        updatedAt: new Date()
+      };
+      
+      // If account ID changed, reload transactions to ensure they appear in the correct scope
+      if (isAccountChanged) {
+        console.log('Account ID changed, reloading all transactions');
+        await loadTransactions(); // Immediately reload transactions
+      } else {
+        // Just update the transaction in the local state if the account hasn't changed
+        setTransactions(prev => {
+          return prev.map(transaction => 
+            transaction.id === transactionId 
+              ? updatedTransaction
+              : transaction
+          );
+        });
+      }
       
       // Update cache
       const cachedTransactions = JSON.parse(await offlineStorageService.getItem(`finance_transactions_${currentScope}`) || '[]');
@@ -559,7 +674,7 @@ export const FinanceProvider = ({ children }) => {
         JSON.stringify(
           cachedTransactions.map(transaction => 
             transaction.id === transactionId 
-              ? { ...transaction, ...transactionData, updatedAt: new Date() } 
+              ? { ...transaction, ...updateData, updatedAt: new Date() } 
               : transaction
           )
         )
@@ -601,36 +716,21 @@ export const FinanceProvider = ({ children }) => {
         throw new Error('You do not have permission to delete this transaction');
       }
       
-      // Update account balance
-      let newBalance = accountData.balance;
-      
-      if (transactionData.type === 'income') {
-        newBalance -= parseFloat(transactionData.amount);
-      } else if (transactionData.type === 'expense') {
-        newBalance += parseFloat(transactionData.amount);
-      }
-      
-      await updateDoc(accountRef, {
-        balance: newBalance,
-        updatedAt: serverTimestamp()
-      });
-      
-      // Update accounts in state
-      setAccounts(prev => 
-        prev.map(account => 
-          account.id === transactionData.accountId 
-            ? { ...account, balance: newBalance, updatedAt: new Date() } 
-            : account
-        )
-      );
+      // Remember the account ID before deleting the transaction
+      const affectedAccountId = transactionData.accountId;
       
       // Delete the transaction from Firestore
       await deleteDoc(transactionRef);
+      console.log(`Deleted transaction ${transactionId} from Firestore`);
+      
+      // Recalculate the account balance
+      await recalculateAccountBalance(affectedAccountId);
       
       // Update local state
       setTransactions(prev => prev.filter(transaction => transaction.id !== transactionId));
+      console.log(`Deleted transaction ${transactionId} from local state`);
       
-      // Update cache
+      // Update cache for the current scope
       const cachedTransactions = JSON.parse(await offlineStorageService.getItem(`finance_transactions_${currentScope}`) || '[]');
       await offlineStorageService.setItem(
         `finance_transactions_${currentScope}`,
@@ -1663,11 +1763,15 @@ export const FinanceProvider = ({ children }) => {
       
       // Actions
       changeScope,
+      loadTransactions,
+      loadAccounts,
       
       // Account management
       createAccount,
       updateAccount,
       deleteAccount,
+      recalculateAccountBalance,
+      recalculateAllAccountBalances,
       
       // Transaction management
       createTransaction,
@@ -1715,6 +1819,360 @@ export const FinanceProvider = ({ children }) => {
     // We're removing function dependencies to avoid circular dependencies
     // Functions are stable and don't need to be in the dependency array
   ]);
+
+  // Recalculate and fix an account's balance based on all its transactions
+  const recalculateAccountBalance = async (accountId) => {
+    if (!user) return false;
+    
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      console.log(`Recalculating balance for account ${accountId}`);
+      
+      // Get the account
+      const accountRef = doc(db, 'finance_accounts', accountId);
+      const accountSnapshot = await getDoc(accountRef);
+      
+      if (!accountSnapshot.exists()) {
+        console.error('Account not found:', accountId);
+        throw new Error('Account not found');
+      }
+      
+      const accountData = accountSnapshot.data();
+      
+      // Check permissions
+      if (accountData.owner !== user.uid && !accountData.sharedWith?.includes(user.uid)) {
+        console.error('Permission denied for account:', accountId);
+        throw new Error('You do not have permission to recalculate this account');
+      }
+      
+      // Get the initial balance (when account was created)
+      let initialBalance = 0;
+      try {
+        initialBalance = typeof accountData.initialBalance === 'number' 
+          ? accountData.initialBalance 
+          : parseFloat(accountData.initialBalance || 0);
+        
+        // Safety check for NaN
+        if (isNaN(initialBalance)) {
+          console.warn(`Invalid initial balance for account ${accountId}, using 0 instead`);
+          initialBalance = 0;
+        }
+      } catch (error) {
+        console.error(`Error parsing initial balance for account ${accountId}:`, error);
+        initialBalance = 0;
+      }
+      
+      console.log(`Initial balance: ${initialBalance}`);
+      
+      // Get all transactions for this account
+      const transactionsQuery = query(
+        collection(db, 'finance_transactions'),
+        where('accountId', '==', accountId)
+      );
+      
+      const transactionsSnapshot = await getDocs(transactionsQuery);
+      console.log(`Found ${transactionsSnapshot.size} transactions for account ${accountId}`);
+      
+      // Calculate the new balance based on all transactions
+      let newBalance = initialBalance;
+      let incomeTotal = 0;
+      let expenseTotal = 0;
+      let transactionCount = 0;
+      let errorCount = 0;
+      
+      // Process each transaction with enhanced error handling
+      transactionsSnapshot.forEach(doc => {
+        try {
+          const transaction = doc.data();
+          if (!transaction) {
+            console.warn(`Empty transaction data for document ${doc.id}, skipping`);
+            errorCount++;
+            return;
+          }
+          
+          // Ensure we have a valid amount
+          let transactionAmount = 0;
+          try {
+            if (typeof transaction.amount === 'number') {
+              transactionAmount = transaction.amount;
+            } else if (typeof transaction.amount === 'string') {
+              transactionAmount = parseFloat(transaction.amount);
+            } else if (transaction.amount) {
+              transactionAmount = parseFloat(transaction.amount);
+            }
+            
+            // Safety check for NaN
+            if (isNaN(transactionAmount)) {
+              console.warn(`Invalid amount in transaction ${doc.id}: ${transaction.amount}, using 0 instead`);
+              transactionAmount = 0;
+            }
+            
+            // Round to prevent floating point errors
+            transactionAmount = Math.round(transactionAmount * 100) / 100;
+          } catch (error) {
+            console.error(`Error parsing amount for transaction ${doc.id}:`, error);
+            transactionAmount = 0;
+            errorCount++;
+          }
+          
+          // Process based on transaction type
+          if (transaction.type === 'income') {
+            newBalance += transactionAmount;
+            incomeTotal += transactionAmount;
+            console.log(`Income transaction ${doc.id}: +${transactionAmount}`);
+          } else if (transaction.type === 'expense') {
+            newBalance -= transactionAmount;
+            expenseTotal += transactionAmount;
+            console.log(`Expense transaction ${doc.id}: -${transactionAmount}`);
+          } else {
+            console.warn(`Unknown transaction type in ${doc.id}: ${transaction.type}, skipping`);
+            errorCount++;
+            return;
+          }
+          
+          transactionCount++;
+        } catch (error) {
+          console.error(`Error processing transaction ${doc.id}:`, error);
+          errorCount++;
+        }
+      });
+      
+      // Round to 2 decimal places to avoid floating point issues
+      newBalance = Math.round(newBalance * 100) / 100;
+      
+      console.log(`Recalculation summary for account ${accountId}:`);
+      console.log(`- Initial balance: ${initialBalance}`);
+      console.log(`- Income total: ${incomeTotal}`);
+      console.log(`- Expense total: ${expenseTotal}`);
+      console.log(`- Processed transactions: ${transactionCount} (errors: ${errorCount})`);
+      console.log(`- New balance: ${newBalance} (previous: ${accountData.balance || 0})`);
+      
+      // Update the account with the recalculated balance
+      await updateDoc(accountRef, {
+        balance: newBalance,
+        updatedAt: serverTimestamp()
+      });
+      
+      // Update the account in the local state
+      setAccounts(prev => 
+        prev.map(account => 
+          account.id === accountId 
+            ? { ...account, balance: newBalance, updatedAt: new Date() } 
+            : account
+        )
+      );
+      
+      // Also update any cached versions
+      const accountScopes = [FINANCE_SCOPE.PERSONAL, FINANCE_SCOPE.NUCLEAR, FINANCE_SCOPE.EXTENDED];
+      for (const scope of accountScopes) {
+        try {
+          const cachedAccounts = JSON.parse(await offlineStorageService.getItem(`finance_accounts_${scope}`) || '[]');
+          const updatedCachedAccounts = cachedAccounts.map(acc => {
+            if (acc.id === accountId) {
+              return { ...acc, balance: newBalance, updatedAt: new Date() };
+            }
+            return acc;
+          });
+          
+          await offlineStorageService.setItem(`finance_accounts_${scope}`, JSON.stringify(updatedCachedAccounts));
+        } catch (err) {
+          console.error(`Error updating cached accounts for scope ${scope}:`, err);
+        }
+      }
+      
+      // Reload transactions to ensure consistency with the recalculated balance
+      await loadTransactions();
+      
+      setIsLoading(false);
+      return true;
+    } catch (err) {
+      console.error('Error recalculating account balance:', err);
+      setError('Failed to recalculate account balance. Please try again.');
+      setIsLoading(false);
+      return false;
+    }
+  };
+
+  // New function to recalculate all account balances
+  const recalculateAllAccountBalances = async () => {
+    if (!user) return false;
+    
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      console.log('Recalculating balances for all accounts');
+      
+      // Get all accounts
+      const userAccounts = [...accounts];
+      console.log(`Found ${userAccounts.length} accounts to process`);
+      
+      // Track success/failure
+      let allSucceeded = true;
+      let processedCount = 0;
+      let errorCount = 0;
+      
+      // Process each account
+      for (const account of userAccounts) {
+        try {
+          console.log(`Processing account: ${account.id} (${account.name})`);
+          
+          // Get the initial balance with enhanced error handling
+          let initialBalance = 0;
+          try {
+            initialBalance = typeof account.initialBalance === 'number' 
+              ? account.initialBalance 
+              : parseFloat(account.initialBalance || 0);
+            
+            if (isNaN(initialBalance)) {
+              console.warn(`Invalid initial balance for account ${account.id}, using 0 instead`);
+              initialBalance = 0;
+            }
+          } catch (error) {
+            console.error(`Error parsing initial balance for account ${account.id}:`, error);
+            initialBalance = 0;
+          }
+          
+          // Get all transactions for this account
+          const transactionsQuery = query(
+            collection(db, 'finance_transactions'),
+            where('accountId', '==', account.id)
+          );
+          
+          const transactionsSnapshot = await getDocs(transactionsQuery);
+          console.log(`Found ${transactionsSnapshot.size} transactions for account ${account.id}`);
+          
+          // Calculate the new balance based on all transactions
+          let newBalance = initialBalance;
+          let incomeTotal = 0;
+          let expenseTotal = 0;
+          let transactionCount = 0;
+          let transactionErrors = 0;
+          
+          // Process each transaction with enhanced error handling
+          transactionsSnapshot.forEach(doc => {
+            try {
+              const transaction = doc.data();
+              if (!transaction) {
+                console.warn(`Empty transaction data for document ${doc.id}, skipping`);
+                transactionErrors++;
+                return;
+              }
+              
+              // Ensure we have a valid amount
+              let transactionAmount = 0;
+              try {
+                if (typeof transaction.amount === 'number') {
+                  transactionAmount = transaction.amount;
+                } else if (typeof transaction.amount === 'string') {
+                  transactionAmount = parseFloat(transaction.amount);
+                } else if (transaction.amount) {
+                  transactionAmount = parseFloat(transaction.amount);
+                }
+                
+                // Safety check for NaN
+                if (isNaN(transactionAmount)) {
+                  console.warn(`Invalid amount in transaction ${doc.id}: ${transaction.amount}, using 0 instead`);
+                  transactionAmount = 0;
+                }
+                
+                // Round to prevent floating point errors
+                transactionAmount = Math.round(transactionAmount * 100) / 100;
+              } catch (error) {
+                console.error(`Error parsing amount for transaction ${doc.id}:`, error);
+                transactionAmount = 0;
+                transactionErrors++;
+              }
+              
+              // Process based on transaction type
+              if (transaction.type === 'income') {
+                newBalance += transactionAmount;
+                incomeTotal += transactionAmount;
+              } else if (transaction.type === 'expense') {
+                newBalance -= transactionAmount;
+                expenseTotal += transactionAmount;
+              } else {
+                console.warn(`Unknown transaction type in ${doc.id}: ${transaction.type}, skipping`);
+                transactionErrors++;
+                return;
+              }
+              
+              transactionCount++;
+            } catch (error) {
+              console.error(`Error processing transaction ${doc.id}:`, error);
+              transactionErrors++;
+            }
+          });
+          
+          // Round to 2 decimal places to avoid floating point issues
+          newBalance = Math.round(newBalance * 100) / 100;
+          
+          console.log(`Recalculation summary for account ${account.id}:`);
+          console.log(`- Initial balance: ${initialBalance}`);
+          console.log(`- Income total: ${incomeTotal}`);
+          console.log(`- Expense total: ${expenseTotal}`);
+          console.log(`- Processed transactions: ${transactionCount} (errors: ${transactionErrors})`);
+          console.log(`- New balance: ${newBalance} (previous: ${account.balance || 0})`);
+          
+          // Get the current balance from the account
+          let currentBalance = 0;
+          try {
+            currentBalance = typeof account.balance === 'number' 
+              ? account.balance 
+              : parseFloat(account.balance || 0);
+            
+            if (isNaN(currentBalance)) {
+              console.warn(`Invalid current balance for account ${account.id}, treating as 0`);
+              currentBalance = 0;
+            }
+          } catch (error) {
+            console.error(`Error parsing current balance for account ${account.id}:`, error);
+            currentBalance = 0;
+          }
+          
+          // Update if the recalculated balance differs from the current balance
+          // Use a small epsilon value to account for potential floating point comparison issues
+          const epsilon = 0.001;
+          if (Math.abs(newBalance - currentBalance) > epsilon) {
+            // Update the account with the recalculated balance
+            const accountRef = doc(db, 'finance_accounts', account.id);
+            await updateDoc(accountRef, {
+              balance: newBalance,
+              updatedAt: serverTimestamp()
+            });
+            
+            console.log(`Updated account ${account.id} with new balance: ${newBalance} (was: ${currentBalance})`);
+          } else {
+            console.log(`No change needed for account ${account.id} (balance already correct)`);
+          }
+          
+          processedCount++;
+        } catch (err) {
+          console.error(`Error recalculating balance for account ${account.id}:`, err);
+          allSucceeded = false;
+          errorCount++;
+        }
+      }
+      
+      console.log(`Recalculation complete for ${processedCount} accounts with ${errorCount} errors`);
+      
+      // Reload accounts to reflect changes
+      await loadAccounts();
+      
+      // Also reload transactions to ensure consistency
+      await loadTransactions();
+      
+      setIsLoading(false);
+      return allSucceeded;
+    } catch (err) {
+      console.error('Error recalculating all account balances:', err);
+      setError('Failed to recalculate account balances. Please try again.');
+      setIsLoading(false);
+      return false;
+    }
+  };
 
   return (
     <FinanceContext.Provider value={contextValue}>

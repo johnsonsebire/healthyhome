@@ -10,7 +10,9 @@ const TransactionList = ({
   onTransactionLongPress,
   formatCurrency,
   displayCurrency = 'GHS',
-  userCurrencySettings
+  userCurrencySettings,
+  refreshControl,
+  ListHeaderComponent
 }) => {
   // Default currency formatting if not provided
   const defaultFormatCurrency = (amount, currency = 'GHS') => {
@@ -74,56 +76,104 @@ const TransactionList = ({
   
   // Render a transaction item
   const renderTransactionItem = ({ item }) => {
-    if (!item) return null;
+    if (!item) {
+      console.warn('Received null or undefined transaction item');
+      return null;
+    }
     
-    // Safely handle null or undefined values
-    const transactionType = item.type || 'expense';
-    const transactionCategory = item.category || 'other_expense';
-    const transactionAmount = parseFloat(item.amount) || 0;
-    const transactionCurrency = item.currency || displayCurrency;
-    
-    // Calculate display amount considering currency conversion
-    const displayAmount = userCurrencySettings?.autoConvert && transactionCurrency !== displayCurrency
-      ? currencyService.convertTransactionAmount(item, displayCurrency, userCurrencySettings)
-      : transactionAmount;
-    
-    const displayCurrencyCode = userCurrencySettings?.autoConvert && transactionCurrency !== displayCurrency
-      ? displayCurrency
-      : transactionCurrency;
+    try {
+      // Log transaction data for debugging
+      console.log(`Rendering transaction: ${item.id}, Type: ${item.type}, Amount: ${item.amount}, Date: ${item.date}`);
+      
+      // Safely handle null or undefined values
+      const transactionType = item.type || 'expense';
+      const transactionCategory = item.category || 'other_expense';
+      
+      // Ensure amount is a valid number with enhanced error handling
+      let transactionAmount = 0;
+      try {
+        if (typeof item.amount === 'number') {
+          transactionAmount = item.amount;
+        } else if (typeof item.amount === 'string') {
+          transactionAmount = parseFloat(item.amount);
+        } else if (item.amount) {
+          transactionAmount = parseFloat(item.amount);
+        }
+        
+        if (isNaN(transactionAmount)) {
+          console.warn(`Invalid transaction amount for ${item.id}: ${item.amount}, using 0 instead`);
+          transactionAmount = 0;
+        }
+        
+        // Round to 2 decimal places to avoid floating point issues
+        transactionAmount = Math.round(transactionAmount * 100) / 100;
+      } catch (error) {
+        console.error(`Error parsing transaction amount for ${item.id}:`, error);
+        transactionAmount = 0;
+      }
+      
+      // Default to displayCurrency if not specified in the transaction
+      const transactionCurrency = item.currency || displayCurrency;
+      
+      // Calculate display amount considering currency conversion
+      let displayAmount = transactionAmount;
+      if (userCurrencySettings?.autoConvert && transactionCurrency !== displayCurrency) {
+        try {
+          displayAmount = currencyService.convertTransactionAmount(item, displayCurrency, userCurrencySettings);
+          console.log(`Converted amount from ${transactionAmount} ${transactionCurrency} to ${displayAmount} ${displayCurrency}`);
+        } catch (error) {
+          console.error(`Error converting currency for transaction ${item.id}:`, error);
+          displayAmount = transactionAmount; // Fallback to original amount on conversion error
+        }
+      }
+      
+      const displayCurrencyCode = userCurrencySettings?.autoConvert && transactionCurrency !== displayCurrency
+        ? displayCurrency
+        : transactionCurrency;
+      
+      // Ensure description is not empty
+      const description = item.description || 
+        (transactionCategory !== 'other_expense' && transactionCategory !== 'other_income' 
+          ? transactionCategory.replace('_', ' ') 
+          : (transactionType === 'income' ? 'Income' : 'Expense'));
 
-    return (
-      <TouchableOpacity
-        style={styles.transactionItem}
-        onPress={() => onTransactionPress && onTransactionPress(item)}
-        onLongPress={() => onTransactionLongPress && onTransactionLongPress(item)}
-      >
-        <View style={styles.iconContainer}>
-          <MaterialIcons 
-            name={getTransactionIcon(item)} 
-            size={24} 
-            color={getTransactionColor(item)} 
-          />
-        </View>
-        <View style={styles.transactionDetails}>
-          <Text style={styles.transactionDescription}>
-            {item.description || item.category || (item.type === 'income' ? 'Income' : 'Expense')}
-          </Text>
-          <Text style={styles.transactionDate}>
-            {formatTransactionDate(item.date)}
-          </Text>
-        </View>
-        <View style={styles.amountContainer}>
-          <Text 
-            style={[
-              styles.transactionAmount, 
-              { color: getTransactionColor(item) }
-            ]}
-          >
-            {transactionType === 'income' ? '+' : '-'} {currencyFormatter(displayAmount, displayCurrencyCode)}
-          </Text>
-        </View>
-      </TouchableOpacity>
-    );
+      return (
+        <TouchableOpacity
+          style={styles.transactionItem}
+          onPress={() => onTransactionPress && onTransactionPress(item)}
+          onLongPress={() => onTransactionLongPress && onTransactionLongPress(item)}
+        >
+          <View style={styles.iconContainer}>
+            <MaterialIcons 
+              name={getTransactionIcon(item)} 
+              size={24} 
+              color={getTransactionColor(item)} 
+            />
+          </View>
+          <View style={styles.transactionDetails}>
+            <Text style={styles.transactionDescription}>
+              {description}
+            </Text>
+            <Text style={styles.transactionDate}>
+              {formatTransactionDate(item.date)}
+            </Text>
+          </View>
+          <View style={styles.amountContainer}>
+            <Text 
+              style={[
+                styles.transactionAmount, 
+                { color: getTransactionColor(item) }
+              ]}
+            >
+              {transactionType === 'income' ? '+' : '-'} {currencyFormatter(Math.abs(displayAmount), displayCurrencyCode)}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      );
+    } catch (error) {
+      console.error('Error rendering transaction item:', error, item);
+      return null;
+    }
   };
   
   // Render separator between items
@@ -141,7 +191,10 @@ const TransactionList = ({
     <FlatList
       data={transactions}
       renderItem={renderTransactionItem}
-      keyExtractor={(item) => item.id || item.transactionId || Math.random().toString()}
+      keyExtractor={(item) => {
+        if (!item) return `empty-${Math.random().toString()}`;
+        return item.id || item.transactionId || `transaction-${Math.random().toString()}`;
+      }}
       ItemSeparatorComponent={renderSeparator}
       ListEmptyComponent={renderEmptyState}
       contentContainerStyle={[
@@ -149,6 +202,10 @@ const TransactionList = ({
         transactions.length === 0 && styles.emptyContainer
       ]}
       showsVerticalScrollIndicator={false}
+      refreshControl={refreshControl}
+      ListHeaderComponent={ListHeaderComponent}
+      scrollEnabled={true} // Enable scrolling in the main FlatList
+      nestedScrollEnabled={true}
     />
   );
 };

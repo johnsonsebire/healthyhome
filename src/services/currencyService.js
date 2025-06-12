@@ -171,27 +171,53 @@ class CurrencyService {
     this.lastUpdated = new Date();
   }
 
-  // Convert amount from one currency to another
+  // Convert amount from one currency to another with enhanced error handling
   convertCurrency(amount, fromCurrency, toCurrency) {
-    if (!amount || amount === 0) return 0;
-    if (fromCurrency === toCurrency) return amount;
+    try {
+      // Handle various input formats and edge cases
+      if (amount === null || amount === undefined) return 0;
+      
+      // Ensure we're working with a number
+      let numericAmount = 0;
+      if (typeof amount === 'number') {
+        numericAmount = amount;
+      } else if (typeof amount === 'string') {
+        numericAmount = parseFloat(amount);
+      } else {
+        numericAmount = parseFloat(amount);
+      }
+      
+      // Check for invalid values
+      if (isNaN(numericAmount)) {
+        console.warn('Invalid amount for currency conversion:', amount);
+        return 0;
+      }
+      
+      if (numericAmount === 0) return 0;
+      if (fromCurrency === toCurrency) return numericAmount;
 
-    const fromRate = this.exchangeRates[fromCurrency];
-    const toRate = this.exchangeRates[toCurrency];
+      const fromRate = this.exchangeRates[fromCurrency];
+      const toRate = this.exchangeRates[toCurrency];
 
-    if (!fromRate || !toRate) {
-      console.warn(`Exchange rate not found for ${fromCurrency} or ${toCurrency}`);
-      return amount; // Return original amount if rates not available
+      if (!fromRate || !toRate) {
+        console.warn(`Exchange rate not found for ${fromCurrency} or ${toCurrency}`);
+        return numericAmount; // Return original amount if rates not available
+      }
+
+      // Convert to GHS first (base currency), then to target currency
+      const ghsAmount = numericAmount / fromRate;
+      const convertedAmount = ghsAmount * toRate;
+
+      // Round to 2 decimal places to avoid floating point precision issues
+      return Math.round(convertedAmount * 100) / 100;
+    } catch (error) {
+      console.error('Error converting currency:', error, amount, fromCurrency, toCurrency);
+      // Return original amount as fallback
+      return typeof amount === 'number' ? amount : parseFloat(amount || 0);
     }
-
-    // Convert to GHS first (base currency), then to target currency
-    const ghsAmount = amount / fromRate;
-    const convertedAmount = ghsAmount * toRate;
-
-    return Math.round(convertedAmount * 100) / 100; // Round to 2 decimal places
   }
 
-  // Format currency for display
+  // Format currency for display with enhanced error handling
   formatCurrency(amount, currencyCode, options = {}) {
     const {
       showSymbol = true,
@@ -200,32 +226,59 @@ class CurrencyService {
       maximumFractionDigits = 2
     } = options;
 
-    if (amount == null || isNaN(amount)) return '';
+    try {
+      // Handle various input formats and edge cases
+      if (amount === null || amount === undefined) return '';
+      
+      // Ensure we're working with a number
+      let numericAmount = 0;
+      if (typeof amount === 'number') {
+        numericAmount = amount;
+      } else if (typeof amount === 'string') {
+        numericAmount = parseFloat(amount);
+      } else {
+        numericAmount = parseFloat(amount);
+      }
+      
+      if (isNaN(numericAmount)) {
+        console.warn('Invalid amount for currency formatting:', amount);
+        return '0.00';
+      }
+      
+      // Ensure we have a valid currency code
+      const validCurrencyCode = currencyCode || this.defaultCurrency;
+      const currencyInfo = this.getCurrencyInfo(validCurrencyCode);
+      
+      // Round to avoid floating point precision issues
+      numericAmount = Math.round(numericAmount * 100) / 100;
+      
+      const formattedAmount = new Intl.NumberFormat('en-US', {
+        minimumFractionDigits,
+        maximumFractionDigits
+      }).format(Math.abs(numericAmount));
 
-    const currencyInfo = this.getCurrencyInfo(currencyCode);
-    const formattedAmount = new Intl.NumberFormat('en-US', {
-      minimumFractionDigits,
-      maximumFractionDigits
-    }).format(Math.abs(amount));
+      let result = '';
+      
+      if (showSymbol) {
+        result = `${currencyInfo.symbol}${formattedAmount}`;
+      } else {
+        result = formattedAmount;
+      }
 
-    let result = '';
-    
-    if (showSymbol) {
-      result = `${currencyInfo.symbol}${formattedAmount}`;
-    } else {
-      result = formattedAmount;
+      if (showCode) {
+        result += ` ${validCurrencyCode}`;
+      }
+
+      // Add negative sign if amount is negative
+      if (numericAmount < 0) {
+        result = `-${result}`;
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Error formatting currency:', error, amount, currencyCode);
+      return '0.00';
     }
-
-    if (showCode) {
-      result += ` ${currencyCode}`;
-    }
-
-    // Add negative sign if amount is negative
-    if (amount < 0) {
-      result = `-${result}`;
-    }
-
-    return result;
   }
 
   // Get currency symbol by code
@@ -305,49 +358,129 @@ class CurrencyService {
     return this.convertCurrency(account.balance, accountCurrency, targetCurrency);
   }
 
-  // Convert transaction amount for display
+  // Convert transaction amount for display with enhanced error handling
   convertTransactionAmount(transaction, displayCurrency, userSettings) {
-    if (!transaction || !transaction.amount) return 0;
+    if (!transaction) return 0;
+    
+    try {
+      // Handle different formats of amount
+      let amount = 0;
+      if (typeof transaction.amount === 'number') {
+        amount = transaction.amount;
+      } else if (typeof transaction.amount === 'string') {
+        amount = parseFloat(transaction.amount);
+      } else if (transaction.amount) {
+        amount = parseFloat(transaction.amount);
+      }
+      
+      if (isNaN(amount)) {
+        console.warn('Invalid transaction amount for conversion:', transaction.id, transaction.amount);
+        return 0;
+      }
+      
+      // Get account currency (assuming transaction has account reference)
+      const accountCurrency = transaction.currency || this.defaultCurrency;
+      const targetCurrency = displayCurrency || this.defaultCurrency;
 
-    // Get account currency (assuming transaction has account reference)
-    const accountCurrency = transaction.currency || this.defaultCurrency;
-    const targetCurrency = displayCurrency || this.defaultCurrency;
+      if (!userSettings?.autoConvert && accountCurrency !== targetCurrency) {
+        return amount;
+      }
 
-    if (!userSettings?.autoConvert && accountCurrency !== targetCurrency) {
-      return transaction.amount;
+      // Convert and round to 2 decimal places to avoid floating point issues
+      const converted = this.convertCurrency(amount, accountCurrency, targetCurrency);
+      return Math.round(converted * 100) / 100;
+    } catch (error) {
+      console.error('Error converting transaction amount:', error, transaction);
+      return 0;
     }
-
-    return this.convertCurrency(transaction.amount, accountCurrency, targetCurrency);
   }
 
   // Get total balance across multiple accounts in display currency, including loans
   getTotalBalanceInCurrency(accounts, displayCurrency, userSettings, loans = []) {
-    if ((!accounts || accounts.length === 0) && (!loans || loans.length === 0)) return 0;
+    try {
+      if ((!accounts || accounts.length === 0) && (!loans || loans.length === 0)) return 0;
 
-    // Calculate total account balance in GHS
-    const accountsInGHS = (accounts || []).reduce((total, account) => {
-      const accountCurrency = account.currency || this.defaultCurrency;
-      const ghsAmount = this.convertCurrency(account.balance || 0, accountCurrency, 'GHS');
-      return total + ghsAmount;
-    }, 0);
-    
-    // Calculate total loans in GHS (loans decrease the total balance)
-    const loansInGHS = (loans || []).reduce((total, loan) => {
-      // Only consider outstanding loans where the user is the borrower
-      if (loan.status === 'active' && !loan.isLender) {
-        const loanCurrency = loan.currency || this.defaultCurrency;
-        const outstandingAmount = loan.amount - (loan.amountPaid || 0);
-        const ghsAmount = this.convertCurrency(outstandingAmount, loanCurrency, 'GHS');
-        return total + ghsAmount;
-      }
-      // If the user is the lender, it's already counted as an asset/account
-      return total;
-    }, 0);
-    
-    // Net balance = accounts - loans
-    const netBalanceInGHS = accountsInGHS - loansInGHS;
-
-    return this.convertCurrency(netBalanceInGHS, 'GHS', displayCurrency || this.defaultCurrency);
+      // Calculate total account balance in GHS with enhanced error handling
+      const accountsInGHS = (accounts || []).reduce((total, account) => {
+        try {
+          if (!account) return total;
+          
+          let balance = 0;
+          if (typeof account.balance === 'number') {
+            balance = account.balance;
+          } else if (typeof account.balance === 'string') {
+            balance = parseFloat(account.balance);
+          } else if (account.balance) {
+            balance = parseFloat(account.balance);
+          }
+          
+          if (isNaN(balance)) {
+            console.warn('Invalid account balance:', account.id, account.balance);
+            return total;
+          }
+          
+          const accountCurrency = account.currency || this.defaultCurrency;
+          const ghsAmount = this.convertCurrency(balance, accountCurrency, 'GHS');
+          return total + ghsAmount;
+        } catch (error) {
+          console.error('Error processing account balance:', error, account);
+          return total;
+        }
+      }, 0);
+      
+      // Calculate total loans in GHS (loans decrease the total balance)
+      const loansInGHS = (loans || []).reduce((total, loan) => {
+        try {
+          // Only consider outstanding loans where the user is the borrower
+          if (!loan || loan.status !== 'active' || loan.isLender) return total;
+          
+          let loanAmount = 0;
+          let amountPaid = 0;
+          
+          // Process loan amount
+          if (typeof loan.amount === 'number') {
+            loanAmount = loan.amount;
+          } else if (typeof loan.amount === 'string') {
+            loanAmount = parseFloat(loan.amount);
+          } else if (loan.amount) {
+            loanAmount = parseFloat(loan.amount);
+          }
+          
+          // Process amount paid
+          if (typeof loan.amountPaid === 'number') {
+            amountPaid = loan.amountPaid;
+          } else if (typeof loan.amountPaid === 'string') {
+            amountPaid = parseFloat(loan.amountPaid);
+          } else if (loan.amountPaid) {
+            amountPaid = parseFloat(loan.amountPaid);
+          }
+          
+          if (isNaN(loanAmount)) {
+            console.warn('Invalid loan amount:', loan.id, loan.amount);
+            return total;
+          }
+          
+          const outstandingAmount = loanAmount - (isNaN(amountPaid) ? 0 : amountPaid);
+          const loanCurrency = loan.currency || this.defaultCurrency;
+          const ghsAmount = this.convertCurrency(outstandingAmount, loanCurrency, 'GHS');
+          
+          return total + ghsAmount;
+        } catch (error) {
+          console.error('Error processing loan amount:', error, loan);
+          return total;
+        }
+      }, 0);
+      
+      // Net balance = accounts - loans
+      const netBalanceInGHS = accountsInGHS - loansInGHS;
+      
+      // Convert to display currency and round to 2 decimal places
+      const convertedBalance = this.convertCurrency(netBalanceInGHS, 'GHS', displayCurrency || this.defaultCurrency);
+      return Math.round(convertedBalance * 100) / 100;
+    } catch (error) {
+      console.error('Error calculating total balance:', error);
+      return 0;
+    }
   }
 
   // Get exchange rate between two currencies

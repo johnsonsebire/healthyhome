@@ -32,6 +32,7 @@ const EditAccountScreen = ({ navigation, route }) => {
     name: account.name || '',
     type: account.type || 'checking',
     balance: account.balance ? account.balance.toString() : '0',
+    initialBalance: account.initialBalance ? account.initialBalance.toString() : (account.balance ? account.balance.toString() : '0'),
     currency: account.currency || 'USD',
     icon: account.icon || 'account-balance',
     color: account.color || '#2196F3',
@@ -118,6 +119,7 @@ const EditAccountScreen = ({ navigation, route }) => {
         name: formData.name.trim(),
         type: formData.type,
         balance: parseFloat(formData.balance),
+        initialBalance: parseFloat(formData.initialBalance),
         currency: formData.currency,
         icon: formData.icon,
         color: formData.color,
@@ -235,6 +237,21 @@ const EditAccountScreen = ({ navigation, route }) => {
             placeholder="0.00"
             keyboardType="numeric"
           />
+        </View>
+        
+        {/* Initial Balance */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Initial Balance</Text>
+          <TextInput
+            style={styles.input}
+            value={formData.initialBalance}
+            onChangeText={(text) => handleInputChange('initialBalance', text)}
+            placeholder="0.00"
+            keyboardType="numeric"
+          />
+          <Text style={styles.helperText}>
+            The starting balance of this account. Used for balance recalculation.
+          </Text>
         </View>
         
         {/* Currency */}
@@ -504,6 +521,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginTop: 8,
+  },
+  helperText: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   actionButtons: {
     padding: 16,
