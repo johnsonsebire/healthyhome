@@ -21,6 +21,7 @@ const FamilyFinanceScreen = ({ navigation }) => {
   const { 
     accounts = [], 
     projects = [],
+    transactions = [],
     isLoading,
     currentScope,
     changeScope
@@ -65,31 +66,91 @@ const FamilyFinanceScreen = ({ navigation }) => {
   
   // Generate report data for the current month
   const generateReportData = async () => {
-    const now = new Date();
-    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    if (!accounts || accounts.length === 0) {
+      setReportData(null);
+      return;
+    }
     
-    // In a real implementation, this would call a function from the FinanceContext
-    // For now, we'll just create some sample data
-    setReportData({
-      startDate: firstDayOfMonth.toLocaleDateString(),
-      endDate: lastDayOfMonth.toLocaleDateString(),
-      totalIncome: 2500,
-      totalExpense: 1800,
-      netIncome: 700,
-      incomeByCategory: {
-        'Salary': 2000,
-        'Investments': 300,
-        'Other': 200
-      },
-      expenseByCategory: {
-        'Housing': 800,
-        'Food': 400,
-        'Utilities': 300,
-        'Entertainment': 200,
-        'Other': 100
+    try {
+      const now = new Date();
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      
+      // Get family accounts
+      const familyAccounts = accounts.filter(account => account.scope === FINANCE_SCOPE.NUCLEAR);
+      
+      if (familyAccounts.length === 0) {
+        setReportData(null);
+        return;
       }
-    });
+      
+      // Calculate total balance
+      const totalBalance = currencyService.getTotalBalanceInCurrency(
+        familyAccounts, 
+        displayCurrency, 
+        userCurrencySettings
+      );
+      
+      // Get transactions from family accounts
+      const familyTransactions = transactions.filter(
+        transaction => familyAccounts.some(account => account.id === transaction.accountId)
+      );
+      
+      // Filter transactions for the current month
+      const monthTransactions = familyTransactions.filter(transaction => {
+        try {
+          if (!transaction || !transaction.date) return false;
+          
+          const transactionDate = transaction.date.toDate 
+            ? transaction.date.toDate() 
+            : new Date(transaction.date);
+            
+          return transactionDate >= firstDayOfMonth && transactionDate <= lastDayOfMonth;
+        } catch (err) {
+          console.error('Error filtering transaction by date:', err);
+          return false;
+        }
+      });
+      
+      // Calculate income and expenses
+      const totalIncome = monthTransactions
+        .filter(t => t && t.type === 'income')
+        .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+        
+      const totalExpense = monthTransactions
+        .filter(t => t && t.type === 'expense')
+        .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+      
+      // Group by category
+      const incomeByCategory = {};
+      const expenseByCategory = {};
+      
+      monthTransactions.forEach(transaction => {
+        if (!transaction) return;
+        
+        if (transaction.type === 'income') {
+          const category = transaction.category || 'Other';
+          incomeByCategory[category] = (incomeByCategory[category] || 0) + (parseFloat(transaction.amount) || 0);
+        } else if (transaction.type === 'expense') {
+          const category = transaction.category || 'Other';
+          expenseByCategory[category] = (expenseByCategory[category] || 0) + (parseFloat(transaction.amount) || 0);
+        }
+      });
+      
+      setReportData({
+        startDate: firstDayOfMonth.toLocaleDateString(),
+        endDate: lastDayOfMonth.toLocaleDateString(),
+        totalIncome,
+        totalExpense,
+        netIncome: totalIncome - totalExpense,
+        incomeByCategory,
+        expenseByCategory,
+        totalBalance
+      });
+    } catch (err) {
+      console.error('Error generating report data:', err);
+      setReportData(null);
+    }
   };
   
   // Load report data when component mounts
@@ -312,36 +373,67 @@ const FamilyFinanceScreen = ({ navigation }) => {
       )}
       
       {/* Family Members Contributions */}
-      <View style={styles.sectionContainer}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Member Contributions</Text>
-        </View>
-        
-        <View style={styles.membersContainer}>
-          {(nuclearFamilyMembers || []).map((member, index) => (
-            <View key={member.id || index} style={styles.memberContributionCard}>
-              <View style={styles.memberInfo}>
-                <MaterialIcons name="person" size={24} color="#2196F3" />
-                <Text style={styles.memberName}>{member.displayName || member.email}</Text>
+      {familyProjects.length > 0 && (
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Member Contributions</Text>
+          </View>
+          
+          <View style={styles.membersContainer}>
+            {(nuclearFamilyMembers || []).map((member, index) => {
+              // Find contributions from this member across all projects
+              const memberContributions = familyProjects.reduce((total, project) => {
+                const contributor = project.contributors?.find(c => c.userId === member.id);
+                return total + (contributor?.contributionAmount || 0);
+              }, 0);
+              
+              // Count transactions
+              const transactionCount = familyProjects.reduce((count, project) => {
+                const contributor = project.contributors?.find(c => c.userId === member.id);
+                return contributor?.lastContribution ? count + 1 : count;
+              }, 0);
+              
+              // Only show members who have made contributions or if there are no contributions yet
+              if (memberContributions > 0 || transactionCount > 0 || familyProjects.some(p => p.contributors?.some(c => c.userId === member.id))) {
+                return (
+                  <View key={member.id || index} style={styles.memberContributionCard}>
+                    <View style={styles.memberInfo}>
+                      <MaterialIcons name="person" size={24} color="#2196F3" />
+                      <Text style={styles.memberName}>{member.name || member.displayName || member.email}</Text>
+                    </View>
+                    <View style={styles.memberStats}>
+                      <View style={styles.statItem}>
+                        <Text style={styles.statValue}>
+                          {formatCurrency(memberContributions)}
+                        </Text>
+                        <Text style={styles.statLabel}>Contributed</Text>
+                      </View>
+                      <View style={styles.statItem}>
+                        <Text style={styles.statValue}>
+                          {transactionCount}
+                        </Text>
+                        <Text style={styles.statLabel}>Transactions</Text>
+                      </View>
+                    </View>
+                  </View>
+                );
+              }
+              return null;
+            }).filter(Boolean)}
+            
+            {/* If no members have contributed yet, show a message */}
+            {(nuclearFamilyMembers || []).length > 0 && 
+             !nuclearFamilyMembers.some(member => 
+               familyProjects.some(p => p.contributors?.some(c => c.userId === member.id))
+             ) && (
+              <View style={styles.emptyStateContainer}>
+                <MaterialIcons name="people" size={36} color="#ccc" />
+                <Text style={styles.emptyStateText}>No contributions yet</Text>
               </View>
-              <View style={styles.memberStats}>
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>
-                    {formatCurrency(Math.random() * 1000)}
-                  </Text>
-                  <Text style={styles.statLabel}>Contributed</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>
-                    {Math.floor(Math.random() * 10)}
-                  </Text>
-                  <Text style={styles.statLabel}>Transactions</Text>
-                </View>
-              </View>
-            </View>
-          ))}
+            )}
+          </View>
         </View>
-      </View>
+      )}
     </ScrollView>
   );
 };

@@ -19,6 +19,7 @@ const PersonalFinanceScreen = ({ navigation }) => {
   const { 
     accounts, 
     transactions, 
+    loans,
     isLoading,
     currentScope,
     changeScope
@@ -63,65 +64,107 @@ const PersonalFinanceScreen = ({ navigation }) => {
   
   // Update recent transactions when transactions change
   useEffect(() => {
-    // Get the 5 most recent transactions
-    const recent = [...transactions]
-      .sort((a, b) => {
-        const dateA = a.date.toDate ? a.date.toDate() : new Date(a.date);
-        const dateB = b.date.toDate ? b.date.toDate() : new Date(b.date);
-        return dateB - dateA;
-      })
-      .slice(0, 5);
+    if (!transactions || transactions.length === 0) {
+      setRecentTransactions([]);
+      return;
+    }
     
-    setRecentTransactions(recent);
-    
-    // Generate report data
-    generateReportData();
+    try {
+      // Get the 5 most recent transactions
+      const recent = [...transactions]
+        .sort((a, b) => {
+          try {
+            const dateA = a.date ? (a.date.toDate ? a.date.toDate() : new Date(a.date)) : new Date();
+            const dateB = b.date ? (b.date.toDate ? b.date.toDate() : new Date(b.date)) : new Date();
+            return dateB - dateA;
+          } catch (err) {
+            console.error('Error sorting transactions by date:', err);
+            return 0;
+          }
+        })
+        .slice(0, 5);
+      
+      setRecentTransactions(recent);
+      
+      // Generate report data
+      generateReportData();
+    } catch (err) {
+      console.error('Error updating recent transactions:', err);
+      setRecentTransactions([]);
+    }
   }, [transactions]);
   
   // Generate report data for the current month
   const generateReportData = () => {
-    const now = new Date();
-    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    if (!transactions || transactions.length === 0) {
+      setReportData(null);
+      return;
+    }
     
-    // Filter transactions for the current month
-    const monthTransactions = transactions.filter(transaction => {
-      const transactionDate = transaction.date.toDate ? transaction.date.toDate() : new Date(transaction.date);
-      return transactionDate >= firstDayOfMonth && transactionDate <= lastDayOfMonth;
-    });
-    
-    // Calculate totals
-    const totalIncome = monthTransactions
-      .filter(t => t.type === 'income')
-      .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+    try {
+      const now = new Date();
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       
-    const totalExpense = monthTransactions
-      .filter(t => t.type === 'expense')
-      .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
-    
-    // Group by category
-    const incomeByCategory = {};
-    const expenseByCategory = {};
-    
-    monthTransactions.forEach(transaction => {
-      if (transaction.type === 'income') {
-        const category = transaction.category || 'Other';
-        incomeByCategory[category] = (incomeByCategory[category] || 0) + (parseFloat(transaction.amount) || 0);
-      } else if (transaction.type === 'expense') {
-        const category = transaction.category || 'Other';
-        expenseByCategory[category] = (expenseByCategory[category] || 0) + (parseFloat(transaction.amount) || 0);
+      // Filter transactions for the current month
+      const monthTransactions = transactions.filter(transaction => {
+        try {
+          if (!transaction || !transaction.date) return false;
+          
+          const transactionDate = transaction.date.toDate 
+            ? transaction.date.toDate() 
+            : new Date(transaction.date);
+            
+          return transactionDate >= firstDayOfMonth && transactionDate <= lastDayOfMonth;
+        } catch (err) {
+          console.error('Error filtering transaction by date:', err);
+          return false;
+        }
+      });
+      
+      if (monthTransactions.length === 0) {
+        setReportData(null);
+        return;
       }
-    });
-    
-    setReportData({
-      startDate: firstDayOfMonth.toLocaleDateString(),
-      endDate: lastDayOfMonth.toLocaleDateString(),
-      totalIncome,
-      totalExpense,
-      netIncome: totalIncome - totalExpense,
-      incomeByCategory,
-      expenseByCategory
-    });
+      
+      // Calculate totals
+      const totalIncome = monthTransactions
+        .filter(t => t && t.type === 'income')
+        .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+        
+      const totalExpense = monthTransactions
+        .filter(t => t && t.type === 'expense')
+        .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+      
+      // Group by category
+      const incomeByCategory = {};
+      const expenseByCategory = {};
+      
+      monthTransactions.forEach(transaction => {
+        if (!transaction) return;
+        
+        if (transaction.type === 'income') {
+          const category = transaction.category || 'Other';
+          incomeByCategory[category] = (incomeByCategory[category] || 0) + (parseFloat(transaction.amount) || 0);
+        } else if (transaction.type === 'expense') {
+          const category = transaction.category || 'Other';
+          expenseByCategory[category] = (expenseByCategory[category] || 0) + (parseFloat(transaction.amount) || 0);
+        }
+      });
+      
+      setReportData({
+        startDate: firstDayOfMonth.toLocaleDateString(),
+        endDate: lastDayOfMonth.toLocaleDateString(),
+        totalIncome,
+        totalExpense,
+        netIncome: totalIncome - totalExpense,
+        incomeByCategory,
+        expenseByCategory
+      });
+    } catch (err) {
+      console.error('Error generating report data:', err);
+      setReportData(null);
+    }
   };
   
   // Handle refresh
@@ -181,7 +224,7 @@ const PersonalFinanceScreen = ({ navigation }) => {
   
   // Calculate total balance across all accounts in display currency
   const calculateTotalBalance = () => {
-    return currencyService.getTotalBalanceInCurrency(accounts, displayCurrency, userCurrencySettings);
+    return currencyService.getTotalBalanceInCurrency(accounts, displayCurrency, userCurrencySettings, loans);
   };
   
   return (

@@ -133,12 +133,68 @@ export const FinanceProvider = ({ children }) => {
       
       switch (currentScope) {
         case FINANCE_SCOPE.PERSONAL:
-          accountsQuery = query(
+          // For personal accounts, we need to handle accounts that might not have the scope field set
+          // We'll perform two queries and merge the results
+          
+          // First query: accounts with scope explicitly set to PERSONAL
+          // NOTE: This query requires a composite index on 'owner' ASC, 'scope' ASC
+          // See firestore.indexes.json for the required index configuration
+          const personalScopeQuery = query(
             collection(db, 'finance_accounts'),
             where('owner', '==', user.uid),
             where('scope', '==', FINANCE_SCOPE.PERSONAL)
           );
-          break;
+          
+          // Get results from the first query
+          const personalScopeSnapshot = await getDocs(personalScopeQuery);
+          const personalScopeAccounts = personalScopeSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          
+          // For accounts without an explicit scope, we need a different approach
+          // Get all accounts owned by the user first
+          const userAccountsQuery = query(
+            collection(db, 'finance_accounts'),
+            where('owner', '==', user.uid)
+          );
+          
+          const userAccountsSnapshot = await getDocs(userAccountsQuery);
+          
+          // Filter accounts that don't have a scope field or have it set to null
+          const accountsWithNoScope = userAccountsSnapshot.docs
+            .filter(doc => {
+              const data = doc.data();
+              return data.scope === undefined || data.scope === null;
+            })
+            .map(doc => ({
+              id: doc.id,
+              ...doc.data(),
+              // Set scope to PERSONAL since these are implicitly personal accounts
+              scope: FINANCE_SCOPE.PERSONAL
+            }));
+          
+          // Combine the results, avoiding duplicates by ID
+          const combinedPersonalAccounts = [...personalScopeAccounts];
+          
+          // Add accounts with no scope, avoiding duplicates
+          accountsWithNoScope.forEach(account => {
+            if (!combinedPersonalAccounts.some(a => a.id === account.id)) {
+              combinedPersonalAccounts.push(account);
+            }
+          });
+          
+          setAccounts(combinedPersonalAccounts);
+          
+          // Cache the results
+          await offlineStorageService.setItem(
+            `finance_accounts_${currentScope}`, 
+            JSON.stringify(combinedPersonalAccounts)
+          );
+          
+          setIsLoading(false);
+          return;
+          
         case FINANCE_SCOPE.NUCLEAR:
           // Get accounts for nuclear family (accounts owned by user or shared with user)
           accountsQuery = query(
@@ -187,6 +243,8 @@ export const FinanceProvider = ({ children }) => {
         owner: user.uid,
         balance: parseFloat(accountData.balance) || 0,
         sharedWith: accountData.sharedWith || [],
+        // Ensure scope is always explicitly set
+        scope: accountData.scope || FINANCE_SCOPE.PERSONAL,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
@@ -328,10 +386,25 @@ export const FinanceProvider = ({ children }) => {
         }
       }
       
-      // Get account IDs for the current scope
-      const accountIds = accounts
-        .filter(account => account.scope === currentScope)
-        .map(account => account.id);
+      // Get account IDs for the current scope, including accounts that might be missing the scope property
+      let accountIds = [];
+      
+      if (currentScope === FINANCE_SCOPE.PERSONAL) {
+        // For personal scope, include accounts owned by the user that either:
+        // 1. Have scope explicitly set to PERSONAL, or
+        // 2. Don't have a scope property set at all (assumed personal)
+        accountIds = accounts
+          .filter(account => 
+            account.owner === user.uid && 
+            (account.scope === FINANCE_SCOPE.PERSONAL || account.scope === undefined || account.scope === null)
+          )
+          .map(account => account.id);
+      } else {
+        // For other scopes, keep the existing filtering logic
+        accountIds = accounts
+          .filter(account => account.scope === currentScope)
+          .map(account => account.id);
+      }
       
       if (accountIds.length === 0) {
         setTransactions([]);
@@ -340,6 +413,8 @@ export const FinanceProvider = ({ children }) => {
       }
       
       // Query transactions for the accounts
+      // NOTE: This query requires a composite index on 'accountId' ASC, 'date' DESC
+      // See firestore.indexes.json for the required index configuration
       const transactionsQuery = query(
         collection(db, 'finance_transactions'),
         where('accountId', 'in', accountIds),
@@ -819,12 +894,18 @@ export const FinanceProvider = ({ children }) => {
     try {
       const loanRef = collection(db, 'finance_loans');
       
+      // Determine the counterpartyName based on loan type
+      const counterpartyName = loanData.type === 'borrowed' ? loanData.lender : loanData.borrower;
+      const isLent = loanData.type === 'lent';
+      
       // Prepare loan data
       const newLoan = {
         ...loanData,
         userId: user.uid,
         amount: parseFloat(loanData.amount) || 0,
         interestRate: parseFloat(loanData.interestRate) || 0,
+        counterpartyName: counterpartyName, // Add counterpartyName
+        isLent: isLent, // Add isLent flag for proper display
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
@@ -852,6 +933,81 @@ export const FinanceProvider = ({ children }) => {
       console.error('Error creating loan:', err);
       setError('Failed to create loan. Please try again.');
       return null;
+    }
+  };
+
+  const updateLoan = async (loanId, loanData) => {
+    if (!user) return false;
+    
+    try {
+      const loanRef = doc(db, 'finance_loans', loanId);
+      const loanSnapshot = await getDoc(loanRef);
+      
+      if (!loanSnapshot.exists()) {
+        throw new Error('Loan not found');
+      }
+      
+      const loanDoc = loanSnapshot.data();
+      
+      // Check if user has permission to update
+      if (loanDoc.userId !== user.uid) {
+        throw new Error('You do not have permission to update this loan');
+      }
+      
+      // Prepare updated data
+      const updatedData = {
+        ...loanData,
+        updatedAt: serverTimestamp()
+      };
+      
+      // Update counterpartyName and isLent based on type if type or relevant fields changed
+      if (loanData.type || loanData.lender || loanData.borrower) {
+        const type = loanData.type || loanDoc.type;
+        const lender = loanData.lender || loanDoc.lender;
+        const borrower = loanData.borrower || loanDoc.borrower;
+        
+        updatedData.isLent = type === 'lent';
+        updatedData.counterpartyName = type === 'borrowed' ? lender : borrower;
+      }
+      
+      if (loanData.amount) {
+        updatedData.amount = parseFloat(loanData.amount);
+      }
+      
+      if (loanData.interestRate) {
+        updatedData.interestRate = parseFloat(loanData.interestRate);
+      }
+      
+      // Update loan in Firestore
+      await updateDoc(loanRef, updatedData);
+      
+      // Update local state
+      setLoans(prev => 
+        prev.map(loan => 
+          loan.id === loanId 
+            ? { ...loan, ...updatedData, updatedAt: new Date() } 
+            : loan
+        )
+      );
+      
+      // Update cache
+      const cachedLoans = JSON.parse(await offlineStorageService.getItem(`finance_loans_${currentScope}`) || '[]');
+      await offlineStorageService.setItem(
+        `finance_loans_${currentScope}`,
+        JSON.stringify(
+          cachedLoans.map(loan => 
+            loan.id === loanId 
+              ? { ...loan, ...updatedData, updatedAt: new Date() } 
+              : loan
+          )
+        )
+      );
+      
+      return true;
+    } catch (err) {
+      console.error('Error updating loan:', err);
+      setError('Failed to update loan. Please try again.');
+      return false;
     }
   };
 
@@ -934,6 +1090,45 @@ export const FinanceProvider = ({ children }) => {
     } catch (err) {
       console.error('Error recording loan payment:', err);
       setError('Failed to record loan payment. Please try again.');
+      return false;
+    }
+  };
+
+  const deleteLoan = async (loanId) => {
+    if (!user) return false;
+    
+    try {
+      const loanRef = doc(db, 'finance_loans', loanId);
+      const loanSnapshot = await getDoc(loanRef);
+      
+      if (!loanSnapshot.exists()) {
+        throw new Error('Loan not found');
+      }
+      
+      const loanDoc = loanSnapshot.data();
+      
+      // Check if user has permission to delete
+      if (loanDoc.userId !== user.uid) {
+        throw new Error('You do not have permission to delete this loan');
+      }
+      
+      // Delete loan from Firestore
+      await deleteDoc(loanRef);
+      
+      // Update local state
+      setLoans(prev => prev.filter(loan => loan.id !== loanId));
+      
+      // Update cache
+      const cachedLoans = JSON.parse(await offlineStorageService.getItem(`finance_loans_${currentScope}`) || '[]');
+      await offlineStorageService.setItem(
+        `finance_loans_${currentScope}`,
+        JSON.stringify(cachedLoans.filter(loan => loan.id !== loanId))
+      );
+      
+      return true;
+    } catch (err) {
+      console.error('Error deleting loan:', err);
+      setError('Failed to delete loan. Please try again.');
       return false;
     }
   };
@@ -1485,6 +1680,8 @@ export const FinanceProvider = ({ children }) => {
       
       // Loan management
       createLoan,
+      updateLoan,
+      deleteLoan,
       recordLoanPayment,
       
       // Welfare management

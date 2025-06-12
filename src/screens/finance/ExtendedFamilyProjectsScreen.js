@@ -19,6 +19,8 @@ const ExtendedFamilyProjectsScreen = ({ navigation }) => {
   const { 
     projects = [],
     welfareAccounts = [],
+    accounts = [],
+    transactions = [],
     isLoading,
     currentScope,
     changeScope
@@ -59,7 +61,40 @@ const ExtendedFamilyProjectsScreen = ({ navigation }) => {
   const onRefresh = async () => {
     setRefreshing(true);
     // Reload data
+    await Promise.all([
+      // Fetch updated data
+    ]);
     setRefreshing(false);
+  };
+  
+  // Calculate financial summary
+  const calculateFinancialSummary = () => {
+    // Filter accounts for extended family
+    const extendedFamilyAccounts = accounts.filter(account => account.scope === FINANCE_SCOPE.EXTENDED);
+    
+    // Calculate total balance
+    const totalBalance = currencyService.getTotalBalanceInCurrency(
+      extendedFamilyAccounts, 
+      displayCurrency, 
+      userCurrencySettings
+    );
+    
+    // Calculate total contributions
+    const totalContributions = projects.reduce((sum, project) => {
+      return sum + (project.currentAmount || 0);
+    }, 0);
+    
+    // Calculate total welfare
+    const totalWelfare = welfareAccounts.reduce((sum, account) => {
+      return sum + (account.balance || 0);
+    }, 0);
+    
+    return {
+      totalBalance,
+      totalContributions,
+      totalWelfare,
+      memberCount: (extendedFamilyMembers || []).length
+    };
   };
   
   // Navigate to project details
@@ -141,6 +176,33 @@ const ExtendedFamilyProjectsScreen = ({ navigation }) => {
         <Text style={styles.headerSubtitle}>
           {(extendedFamilyMembers || []).length} family members
         </Text>
+        
+        {/* Financial Summary Card */}
+        <View style={styles.financialSummaryCard}>
+          <Text style={styles.financialSummaryTitle}>Financial Summary</Text>
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryValue}>
+                {formatCurrency(calculateFinancialSummary().totalBalance)}
+              </Text>
+              <Text style={styles.summaryLabel}>Total Balance</Text>
+            </View>
+            
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryValue}>
+                {formatCurrency(calculateFinancialSummary().totalContributions)}
+              </Text>
+              <Text style={styles.summaryLabel}>Contributions</Text>
+            </View>
+            
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryValue}>
+                {formatCurrency(calculateFinancialSummary().totalWelfare)}
+              </Text>
+              <Text style={styles.summaryLabel}>Welfare Funds</Text>
+            </View>
+          </View>
+        </View>
         
         <View style={styles.headerButtons}>
           <TouchableOpacity 
@@ -295,6 +357,37 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: 4,
+  },
+  financialSummaryCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 8,
+    padding: 16,
+    marginTop: 16,
+    elevation: 1,
+  },
+  financialSummaryTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 12,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  summaryItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  summaryValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  summaryLabel: {
+    fontSize: 12,
     color: 'rgba(255, 255, 255, 0.8)',
     marginTop: 4,
   },

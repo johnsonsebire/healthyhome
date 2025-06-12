@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { doc, setDoc, getDoc, collection, query, where, getDocs, addDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
 import { useAuth } from './AuthContext';
-import { SHARING_PREFERENCES } from '../utils/familyRelationships';
+import { SHARING_PREFERENCES, getFamilyCategoryByPerspective, FAMILY_CATEGORIES } from '../utils/familyRelationships';
 import networkService from '../services/networkService';
 import offlineStorageService from '../services/offlineStorage';
 
@@ -20,15 +20,19 @@ export const FamilySharingProvider = ({ children }) => {
   const { user, userProfile } = useAuth();
   const [sharingPreferences, setSharingPreferences] = useState(SHARING_PREFERENCES.NUCLEAR);
   const [pendingInvitations, setPendingInvitations] = useState([]);
+  const [nuclearFamilyMembers, setNuclearFamilyMembers] = useState([]);
+  const [extendedFamilyMembers, setExtendedFamilyMembers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (user) {
       loadSharingPreferences();
       loadPendingInvitations();
+      loadFamilyMembers();
     }
   }, [user]);
 
+  // Load sharing preferences from the database
   const loadSharingPreferences = async () => {
     try {
       // Try cache first if offline
@@ -99,6 +103,7 @@ export const FamilySharingProvider = ({ children }) => {
     }
   };
 
+  // Load pending invitations from the database
   const loadPendingInvitations = async () => {
     try {
       // Try cache first if offline
@@ -145,6 +150,91 @@ export const FamilySharingProvider = ({ children }) => {
       await offlineStorageService.cacheFamilyInvitations(allInvitations);
     } catch (error) {
       console.error('Error loading pending invitations:', error);
+    }
+  };
+
+  // Load family members from the database
+  const loadFamilyMembers = async () => {
+    try {
+      // Try cache first if offline
+      if (!networkService.isOnline()) {
+        const cachedNuclearMembers = await offlineStorageService.getItem('nuclear_family_members');
+        const cachedExtendedMembers = await offlineStorageService.getItem('extended_family_members');
+        
+        if (cachedNuclearMembers) {
+          setNuclearFamilyMembers(JSON.parse(cachedNuclearMembers));
+        }
+        
+        if (cachedExtendedMembers) {
+          setExtendedFamilyMembers(JSON.parse(cachedExtendedMembers));
+        }
+        
+        if (cachedNuclearMembers || cachedExtendedMembers) {
+          return;
+        }
+      }
+
+      // Load from Firebase
+      const familyMembersRef = collection(db, 'familyMembers');
+      const q = query(familyMembersRef, where('userId', '==', user.uid));
+      const snapshot = await getDocs(q);
+      
+      const nuclear = [];
+      const extended = [];
+      
+      snapshot.forEach(doc => {
+        const member = { id: doc.id, ...doc.data() };
+        
+        // Use the getFamilyCategoryByPerspective function to determine family category
+        const category = getFamilyCategoryByPerspective(member.relationship);
+        
+        if (category === FAMILY_CATEGORIES.NUCLEAR) {
+          nuclear.push(member);
+        } else {
+          extended.push(member);
+        }
+        
+        // If this is SELF, also add to extended family
+        if (member.relationship === 'Self') {
+          // Create a copy for extended family to avoid reference issues
+          extended.push({...member});
+        }
+      });
+      
+      // Check if the current user exists in the family members. If not, we need to add them.
+      // This is important for new users who haven't set up family connections yet.
+      const allMembers = [...nuclear, ...extended];
+      const currentUserExists = allMembers.some(member => 
+        member.relationship === 'Self' || member.connectedUserId === user.uid
+      );
+      
+      if (!currentUserExists) {
+        // Add current user as 'Self' - will be automatically categorized as nuclear
+        const currentUser = {
+          id: `self_${user.uid}`,
+          name: userProfile?.displayName || user.email || 'You',
+          email: user.email,
+          userId: user.uid,
+          connectedUserId: user.uid,
+          relationship: 'Self',
+          isConnected: true,
+          isSelf: true
+        };
+        
+        // Add the current user to both nuclear and extended family
+        nuclear.push(currentUser);
+        // Add a copy to extended family to avoid reference issues
+        extended.push({...currentUser});
+      }
+      
+      setNuclearFamilyMembers(nuclear);
+      setExtendedFamilyMembers(extended);
+      
+      // Cache the members
+      await offlineStorageService.setItem('nuclear_family_members', JSON.stringify(nuclear));
+      await offlineStorageService.setItem('extended_family_members', JSON.stringify(extended));
+    } catch (error) {
+      console.error('Error loading family members:', error);
     }
   };
 
@@ -306,7 +396,9 @@ export const FamilySharingProvider = ({ children }) => {
     pendingInvitations,
     sendFamilyInvitation,
     respondToInvitation,
-    isLoading
+    isLoading,
+    nuclearFamilyMembers,
+    extendedFamilyMembers
   };
 
   return (

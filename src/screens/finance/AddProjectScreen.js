@@ -13,6 +13,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFinance, FINANCE_SCOPE } from '../../contexts/FinanceContext';
 import { useFamilySharing } from '../../contexts/FamilySharingContext';
+import { getFamilyCategoryByPerspective, FAMILY_CATEGORIES } from '../../utils/familyRelationships';
 import currencyService from '../../services/currencyService';
 
 // Custom component for member menu items
@@ -101,9 +102,36 @@ const AddProjectScreen = ({ navigation, route }) => {
   
   // Get available family members based on scope
   const getAvailableFamilyMembers = () => {
-    return scope === FINANCE_SCOPE.NUCLEAR 
-      ? (nuclearFamilyMembers || []) 
-      : (extendedFamilyMembers || []);
+    let members = [];
+    let allMembers = [...(nuclearFamilyMembers || []), ...(extendedFamilyMembers || [])];
+    
+    if (scope === FINANCE_SCOPE.NUCLEAR) {
+      // For nuclear family projects, only include nuclear family members
+      // Using the same categorization algorithm as in the FamilyTree
+      members = allMembers.filter(member => 
+        getFamilyCategoryByPerspective(member.relationship) === FAMILY_CATEGORIES.NUCLEAR
+      );
+    } else if (scope === FINANCE_SCOPE.EXTENDED) {
+      // For extended family projects, include extended family members plus Self
+      // First filter for extended family members and Self
+      const extendedMembers = allMembers.filter(member => 
+        getFamilyCategoryByPerspective(member.relationship) === FAMILY_CATEGORIES.EXTENDED || 
+        member.relationship === 'Self'
+      );
+      
+      // Then remove duplicates if any
+      const uniqueIds = new Set();
+      members = extendedMembers.filter(member => {
+        if (!member.id || uniqueIds.has(member.id)) {
+          return false; // Skip if no ID or already included
+        }
+        uniqueIds.add(member.id);
+        return true;
+      });
+    }
+    
+    console.log(`Available ${scope} family members:`, members);
+    return members;
   };
   
   // Handle form submission
@@ -282,7 +310,7 @@ const AddProjectScreen = ({ navigation, route }) => {
             <Menu.Item
               key={member.id || Math.random().toString()}
               onPress={() => toggleFamilyMember(member)}
-              title={member.displayName || member.email || 'Unknown Member'}
+              title={member.name || member.displayName || member.email || 'Unknown Member'}
               leadingIcon={() => (
                 <MemberMenuItem isSelected={(selectedFamilyMembers || []).some(m => m.id === member.id)} />
               )}

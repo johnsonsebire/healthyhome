@@ -55,12 +55,19 @@ export const getRelationshipCategory = (relationship) => {
  * Categorizes a family member as nuclear or extended from the perspective of the primary user
  * A Nuclear Family includes the user, their spouse, and their direct children
  * An Extended Family includes all other relatives (parents, siblings, grandparents, etc.)
+ * Note: The SELF relationship is always considered part of both nuclear and extended family
  * 
  * @param {string} relationship - The relationship type of the family member to the primary user
  * @param {string} primaryUserRelationship - The relationship type of the primary user (typically 'Self')
+ * @param {boolean} extendedFamilyView - When true, returns EXTENDED for SELF as well (for UI views where self should appear in both categories)
  * @returns {string} The family category (nuclear or extended)
  */
-export const getFamilyCategoryByPerspective = (relationship, primaryUserRelationship = RELATIONSHIP_TYPES.SELF) => {
+export const getFamilyCategoryByPerspective = (relationship, primaryUserRelationship = RELATIONSHIP_TYPES.SELF, extendedFamilyView = false) => {
+  // If this is checking for SELF and we're in extendedFamilyView mode, return EXTENDED
+  if (relationship === RELATIONSHIP_TYPES.SELF && extendedFamilyView) {
+    return FAMILY_CATEGORIES.EXTENDED;
+  }
+  
   // If viewing from the primary user's perspective (the usual case)
   if (primaryUserRelationship === RELATIONSHIP_TYPES.SELF) {
     switch (relationship) {

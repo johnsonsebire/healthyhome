@@ -320,17 +320,34 @@ class CurrencyService {
     return this.convertCurrency(transaction.amount, accountCurrency, targetCurrency);
   }
 
-  // Get total balance across multiple accounts in display currency
-  getTotalBalanceInCurrency(accounts, displayCurrency, userSettings) {
-    if (!accounts || accounts.length === 0) return 0;
+  // Get total balance across multiple accounts in display currency, including loans
+  getTotalBalanceInCurrency(accounts, displayCurrency, userSettings, loans = []) {
+    if ((!accounts || accounts.length === 0) && (!loans || loans.length === 0)) return 0;
 
-    const totalInGHS = accounts.reduce((total, account) => {
+    // Calculate total account balance in GHS
+    const accountsInGHS = (accounts || []).reduce((total, account) => {
       const accountCurrency = account.currency || this.defaultCurrency;
       const ghsAmount = this.convertCurrency(account.balance || 0, accountCurrency, 'GHS');
       return total + ghsAmount;
     }, 0);
+    
+    // Calculate total loans in GHS (loans decrease the total balance)
+    const loansInGHS = (loans || []).reduce((total, loan) => {
+      // Only consider outstanding loans where the user is the borrower
+      if (loan.status === 'active' && !loan.isLender) {
+        const loanCurrency = loan.currency || this.defaultCurrency;
+        const outstandingAmount = loan.amount - (loan.amountPaid || 0);
+        const ghsAmount = this.convertCurrency(outstandingAmount, loanCurrency, 'GHS');
+        return total + ghsAmount;
+      }
+      // If the user is the lender, it's already counted as an asset/account
+      return total;
+    }, 0);
+    
+    // Net balance = accounts - loans
+    const netBalanceInGHS = accountsInGHS - loansInGHS;
 
-    return this.convertCurrency(totalInGHS, 'GHS', displayCurrency || this.defaultCurrency);
+    return this.convertCurrency(netBalanceInGHS, 'GHS', displayCurrency || this.defaultCurrency);
   }
 
   // Get exchange rate between two currencies

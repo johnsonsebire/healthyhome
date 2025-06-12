@@ -117,39 +117,53 @@ const TransactionsScreen = ({ navigation, route }) => {
 
   // Apply filters to transactions
   const filteredTransactions = scopedTransactions.filter(transaction => {
-    // Search filter
-    const searchLower = searchQuery.toLowerCase();
-    const matchesSearch = 
-      (transaction.description || '').toLowerCase().includes(searchLower) ||
-      (transaction.category || '').toLowerCase().includes(searchLower) ||
-      transaction.type.toLowerCase().includes(searchLower);
+    if (!transaction) return false;
     
-    // Type filter
-    const matchesType = filterType === 'all' || transaction.type === filterType;
-
-    // Category filter
-    const matchesCategory = filterCategory === 'all' || transaction.category === filterCategory;
-
-    // Account filter
-    const matchesAccount = filterAccount === 'all' || transaction.accountId === filterAccount;
-
-    // Date range filter
-    let matchesDateRange = true;
-    if (dateRange.start || dateRange.end) {
-      const transactionDate = transaction.date.toDate ? transaction.date.toDate() : new Date(transaction.date);
+    try {
+      // Search filter
+      const searchLower = (searchQuery || '').toLowerCase();
+      const matchesSearch = 
+        ((transaction.description || '').toLowerCase().includes(searchLower)) ||
+        ((transaction.category || '').toLowerCase().includes(searchLower)) ||
+        ((transaction.type || '').toLowerCase().includes(searchLower));
       
-      if (dateRange.start) {
-        matchesDateRange = matchesDateRange && transactionDate >= dateRange.start;
+      // Type filter
+      const matchesType = filterType === 'all' || transaction.type === filterType;
+
+      // Category filter
+      const matchesCategory = filterCategory === 'all' || transaction.category === filterCategory;
+
+      // Account filter
+      const matchesAccount = filterAccount === 'all' || transaction.accountId === filterAccount;
+
+      // Date range filter
+      let matchesDateRange = true;
+      if (dateRange.start || dateRange.end) {
+        try {
+          const transactionDate = transaction.date
+            ? (transaction.date.toDate ? transaction.date.toDate() : new Date(transaction.date))
+            : new Date();
+          
+          if (dateRange.start) {
+            matchesDateRange = matchesDateRange && transactionDate >= dateRange.start;
+          }
+          
+          if (dateRange.end) {
+            const endDate = new Date(dateRange.end);
+            endDate.setHours(23, 59, 59, 999); // End of day
+            matchesDateRange = matchesDateRange && transactionDate <= endDate;
+          }
+        } catch (err) {
+          console.error('Error filtering by date range:', err);
+          matchesDateRange = false;
+        }
       }
-      
-      if (dateRange.end) {
-        const endDate = new Date(dateRange.end);
-        endDate.setHours(23, 59, 59, 999); // End of day
-        matchesDateRange = matchesDateRange && transactionDate <= endDate;
-      }
+
+      return matchesSearch && matchesType && matchesCategory && matchesAccount && matchesDateRange;
+    } catch (err) {
+      console.error('Error filtering transaction:', err);
+      return false;
     }
-
-    return matchesSearch && matchesType && matchesCategory && matchesAccount && matchesDateRange;
   });
 
   // Sort transactions

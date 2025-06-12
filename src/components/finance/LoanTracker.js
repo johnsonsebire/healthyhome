@@ -127,7 +127,9 @@ const LoanTracker = ({ loan, onPress, onRecordPayment }) => {
             <MaterialIcons name="person" size={16} color="#666" />
             <Text style={styles.counterpartyText}>
               {loan.isLent ? 'Lent to: ' : 'Borrowed from: '}
-              <Text style={styles.counterpartyName}>{loan.counterpartyName}</Text>
+              <Text style={styles.counterpartyName}>
+                {loan.counterpartyName || (loan.isLent ? loan.borrower : loan.lender) || 'N/A'}
+              </Text>
             </Text>
           </View>
           

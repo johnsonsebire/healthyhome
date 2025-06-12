@@ -20,6 +20,11 @@ const TransactionList = ({
   const currencyFormatter = formatCurrency || defaultFormatCurrency;
   // Get transaction icon based on category
   const getTransactionIcon = (transaction) => {
+    if (!transaction) return 'receipt';
+    
+    const category = transaction.category || '';
+    const type = transaction.type || 'expense';
+    
     const iconMap = {
       // Income categories
       'salary': 'account-balance-wallet',
@@ -41,36 +46,50 @@ const TransactionList = ({
       'other_expense': 'receipt'
     };
     
-    return iconMap[transaction.category] || (transaction.type === 'income' ? 'add-circle' : 'remove-circle');
+    return iconMap[category] || (type === 'income' ? 'add-circle' : 'remove-circle');
   };
   
   // Get color based on transaction type
   const getTransactionColor = (transaction) => {
-    return transaction.type === 'income' ? '#4CAF50' : '#F44336';
+    if (!transaction) return '#F44336';
+    return (transaction.type || '').toLowerCase() === 'income' ? '#4CAF50' : '#F44336';
   };
   
   // Format transaction date
   const formatTransactionDate = (date) => {
     if (!date) return '';
     
-    const transactionDate = date.toDate ? date.toDate() : new Date(date);
-    return transactionDate.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
-    });
+    try {
+      const transactionDate = date.toDate ? date.toDate() : new Date(date);
+      return transactionDate.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
+      });
+    } catch (err) {
+      console.error('Error formatting date:', err);
+      return 'Invalid date';
+    }
   };
   
   // Render a transaction item
   const renderTransactionItem = ({ item }) => {
-    // Calculate display amount considering currency conversion
-    const displayAmount = userCurrencySettings?.autoConvert && item.currency !== displayCurrency
-      ? currencyService.convertTransactionAmount(item, displayCurrency, userCurrencySettings)
-      : item.amount;
+    if (!item) return null;
     
-    const displayCurrencyCode = userCurrencySettings?.autoConvert && item.currency !== displayCurrency
+    // Safely handle null or undefined values
+    const transactionType = item.type || 'expense';
+    const transactionCategory = item.category || 'other_expense';
+    const transactionAmount = parseFloat(item.amount) || 0;
+    const transactionCurrency = item.currency || displayCurrency;
+    
+    // Calculate display amount considering currency conversion
+    const displayAmount = userCurrencySettings?.autoConvert && transactionCurrency !== displayCurrency
+      ? currencyService.convertTransactionAmount(item, displayCurrency, userCurrencySettings)
+      : transactionAmount;
+    
+    const displayCurrencyCode = userCurrencySettings?.autoConvert && transactionCurrency !== displayCurrency
       ? displayCurrency
-      : item.currency || displayCurrency;
+      : transactionCurrency;
 
     return (
       <TouchableOpacity
@@ -100,7 +119,7 @@ const TransactionList = ({
               { color: getTransactionColor(item) }
             ]}
           >
-            {item.type === 'income' ? '+' : '-'} {currencyFormatter(displayAmount, displayCurrencyCode)}
+            {transactionType === 'income' ? '+' : '-'} {currencyFormatter(displayAmount, displayCurrencyCode)}
           </Text>
         </View>
       </TouchableOpacity>

@@ -109,13 +109,13 @@ service cloud.firestore {
       // Helper function to check if user is a member of nuclear family
       function isNuclearFamilyMember(userId) {
         return exists(/databases/$(database)/documents/familyMembers/$(userId)) &&
-               get(/databases/$(database)/documents/familyMembers/$(userId)).data.relationshipType == 'nuclear';
+               get(/databases/$(database)/documents/familyMembers/$(userId)).data.relationship in ['Self', 'Spouse', 'Child'];
       }
       
       // Helper function to check if user is a member of extended family
       function isExtendedFamilyMember(userId) {
         return exists(/databases/$(database)/documents/familyMembers/$(userId)) &&
-               get(/databases/$(database)/documents/familyMembers/$(userId)).data.relationshipType == 'extended';
+               get(/databases/$(database)/documents/familyMembers/$(userId)).data.relationship in ['Parent', 'Sibling', 'Grandparent', 'Grandchild', 'Other'];
       }
       
       // Allow read access based on scope and sharing settings
@@ -207,7 +207,8 @@ service cloud.firestore {
       // Allow read if user is involved in the loan
       allow read: if request.auth != null && (
         resource.data.userId == request.auth.uid ||
-        resource.data.counterpartyId == request.auth.uid
+        (resource.data.type == 'borrowed' && resource.data.lender == request.auth.uid) ||
+        (resource.data.type == 'lent' && resource.data.borrower == request.auth.uid)
       );
       
       // Allow create if user is setting themselves as involved
@@ -217,7 +218,8 @@ service cloud.firestore {
       // Allow update if user is involved in the loan
       allow update: if request.auth != null && (
         resource.data.userId == request.auth.uid ||
-        resource.data.counterpartyId == request.auth.uid
+        (resource.data.type == 'borrowed' && resource.data.lender == request.auth.uid) ||
+        (resource.data.type == 'lent' && resource.data.borrower == request.auth.uid)
       );
       
       // Only loan creator can delete
