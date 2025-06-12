@@ -26,10 +26,10 @@ const MemberMenuItem = ({ isSelected, color = '#2196F3' }) => (
 
 const AddProjectScreen = ({ navigation, route }) => {
   const { createProject } = useFinance();
-  const { nuclearFamilyMembers, extendedFamilyMembers } = useFamilySharing();
+  const { nuclearFamilyMembers = [], extendedFamilyMembers = [] } = useFamilySharing();
   
   // Get scope if passed from route params
-  const scope = route.params?.scope || FINANCE_SCOPE.NUCLEAR;
+  const scope = route?.params?.scope || FINANCE_SCOPE.NUCLEAR;
   
   // State for the form
   const [formData, setFormData] = useState({
@@ -90,16 +90,20 @@ const AddProjectScreen = ({ navigation, route }) => {
   
   // Toggle family member selection
   const toggleFamilyMember = (member) => {
-    if (selectedFamilyMembers.some(m => m.id === member.id)) {
-      setSelectedFamilyMembers(selectedFamilyMembers.filter(m => m.id !== member.id));
+    if (!member || !member.id) return;
+    
+    if ((selectedFamilyMembers || []).some(m => m?.id === member.id)) {
+      setSelectedFamilyMembers((selectedFamilyMembers || []).filter(m => m?.id !== member.id));
     } else {
-      setSelectedFamilyMembers([...selectedFamilyMembers, member]);
+      setSelectedFamilyMembers([...(selectedFamilyMembers || []), member]);
     }
   };
   
   // Get available family members based on scope
   const getAvailableFamilyMembers = () => {
-    return scope === FINANCE_SCOPE.NUCLEAR ? nuclearFamilyMembers : extendedFamilyMembers;
+    return scope === FINANCE_SCOPE.NUCLEAR 
+      ? (nuclearFamilyMembers || []) 
+      : (extendedFamilyMembers || []);
   };
   
   // Handle form submission
@@ -129,7 +133,7 @@ const AddProjectScreen = ({ navigation, route }) => {
     
     try {
       // Prepare contributors array
-      const contributors = selectedFamilyMembers.map(member => ({
+      const contributors = (selectedFamilyMembers || []).map(member => ({
         userId: member.id,
         contributionAmount: 0,
         lastContribution: null
@@ -276,23 +280,23 @@ const AddProjectScreen = ({ navigation, route }) => {
         >
           {getAvailableFamilyMembers().map(member => (
             <Menu.Item
-              key={member.id}
+              key={member.id || Math.random().toString()}
               onPress={() => toggleFamilyMember(member)}
-              title={member.displayName || member.email}
+              title={member.displayName || member.email || 'Unknown Member'}
               leadingIcon={() => (
-                <MemberMenuItem isSelected={selectedFamilyMembers.some(m => m.id === member.id)} />
+                <MemberMenuItem isSelected={(selectedFamilyMembers || []).some(m => m.id === member.id)} />
               )}
             />
           ))}
         </Menu>
         
-        {selectedFamilyMembers.length > 0 && (
+        {(selectedFamilyMembers || []).length > 0 && (
           <View style={styles.selectedMembersContainer}>
             <Text style={styles.selectedMembersLabel}>Selected Contributors:</Text>
-            {selectedFamilyMembers.map(member => (
-              <View key={member.id} style={styles.selectedMemberItem}>
+            {(selectedFamilyMembers || []).map(member => (
+              <View key={member.id || Math.random().toString()} style={styles.selectedMemberItem}>
                 <MaterialIcons name="person" size={16} color="#2196F3" />
-                <Text style={styles.selectedMemberName}>{member.displayName || member.email}</Text>
+                <Text style={styles.selectedMemberName}>{member.displayName || member.email || 'Unknown Member'}</Text>
                 <TouchableOpacity onPress={() => toggleFamilyMember(member)}>
                   <MaterialIcons name="cancel" size={16} color="#F44336" />
                 </TouchableOpacity>

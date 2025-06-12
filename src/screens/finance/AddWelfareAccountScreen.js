@@ -34,7 +34,7 @@ const MemberListIcon = (props) => (
 const AddWelfareAccountScreen = ({ navigation }) => {
   const { user } = useAuth();
   const { createWelfareAccount, currentScope, changeScope } = useFinance();
-  const { extendedFamilyMembers } = useFamilySharing();
+  const { extendedFamilyMembers = [] } = useFamilySharing();
   
   // Form state
   const [name, setName] = useState('');
@@ -63,13 +63,13 @@ const AddWelfareAccountScreen = ({ navigation }) => {
   
   // Always include current user in selected members
   useEffect(() => {
-    if (user && extendedFamilyMembers.length > 0) {
+    if (user && (extendedFamilyMembers || []).length > 0) {
       // Find current user in extended family members
-      const currentUserInFamily = extendedFamilyMembers.find(
+      const currentUserInFamily = (extendedFamilyMembers || []).find(
         member => member.userId === user.uid
       );
       
-      if (currentUserInFamily && !selectedMembers.some(m => m.userId === user.uid)) {
+      if (currentUserInFamily && !(selectedMembers || []).some(m => m.userId === user.uid)) {
         setSelectedMembers([
           {
             userId: user.uid,
@@ -96,20 +96,20 @@ const AddWelfareAccountScreen = ({ navigation }) => {
   // Toggle member selection
   const toggleMemberSelection = (member) => {
     // Cannot remove current user
-    if (member.userId === user.uid) {
+    if (!member || !user || member.userId === user.uid) {
       return;
     }
     
-    const isSelected = selectedMembers.some(m => m.userId === member.userId);
+    const isSelected = (selectedMembers || []).some(m => m.userId === member.userId);
     
     if (isSelected) {
-      setSelectedMembers(selectedMembers.filter(m => m.userId !== member.userId));
+      setSelectedMembers((selectedMembers || []).filter(m => m.userId !== member.userId));
     } else {
       setSelectedMembers([
-        ...selectedMembers,
+        ...(selectedMembers || []),
         {
           userId: member.userId,
-          name: member.displayName,
+          name: member.displayName || 'Unknown Member',
           status: 'active',
           contributionHistory: []
         }
@@ -165,9 +165,9 @@ const AddWelfareAccountScreen = ({ navigation }) => {
         name: name.trim(),
         description: description.trim(),
         monthlyContributionAmount: parseFloat(monthlyContribution),
-        members: selectedMembers,
-        createdBy: user.uid,
-        createdByName: user.displayName || user.email,
+        members: selectedMembers || [],
+        createdBy: user?.uid,
+        createdByName: user?.displayName || user?.email || 'Unknown User',
       };
       
       const newWelfareAccount = await createWelfareAccount(welfareAccountData);
@@ -274,11 +274,11 @@ const AddWelfareAccountScreen = ({ navigation }) => {
             )}
             
             <View style={styles.selectedMembersContainer}>
-              {selectedMembers.map((member) => (
+              {(selectedMembers || []).map((member) => (
                 <Chip
-                  key={member.userId}
+                  key={member.userId || Math.random().toString()}
                   style={styles.memberChip}
-                  onClose={member.userId !== user.uid ? () => toggleMemberSelection(member) : undefined}
+                  onClose={member.userId !== user?.uid ? () => toggleMemberSelection(member) : undefined}
                   avatar={
                     <View style={styles.avatarContainer}>
                       <Text style={styles.avatarText}>
@@ -326,13 +326,13 @@ const AddWelfareAccountScreen = ({ navigation }) => {
           <Dialog.Title>Select Members</Dialog.Title>
           <Dialog.Content>
             <ScrollView style={styles.membersList}>
-              {extendedFamilyMembers.map((member) => {
-                const isSelected = selectedMembers.some(m => m.userId === member.userId);
-                const isCurrentUser = member.userId === user.uid;
+              {(extendedFamilyMembers || []).map((member) => {
+                const isSelected = (selectedMembers || []).some(m => m.userId === member.userId);
+                const isCurrentUser = member.userId === user?.uid;
                 
                 return (
                   <List.Item
-                    key={member.userId}
+                    key={member.userId || Math.random().toString()}
                     title={member.displayName + (isCurrentUser ? ' (You)' : '')}
                     description={isCurrentUser ? 'Account Creator' : 'Family Member'}
                     left={() => (

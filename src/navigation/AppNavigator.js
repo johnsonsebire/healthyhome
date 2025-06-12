@@ -24,6 +24,7 @@ import FamilySharingScreen from '../screens/FamilySharingScreen';
 import SubscriptionScreen from '../screens/SubscriptionScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import FinanceSelectionScreen from '../screens/finance/FinanceSelectionScreen';
 import PersonalFinanceScreen from '../screens/finance/PersonalFinanceScreen';
 import FamilyFinanceScreen from '../screens/finance/FamilyFinanceScreen';
 import ExtendedFamilyProjectsScreen from '../screens/finance/ExtendedFamilyProjectsScreen';
@@ -208,9 +209,18 @@ const AppStack = () => (
     />
     <Stack.Screen 
       name="Finance" 
-      component={PersonalFinanceScreen}
+      component={FinanceSelectionScreen}
       options={{ 
         title: 'Finance',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="PersonalFinance" 
+      component={PersonalFinanceScreen}
+      options={{ 
+        title: 'Personal Finance',
         headerStyle: { backgroundColor: '#6366f1' },
         headerTintColor: '#fff'
       }}

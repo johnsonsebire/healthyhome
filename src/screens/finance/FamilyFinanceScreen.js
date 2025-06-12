@@ -19,15 +19,15 @@ import currencyService from '../../services/currencyService';
 
 const FamilyFinanceScreen = ({ navigation }) => {
   const { 
-    accounts, 
-    projects,
+    accounts = [], 
+    projects = [],
     isLoading,
     currentScope,
     changeScope
   } = useFinance();
   
   const { user } = useAuth();
-  const { nuclearFamilyMembers } = useFamilySharing();
+  const { nuclearFamilyMembers = [] } = useFamilySharing();
   
   const [refreshing, setRefreshing] = useState(false);
   const [reportData, setReportData] = useState(null);
@@ -115,7 +115,7 @@ const FamilyFinanceScreen = ({ navigation }) => {
   
   // Navigate to all accounts
   const navigateToAllAccounts = () => {
-    navigation.navigate('AccountsScreen', { scope: FINANCE_SCOPE.NUCLEAR });
+    navigation.navigate('Accounts', { scope: FINANCE_SCOPE.NUCLEAR });
   };
   
   // Navigate to all transactions
@@ -156,20 +156,30 @@ const FamilyFinanceScreen = ({ navigation }) => {
   
   // Format currency
   const formatCurrency = (amount, currency) => {
-    return currencyService.formatCurrency(amount, currency || displayCurrency);
+    try {
+      return currencyService.formatCurrency(amount, currency || displayCurrency);
+    } catch (error) {
+      console.error('Error formatting currency:', error);
+      return `${currency || displayCurrency} ${amount}`;
+    }
   };
   
   // Calculate total balance across all accounts in display currency
   const calculateTotalBalance = () => {
-    const familyAccounts = accounts.filter(account => account.scope === FINANCE_SCOPE.NUCLEAR);
-    return currencyService.getTotalBalanceInCurrency(familyAccounts, displayCurrency, userCurrencySettings);
+    try {
+      const familyAccounts = (accounts || []).filter(account => account.scope === FINANCE_SCOPE.NUCLEAR);
+      return currencyService.getTotalBalanceInCurrency(familyAccounts, displayCurrency, userCurrencySettings) || 0;
+    } catch (error) {
+      console.error('Error calculating total balance:', error);
+      return 0;
+    }
   };
   
   // Filter projects for the nuclear family
-  const familyProjects = projects.filter(project => project.scope === FINANCE_SCOPE.NUCLEAR);
+  const familyProjects = (projects || []).filter(project => project.scope === FINANCE_SCOPE.NUCLEAR);
   
   // Filter accounts for the nuclear family
-  const familyAccounts = accounts.filter(account => account.scope === FINANCE_SCOPE.NUCLEAR);
+  const familyAccounts = (accounts || []).filter(account => account.scope === FINANCE_SCOPE.NUCLEAR);
   
   return (
     <ScrollView
@@ -182,7 +192,7 @@ const FamilyFinanceScreen = ({ navigation }) => {
       <View style={styles.headerContainer}>
         <Text style={styles.headerTitle}>Family Finance</Text>
         <Text style={styles.headerSubtitle}>
-          {nuclearFamilyMembers.length} family members
+          {(nuclearFamilyMembers || []).length} family members
         </Text>
       </View>
       
@@ -233,7 +243,7 @@ const FamilyFinanceScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
         
-        {familyAccounts.length === 0 ? (
+        {(familyAccounts || []).length === 0 ? (
           <View style={styles.emptyStateContainer}>
             <MaterialIcons name="account-balance-wallet" size={48} color="#ccc" />
             <Text style={styles.emptyStateText}>No family accounts yet</Text>
@@ -245,7 +255,7 @@ const FamilyFinanceScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
         ) : (
-          familyAccounts.slice(0, 3).map(account => (
+          (familyAccounts || []).slice(0, 3).map(account => (
             <AccountCard
               key={account.id}
               account={account}
@@ -264,7 +274,7 @@ const FamilyFinanceScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
         
-        {familyProjects.length === 0 ? (
+        {(familyProjects || []).length === 0 ? (
           <View style={styles.emptyStateContainer}>
             <MaterialIcons name="assignment" size={48} color="#ccc" />
             <Text style={styles.emptyStateText}>No family projects yet</Text>
@@ -276,7 +286,7 @@ const FamilyFinanceScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
         ) : (
-          familyProjects.slice(0, 2).map(project => (
+          (familyProjects || []).slice(0, 2).map(project => (
             <ProjectContributionTracker
               key={project.id}
               project={project}
@@ -308,7 +318,7 @@ const FamilyFinanceScreen = ({ navigation }) => {
         </View>
         
         <View style={styles.membersContainer}>
-          {nuclearFamilyMembers.map((member, index) => (
+          {(nuclearFamilyMembers || []).map((member, index) => (
             <View key={member.id || index} style={styles.memberContributionCard}>
               <View style={styles.memberInfo}>
                 <MaterialIcons name="person" size={24} color="#2196F3" />

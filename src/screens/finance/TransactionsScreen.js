@@ -19,7 +19,9 @@ import currencyService from '../../services/currencyService';
 const TransactionsScreen = ({ navigation, route }) => {
   const { transactions, accounts, isLoading, deleteTransaction } = useFinance();
   const { user } = useAuth();
-  const scope = route.params?.scope || FINANCE_SCOPE.PERSONAL;
+  
+  // Safely handle route params with proper null checks
+  const scope = route?.params?.scope || FINANCE_SCOPE.PERSONAL;
 
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -308,7 +310,7 @@ const TransactionsScreen = ({ navigation, route }) => {
 
       {/* Date Filter */}
       <Chip
-        selected={dateRange.start || dateRange.end}
+        selected={!!(dateRange.start || dateRange.end)}
         onPress={() => setShowDateFilter(true)}
         style={[styles.filterChip, (dateRange.start || dateRange.end) && styles.selectedChip]}
         textStyle={(dateRange.start || dateRange.end) ? styles.selectedChipText : styles.chipText}
@@ -390,7 +392,7 @@ const TransactionsScreen = ({ navigation, route }) => {
       <Menu
         visible={showSortMenu}
         onDismiss={() => setShowSortMenu(false)}
-        anchor={{ x: 0, y: 0 }}
+        anchor={<View />}
         style={styles.menu}
       >
         <Menu.Item 
@@ -419,7 +421,7 @@ const TransactionsScreen = ({ navigation, route }) => {
       <Menu
         visible={showTypeMenu}
         onDismiss={() => setShowTypeMenu(false)}
-        anchor={{ x: 0, y: 0 }}
+        anchor={<View />}
         style={styles.menu}
       >
         <Menu.Item 
@@ -443,7 +445,7 @@ const TransactionsScreen = ({ navigation, route }) => {
       <Menu
         visible={showAccountMenu}
         onDismiss={() => setShowAccountMenu(false)}
-        anchor={{ x: 0, y: 0 }}
+        anchor={<View />}
         style={styles.menu}
       >
         <Menu.Item 
@@ -465,7 +467,7 @@ const TransactionsScreen = ({ navigation, route }) => {
       <Menu
         visible={showCategoryMenu}
         onDismiss={() => setShowCategoryMenu(false)}
-        anchor={{ x: 0, y: 0 }}
+        anchor={<View />}
         style={styles.menu}
       >
         <Menu.Item 

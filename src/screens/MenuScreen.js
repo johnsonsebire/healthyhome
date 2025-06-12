@@ -174,7 +174,7 @@ const MenuScreen = ({ navigation }) => {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Menu</Text>
-          <Text style={styles.headerSubtitle}>Quick access to all features</Text>
+          <Text style={styles.headerSubtitle}>Access all Services</Text>
         </View>
 
         {/* Shortcuts Section */}

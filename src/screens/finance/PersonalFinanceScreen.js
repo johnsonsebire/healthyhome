@@ -146,12 +146,12 @@ const PersonalFinanceScreen = ({ navigation }) => {
   
   // Navigate to all accounts
   const navigateToAllAccounts = () => {
-    navigation.navigate('AccountsScreen');
+    navigation.navigate('Accounts');
   };
   
   // Navigate to all transactions
   const navigateToAllTransactions = () => {
-    navigation.navigate('TransactionsScreen');
+    navigation.navigate('Transactions');
   };
   
   // Navigate to reports

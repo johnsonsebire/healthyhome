@@ -18,7 +18,9 @@ import currencyService from '../../services/currencyService';
 const AccountsScreen = ({ navigation, route }) => {
   const { accounts, isLoading, deleteAccount } = useFinance();
   const { user } = useAuth();
-  const scope = route.params?.scope || FINANCE_SCOPE.PERSONAL;
+  
+  // Safely handle route params with proper null checks
+  const scope = route?.params?.scope || FINANCE_SCOPE.PERSONAL;
 
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');

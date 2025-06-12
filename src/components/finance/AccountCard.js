@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Card as PaperCard } from 'react-native-paper';
 import { MaterialIcons } from '@expo/vector-icons';
+import currencyService from '../../services/currencyService';
 
 const AccountCard = ({ account, onPress }) => {
   // Define a color based on account type or use the one provided
@@ -24,11 +25,7 @@ const AccountCard = ({ account, onPress }) => {
 
   // Format currency
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', { 
-      style: 'currency', 
-      currency: account.currency || 'USD',
-      minimumFractionDigits: 2 
-    }).format(amount);
+    return currencyService.formatCurrency(amount, account.currency || 'GHS');
   };
 
   // Get icon based on account type

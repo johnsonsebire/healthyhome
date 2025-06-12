@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import BudgetProgressBar from './BudgetProgressBar';
+import currencyService from '../../services/currencyService';
 
 const ProjectContributionTracker = ({ project, onPress, onContribute }) => {
   // Format dates
@@ -99,7 +100,7 @@ const ProjectContributionTracker = ({ project, onPress, onContribute }) => {
         <View style={styles.detailItem}>
           <MaterialIcons name="person" size={16} color="#666" />
           <Text style={styles.detailText}>
-            Your contribution: ${getUserContribution().toFixed(2)}
+            Your contribution: {currencyService.formatCurrency(getUserContribution(), project.currency || 'GHS')}
           </Text>
         </View>
       </View>

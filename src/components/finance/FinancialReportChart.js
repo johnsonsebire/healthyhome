@@ -1,17 +1,14 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import currencyService from '../../services/currencyService';
 
-const FinancialReportChart = ({ data, type = 'income-expense' }) => {
+const FinancialReportChart = ({ data, type = 'income-expense', currency = 'GHS' }) => {
   // For now, this is a placeholder component that displays the financial data in text format
   // In a real implementation, you would use a charting library like react-native-chart-kit
   
-  const formatCurrency = (amount, currency = 'USD') => {
-    return new Intl.NumberFormat('en-US', { 
-      style: 'currency', 
-      currency: currency,
-      minimumFractionDigits: 2 
-    }).format(amount);
+  const formatCurrency = (amount) => {
+    return currencyService.formatCurrency(amount, currency);
   };
   
   const renderIncomeExpenseSummary = () => {

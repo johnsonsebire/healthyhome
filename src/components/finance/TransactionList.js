@@ -2,8 +2,22 @@ import React from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { Divider } from 'react-native-paper';
 import { MaterialIcons } from '@expo/vector-icons';
+import currencyService from '../../services/currencyService';
 
-const TransactionList = ({ transactions, onTransactionPress, formatCurrency = (val) => `$${val.toFixed(2)}` }) => {
+const TransactionList = ({ 
+  transactions, 
+  onTransactionPress, 
+  onTransactionLongPress,
+  formatCurrency,
+  displayCurrency = 'GHS',
+  userCurrencySettings
+}) => {
+  // Default currency formatting if not provided
+  const defaultFormatCurrency = (amount, currency = 'GHS') => {
+    return currencyService.formatCurrency(amount, currency);
+  };
+  
+  const currencyFormatter = formatCurrency || defaultFormatCurrency;
   // Get transaction icon based on category
   const getTransactionIcon = (transaction) => {
     const iconMap = {
@@ -48,38 +62,50 @@ const TransactionList = ({ transactions, onTransactionPress, formatCurrency = (v
   };
   
   // Render a transaction item
-  const renderTransactionItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.transactionItem}
-      onPress={() => onTransactionPress && onTransactionPress(item)}
-    >
-      <View style={styles.iconContainer}>
-        <MaterialIcons 
-          name={getTransactionIcon(item)} 
-          size={24} 
-          color={getTransactionColor(item)} 
-        />
-      </View>
-      <View style={styles.transactionDetails}>
-        <Text style={styles.transactionDescription}>
-          {item.description || item.category || (item.type === 'income' ? 'Income' : 'Expense')}
-        </Text>
-        <Text style={styles.transactionDate}>
-          {formatTransactionDate(item.date)}
-        </Text>
-      </View>
-      <View style={styles.amountContainer}>
-        <Text 
-          style={[
-            styles.transactionAmount, 
-            { color: getTransactionColor(item) }
-          ]}
-        >
-          {item.type === 'income' ? '+' : '-'} {formatCurrency(item.amount)}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+  const renderTransactionItem = ({ item }) => {
+    // Calculate display amount considering currency conversion
+    const displayAmount = userCurrencySettings?.autoConvert && item.currency !== displayCurrency
+      ? currencyService.convertTransactionAmount(item, displayCurrency, userCurrencySettings)
+      : item.amount;
+    
+    const displayCurrencyCode = userCurrencySettings?.autoConvert && item.currency !== displayCurrency
+      ? displayCurrency
+      : item.currency || displayCurrency;
+
+    return (
+      <TouchableOpacity
+        style={styles.transactionItem}
+        onPress={() => onTransactionPress && onTransactionPress(item)}
+        onLongPress={() => onTransactionLongPress && onTransactionLongPress(item)}
+      >
+        <View style={styles.iconContainer}>
+          <MaterialIcons 
+            name={getTransactionIcon(item)} 
+            size={24} 
+            color={getTransactionColor(item)} 
+          />
+        </View>
+        <View style={styles.transactionDetails}>
+          <Text style={styles.transactionDescription}>
+            {item.description || item.category || (item.type === 'income' ? 'Income' : 'Expense')}
+          </Text>
+          <Text style={styles.transactionDate}>
+            {formatTransactionDate(item.date)}
+          </Text>
+        </View>
+        <View style={styles.amountContainer}>
+          <Text 
+            style={[
+              styles.transactionAmount, 
+              { color: getTransactionColor(item) }
+            ]}
+          >
+            {item.type === 'income' ? '+' : '-'} {currencyFormatter(displayAmount, displayCurrencyCode)}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
   
   // Render separator between items
   const renderSeparator = () => <Divider style={styles.divider} />;
@@ -96,10 +122,14 @@ const TransactionList = ({ transactions, onTransactionPress, formatCurrency = (v
     <FlatList
       data={transactions}
       renderItem={renderTransactionItem}
-      keyExtractor={(item) => item.id}
+      keyExtractor={(item) => item.id || item.transactionId || Math.random().toString()}
       ItemSeparatorComponent={renderSeparator}
       ListEmptyComponent={renderEmptyState}
-      contentContainerStyle={transactions.length === 0 ? { flex: 1 } : styles.listContent}
+      contentContainerStyle={[
+        styles.listContent,
+        transactions.length === 0 && styles.emptyContainer
+      ]}
+      showsVerticalScrollIndicator={false}
     />
   );
 };
@@ -107,6 +137,9 @@ const TransactionList = ({ transactions, onTransactionPress, formatCurrency = (v
 const styles = StyleSheet.create({
   listContent: {
     paddingBottom: 16,
+  },
+  emptyContainer: {
+    flex: 1,
   },
   transactionItem: {
     flexDirection: 'row',

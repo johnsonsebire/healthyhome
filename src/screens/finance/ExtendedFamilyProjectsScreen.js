@@ -11,20 +11,42 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFinance, FINANCE_SCOPE } from '../../contexts/FinanceContext';
 import { useFamilySharing } from '../../contexts/FamilySharingContext';
+import { useAuth } from '../../contexts/AuthContext';
 import ProjectContributionTracker from '../../components/finance/ProjectContributionTracker';
+import currencyService from '../../services/currencyService';
 
 const ExtendedFamilyProjectsScreen = ({ navigation }) => {
   const { 
-    projects,
-    welfareAccounts,
+    projects = [],
+    welfareAccounts = [],
     isLoading,
     currentScope,
     changeScope
   } = useFinance();
   
-  const { extendedFamilyMembers } = useFamilySharing();
+  const { user } = useAuth();
+  const { extendedFamilyMembers = [] } = useFamilySharing();
   
   const [refreshing, setRefreshing] = useState(false);
+  const [userCurrencySettings, setUserCurrencySettings] = useState(null);
+  const [displayCurrency, setDisplayCurrency] = useState('GHS');
+  
+  // Load user currency settings
+  useEffect(() => {
+    const loadCurrencySettings = async () => {
+      if (user) {
+        try {
+          const settings = await currencyService.loadUserCurrencySettings(user.uid);
+          setUserCurrencySettings(settings);
+          setDisplayCurrency(settings?.displayCurrency || 'GHS');
+        } catch (error) {
+          console.error('Error loading currency settings:', error);
+        }
+      }
+    };
+
+    loadCurrencySettings();
+  }, [user]);
   
   // Set scope to extended when component mounts
   useEffect(() => {
@@ -77,15 +99,24 @@ const ExtendedFamilyProjectsScreen = ({ navigation }) => {
   };
   
   // Filter projects for the extended family
-  const extendedProjects = projects.filter(project => project.scope === FINANCE_SCOPE.EXTENDED);
+  const extendedProjects = (projects || []).filter(project => project.scope === FINANCE_SCOPE.EXTENDED);
   
   // Format currency
-  const formatCurrency = (amount, currency = 'USD') => {
-    return new Intl.NumberFormat('en-US', { 
-      style: 'currency', 
-      currency: currency,
-      minimumFractionDigits: 2 
-    }).format(amount);
+  const formatCurrency = (amount, currency = 'GHS') => {
+    try {
+      if (typeof currencyService !== 'undefined' && currencyService.formatCurrency) {
+        return currencyService.formatCurrency(amount, currency);
+      }
+      // Fallback if currency service is not available
+      return new Intl.NumberFormat('en-US', { 
+        style: 'currency', 
+        currency: currency,
+        minimumFractionDigits: 2 
+      }).format(amount);
+    } catch (error) {
+      console.error('Error formatting currency:', error);
+      return `${currency} ${amount}`;
+    }
   };
   
   // Display alert for join requirements
@@ -108,7 +139,7 @@ const ExtendedFamilyProjectsScreen = ({ navigation }) => {
       <View style={styles.headerContainer}>
         <Text style={styles.headerTitle}>Extended Family</Text>
         <Text style={styles.headerSubtitle}>
-          {extendedFamilyMembers.length} family members
+          {(extendedFamilyMembers || []).length} family members
         </Text>
         
         <View style={styles.headerButtons}>
@@ -139,7 +170,7 @@ const ExtendedFamilyProjectsScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
         
-        {extendedProjects.length === 0 ? (
+        {(extendedProjects || []).length === 0 ? (
           <View style={styles.emptyStateContainer}>
             <MaterialIcons name="groups" size={48} color="#ccc" />
             <Text style={styles.emptyStateText}>No extended family projects yet</Text>
@@ -151,7 +182,7 @@ const ExtendedFamilyProjectsScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
         ) : (
-          extendedProjects.map(project => (
+          (extendedProjects || []).map(project => (
             <ProjectContributionTracker
               key={project.id}
               project={project}
@@ -168,7 +199,7 @@ const ExtendedFamilyProjectsScreen = ({ navigation }) => {
           <Text style={styles.sectionTitle}>Welfare Accounts</Text>
         </View>
         
-        {welfareAccounts.length === 0 ? (
+        {(welfareAccounts || []).length === 0 ? (
           <View style={styles.emptyStateContainer}>
             <MaterialIcons name="favorite" size={48} color="#ccc" />
             <Text style={styles.emptyStateText}>No welfare accounts yet</Text>
@@ -180,7 +211,7 @@ const ExtendedFamilyProjectsScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
         ) : (
-          welfareAccounts.map(welfareAccount => (
+          (welfareAccounts || []).map(welfareAccount => (
             <TouchableOpacity
               key={welfareAccount.id}
               style={styles.welfareCard}
