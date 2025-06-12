@@ -66,19 +66,36 @@ const AccountDetailsScreen = ({ route, navigation }) => {
       const filteredTransactions = transactions.filter(t => t && t.accountId === account.id);
       console.log(`Filtered transactions for account ${account.id}: ${filteredTransactions.length}`);
       
+      // Deduplicate transactions by ID
+      const uniqueTransactionsMap = new Map();
+      filteredTransactions.forEach(transaction => {
+        if (transaction && transaction.id) {
+          // Only add if not already in the map, or replace with newer transaction (by updatedAt)
+          if (!uniqueTransactionsMap.has(transaction.id) ||
+              (transaction.updatedAt && uniqueTransactionsMap.get(transaction.id).updatedAt &&
+               transaction.updatedAt > uniqueTransactionsMap.get(transaction.id).updatedAt)) {
+            uniqueTransactionsMap.set(transaction.id, transaction);
+          }
+        }
+      });
+      
+      // Convert map back to array
+      const uniqueTransactions = Array.from(uniqueTransactionsMap.values());
+      console.log(`Unique transactions after deduplication: ${uniqueTransactions.length}`);
+      
       // Log transaction IDs for debugging
-      filteredTransactions.forEach(t => {
+      uniqueTransactions.forEach(t => {
         console.log(`Transaction: ${t.id}, Type: ${t.type}, Amount: ${t.amount}, Date: ${t.date}`);
       });
       
-      setAccountTransactions(filteredTransactions);
+      setAccountTransactions(uniqueTransactions);
       
       // Calculate stats with enhanced precision and error handling
       let income = 0;
       let expense = 0;
       
       // Process each transaction carefully
-      filteredTransactions.forEach(t => {
+      uniqueTransactions.forEach(t => {
         if (!t) {
           console.warn('Skipping undefined transaction');
           return;

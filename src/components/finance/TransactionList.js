@@ -193,7 +193,10 @@ const TransactionList = ({
       renderItem={renderTransactionItem}
       keyExtractor={(item) => {
         if (!item) return `empty-${Math.random().toString()}`;
-        return item.id || item.transactionId || `transaction-${Math.random().toString()}`;
+        // Use a consistent key to prevent duplicates in the UI
+        if (item.id) return `transaction-${item.id}`;
+        if (item.transactionId) return `transaction-${item.transactionId}`;
+        return `transaction-${item.date?.toString() || ''}-${item.amount || ''}-${item.description || ''}`;
       }}
       ItemSeparatorComponent={renderSeparator}
       ListEmptyComponent={renderEmptyState}
