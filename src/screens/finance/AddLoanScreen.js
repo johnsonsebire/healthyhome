@@ -218,6 +218,7 @@ const AddLoanScreen = ({ navigation, route }) => {
             value={formData.name}
             onChangeText={(text) => handleInputChange('name', text)}
             placeholder="Enter loan name or purpose"
+            placeholderTextColor="#9ca3af"
           />
         </View>
         
@@ -250,6 +251,7 @@ const AddLoanScreen = ({ navigation, route }) => {
               }
             }}
             placeholder={formData.type === 'borrowed' ? "Who lent you money?" : "Who borrowed from you?"}
+            placeholderTextColor="#9ca3af"
           />
         </View>
         
@@ -261,6 +263,7 @@ const AddLoanScreen = ({ navigation, route }) => {
             value={formData.amount}
             onChangeText={(text) => handleInputChange('amount', text)}
             placeholder="0.00"
+            placeholderTextColor="#9ca3af"
             keyboardType="numeric"
           />
         </View>
@@ -273,6 +276,7 @@ const AddLoanScreen = ({ navigation, route }) => {
             value={formData.interestRate}
             onChangeText={(text) => handleInputChange('interestRate', text)}
             placeholder="0.00"
+            placeholderTextColor="#9ca3af"
             keyboardType="numeric"
           />
         </View>
@@ -285,6 +289,7 @@ const AddLoanScreen = ({ navigation, route }) => {
             value={formData.term}
             onChangeText={(text) => handleInputChange('term', text)}
             placeholder="12"
+            placeholderTextColor="#9ca3af"
             keyboardType="numeric"
           />
         </View>

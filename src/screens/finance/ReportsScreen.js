@@ -50,29 +50,27 @@ const ReportsScreen = ({ navigation }) => {
   
   // Generate report when transactions, period, or scope changes
   useEffect(() => {
-    if (transactions && transactions.length > 0) {
-      // Handle custom date picker changes
-      if (selectedPeriod === 'custom') {
-        setShowCustomDatePicker(true);
-        return;
-      }
-      
-      try {
-        generateReport();
-      } catch (error) {
-        console.error('Error generating report:', error);
-        // Set a minimal valid report data structure as fallback
-        setReportData({
-          startDate: new Date().toLocaleDateString(),
-          endDate: new Date().toLocaleDateString(),
-          totalIncome: 0,
-          totalExpense: 0,
-          netIncome: 0,
-          incomeByCategory: {},
-          expenseByCategory: {},
-          dateGroups: {}
-        });
-      }
+    // Handle custom date picker changes
+    if (selectedPeriod === 'custom') {
+      setShowCustomDatePicker(true);
+      return;
+    }
+    
+    try {
+      generateReport();
+    } catch (error) {
+      console.error('Error generating report:', error);
+      // Set a minimal valid report data structure as fallback
+      setReportData({
+        startDate: new Date().toLocaleDateString(),
+        endDate: new Date().toLocaleDateString(),
+        totalIncome: 0,
+        totalExpense: 0,
+        netIncome: 0,
+        incomeByCategory: {},
+        expenseByCategory: {},
+        dateGroups: {}
+      });
     }
   }, [transactions, selectedPeriod, selectedScope, customStartDate, customEndDate]);
   
@@ -188,7 +186,7 @@ const ReportsScreen = ({ navigation }) => {
       }
       
       // Filter transactions based on date range and selected filters
-      const filteredTransactions = transactions.filter(transaction => {
+      const filteredTransactions = (transactions || []).filter(transaction => {
         try {
           if (!transaction || !transaction.date) {
             console.warn('Skipping transaction with missing date', transaction?.id);

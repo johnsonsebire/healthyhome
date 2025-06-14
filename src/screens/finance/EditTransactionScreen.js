@@ -229,6 +229,7 @@ const EditTransactionScreen = ({ navigation, route }) => {
             value={formData.amount}
             onChangeText={(text) => handleInputChange('amount', text)}
             placeholder="0.00"
+            placeholderTextColor="#9ca3af"
             keyboardType="numeric"
           />
         </View>
@@ -370,6 +371,7 @@ const EditTransactionScreen = ({ navigation, route }) => {
             value={formData.description}
             onChangeText={(text) => handleInputChange('description', text)}
             placeholder="Enter description"
+            placeholderTextColor="#9ca3af"
           />
         </View>
         
@@ -381,6 +383,7 @@ const EditTransactionScreen = ({ navigation, route }) => {
             value={formData.notes}
             onChangeText={(text) => handleInputChange('notes', text)}
             placeholder="Add additional notes"
+            placeholderTextColor="#9ca3af"
             multiline={true}
             numberOfLines={4}
           />

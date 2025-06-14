@@ -192,6 +192,7 @@ const EditAccountScreen = ({ navigation, route }) => {
             value={formData.name}
             onChangeText={(text) => handleInputChange('name', text)}
             placeholder="Enter account name"
+            placeholderTextColor="#9ca3af"
           />
         </View>
         
@@ -235,6 +236,7 @@ const EditAccountScreen = ({ navigation, route }) => {
             value={formData.balance}
             onChangeText={(text) => handleInputChange('balance', text)}
             placeholder="0.00"
+            placeholderTextColor="#9ca3af"
             keyboardType="numeric"
           />
         </View>
@@ -247,6 +249,7 @@ const EditAccountScreen = ({ navigation, route }) => {
             value={formData.initialBalance}
             onChangeText={(text) => handleInputChange('initialBalance', text)}
             placeholder="0.00"
+            placeholderTextColor="#9ca3af"
             keyboardType="numeric"
           />
           <Text style={styles.helperText}>
@@ -359,6 +362,7 @@ const EditAccountScreen = ({ navigation, route }) => {
             value={formData.description}
             onChangeText={(text) => handleInputChange('description', text)}
             placeholder="Add notes about this account"
+            placeholderTextColor="#9ca3af"
             multiline={true}
             numberOfLines={4}
           />
