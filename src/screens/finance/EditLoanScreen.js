@@ -241,7 +241,10 @@ const EditLoanScreen = ({ navigation, route }) => {
         amount: parseFloat(formData.amount),
         interestRate: parseFloat(formData.interestRate) || 0,
         term: parseInt(formData.term) || 12,
-        paymentSchedule
+        paymentSchedule,
+        // Preserve existing payment data or initialize if not present
+        payments: initialLoan.payments || [],
+        totalPaid: initialLoan.totalPaid || 0
       };
       
       // Update loan

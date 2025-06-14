@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -9,10 +9,28 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Card } from 'react-native-paper';
+import { useFinance } from '../../contexts/FinanceContext';
 
 const { width } = Dimensions.get('window');
 
 const FinanceSelectionScreen = ({ navigation }) => {
+  const { recalculateAllAccountBalances } = useFinance();
+  
+  // Automatically recalculate balances when finance module is opened
+  useEffect(() => {
+    const initializeFinanceData = async () => {
+      try {
+        // Ensure all account balances are accurate upon entering the finance module
+        await recalculateAllAccountBalances();
+        console.log('Finance data initialized and account balances recalculated');
+      } catch (error) {
+        console.error('Error initializing finance data:', error);
+      }
+    };
+    
+    initializeFinanceData();
+  }, []);
+  
   const financeOptions = [
     {
       id: 'personal',

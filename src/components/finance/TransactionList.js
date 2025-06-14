@@ -191,12 +191,13 @@ const TransactionList = ({
     <FlatList
       data={transactions}
       renderItem={renderTransactionItem}
-      keyExtractor={(item) => {
-        if (!item) return `empty-${Math.random().toString()}`;
+      keyExtractor={(item, index) => {
+        if (!item) return `empty-${index}-${Math.random().toString()}`;
         // Use a consistent key to prevent duplicates in the UI
         if (item.id) return `transaction-${item.id}`;
         if (item.transactionId) return `transaction-${item.transactionId}`;
-        return `transaction-${item.date?.toString() || ''}-${item.amount || ''}-${item.description || ''}`;
+        // Include the index as part of the key to ensure uniqueness
+        return `transaction-${index}-${item.date?.toString() || ''}-${item.amount || ''}-${item.description || ''}`;
       }}
       ItemSeparatorComponent={renderSeparator}
       ListEmptyComponent={renderEmptyState}
@@ -207,8 +208,8 @@ const TransactionList = ({
       showsVerticalScrollIndicator={false}
       refreshControl={refreshControl}
       ListHeaderComponent={ListHeaderComponent}
-      scrollEnabled={true} // Enable scrolling in the main FlatList
-      nestedScrollEnabled={true}
+      scrollEnabled={false} // Disable scrolling to prevent nesting issues
+      nestedScrollEnabled={false}
     />
   );
 };

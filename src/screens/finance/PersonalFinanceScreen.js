@@ -22,7 +22,8 @@ const PersonalFinanceScreen = ({ navigation }) => {
     loans,
     isLoading,
     currentScope,
-    changeScope
+    changeScope,
+    recalculateAllAccountBalances
   } = useFinance();
   
   const { user } = useAuth();
@@ -39,6 +40,23 @@ const PersonalFinanceScreen = ({ navigation }) => {
       changeScope(FINANCE_SCOPE.PERSONAL);
     }
   }, []);
+
+  // Automatically load transactions and recalculate balances when screen loads or scope changes
+  useEffect(() => {
+    const loadFinanceData = async () => {
+      try {
+        // Make sure we have the latest transactions
+        if (accounts.length > 0) {
+          // Recalculate all account balances to ensure accuracy
+          await recalculateAllAccountBalances();
+        }
+      } catch (error) {
+        console.error('Error loading finance data:', error);
+      }
+    };
+    
+    loadFinanceData();
+  }, [currentScope, accounts.length]);
 
   // Load user currency settings
   useEffect(() => {
@@ -171,9 +189,13 @@ const PersonalFinanceScreen = ({ navigation }) => {
   const onRefresh = async () => {
     setRefreshing(true);
     // Reload data
-    await Promise.all([
+    try {
       // Reload accounts and transactions
-    ]);
+      await recalculateAllAccountBalances();
+      // This will automatically trigger useEffect for transactions and reportData
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    }
     setRefreshing(false);
   };
   

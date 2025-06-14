@@ -50,12 +50,27 @@ const LoanTracker = ({ loan, onPress, onRecordPayment }) => {
   
   const statusInfo = getLoanStatusInfo();
   
+  // Calculate paid amount (support both new payments array and old schedule)
+  const calculatePaidAmount = () => {
+    // New payment system - use payments array and totalPaid
+    if (loan.payments && Array.isArray(loan.payments)) {
+      return loan.totalPaid || loan.payments.reduce((sum, payment) => sum + (parseFloat(payment.amount) || 0), 0);
+    }
+    
+    // Fallback to old payment schedule system
+    if (loan.paymentSchedule) {
+      return loan.paymentSchedule
+        .filter(payment => payment.status === 'paid')
+        .reduce((sum, payment) => sum + (payment.amount || 0), 0);
+    }
+    
+    return 0;
+  };
+
   // Calculate remaining amount
   const calculateRemainingAmount = () => {
     const totalAmount = loan.amount || 0;
-    const paidAmount = loan.paymentSchedule
-      ?.filter(payment => payment.status === 'paid')
-      .reduce((sum, payment) => sum + (payment.amount || 0), 0) || 0;
+    const paidAmount = calculatePaidAmount();
     
     return totalAmount - paidAmount;
   };
@@ -65,9 +80,7 @@ const LoanTracker = ({ loan, onPress, onRecordPayment }) => {
     const totalAmount = loan.amount || 0;
     if (totalAmount === 0) return 100;
     
-    const paidAmount = loan.paymentSchedule
-      ?.filter(payment => payment.status === 'paid')
-      .reduce((sum, payment) => sum + (payment.amount || 0), 0) || 0;
+    const paidAmount = calculatePaidAmount();
     
     return Math.min(100, (paidAmount / totalAmount) * 100);
   };

@@ -12,7 +12,15 @@ class NetworkService {
     // Listen for network state changes
     this.unsubscribe = NetInfo.addEventListener(state => {
       const wasConnected = this.isConnected;
-      this.isConnected = state.isConnected && state.isInternetReachable;
+      
+      // On WiFi, we'll trust isConnected even if isInternetReachable might be false
+      // This prevents false disconnection alerts on some WiFi networks
+      if (state.type === 'wifi') {
+        this.isConnected = state.isConnected;
+      } else {
+        // For cellular and other connections, we'll continue checking both
+        this.isConnected = state.isConnected && state.isInternetReachable;
+      }
       
       if (wasConnected !== this.isConnected) {
         this.notifyListeners(this.isConnected);
@@ -43,7 +51,30 @@ class NetworkService {
 
   // Check if device is online
   isOnline() {
+    // Immediately check the connection again if we're on WiFi
+    // This helps ensure we have the most up-to-date connection status
+    if (this._lastCheckWasWifi) {
+      this._checkConnectionStatus();
+    }
     return this.isConnected;
+  }
+  
+  // Check connection status in background
+  async _checkConnectionStatus() {
+    try {
+      const state = await NetInfo.fetch();
+      this._lastCheckWasWifi = state.type === 'wifi';
+      
+      // Update connection state based on the latest information
+      // On WiFi, trust isConnected even if isInternetReachable might be false
+      if (state.type === 'wifi') {
+        this.isConnected = state.isConnected;
+      } else {
+        this.isConnected = state.isConnected && state.isInternetReachable;
+      }
+    } catch (error) {
+      console.error('Error checking connection status:', error);
+    }
   }
 
   // Add listener for network changes

@@ -580,7 +580,7 @@ const FamilyTreeView = ({ familyMembers, onMemberPress }) => {
         <Svg height="800" width="2400">
           {getConnectorLines()}
           {treeLayout.map((member, index) => (
-            <React.Fragment key={member.id || index}>
+            <React.Fragment key={member.id || `member-${index}`}>
               <Circle
                 cx={member.x}
                 cy={member.y + 100}

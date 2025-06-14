@@ -437,27 +437,73 @@ export const FinanceProvider = ({ children }) => {
         }
       }
       
-      // Query transactions for the accounts
-      // NOTE: This query requires a composite index on 'accountId' ASC, 'date' DESC
-      // See firestore.indexes.json for the required index configuration
-      const transactionsQuery = query(
-        collection(db, 'finance_transactions'),
-        where('accountId', 'in', accountIds),
-        orderBy('date', 'desc')
-      );
+      // If we have more than 10 account IDs, batch the queries to avoid Firestore limitations
+      const MAX_FIRESTORE_IN_QUERY_ITEMS = 10;
+      let allTransactions = [];
       
-      const querySnapshot = await getDocs(transactionsQuery);
-      const transactionsList = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      // Process accounts in batches if there are many
+      if (accountIds.length > MAX_FIRESTORE_IN_QUERY_ITEMS) {
+        const batches = [];
+        for (let i = 0; i < accountIds.length; i += MAX_FIRESTORE_IN_QUERY_ITEMS) {
+          batches.push(accountIds.slice(i, i + MAX_FIRESTORE_IN_QUERY_ITEMS));
+        }
+        
+        // Execute each batch query
+        for (const batchIds of batches) {
+          // Query transactions for this batch of accounts
+          const batchQuery = query(
+            collection(db, 'finance_transactions'),
+            where('accountId', 'in', batchIds),
+            orderBy('date', 'desc')
+          );
+          
+          const batchSnapshot = await getDocs(batchQuery);
+          const batchTransactions = batchSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          
+          allTransactions = [...allTransactions, ...batchTransactions];
+        }
+      } else {
+        // If fewer accounts, use a single query
+        const transactionsQuery = query(
+          collection(db, 'finance_transactions'),
+          where('accountId', 'in', accountIds),
+          orderBy('date', 'desc')
+        );
+        
+        const querySnapshot = await getDocs(transactionsQuery);
+        allTransactions = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+      }
       
-      console.log(`Loaded ${transactionsList.length} transactions from Firestore for scope: ${currentScope}`);
+      console.log(`Loaded ${allTransactions.length} transactions from Firestore for scope: ${currentScope}`);
       
-      setTransactions(transactionsList);
+      // Deduplicate transactions by ID to ensure no duplicates in the UI
+      const uniqueTransactionsMap = new Map();
+      allTransactions.forEach(transaction => {
+        if (transaction && transaction.id) {
+          uniqueTransactionsMap.set(transaction.id, transaction);
+        }
+      });
+      
+      const uniqueTransactions = Array.from(uniqueTransactionsMap.values());
+      console.log(`After deduplication: ${uniqueTransactions.length} unique transactions`);
+      
+      // Sort by date (most recent first)
+      uniqueTransactions.sort((a, b) => {
+        const dateA = a.date && a.date.toDate ? a.date.toDate() : new Date(a.date || 0);
+        const dateB = b.date && b.date.toDate ? b.date.toDate() : new Date(b.date || 0);
+        return dateB - dateA;
+      });
+      
+      setTransactions(uniqueTransactions);
       
       // Cache the results
-      await offlineStorageService.setItem(`finance_transactions_${currentScope}`, JSON.stringify(transactionsList));
+      await offlineStorageService.setItem(`finance_transactions_${currentScope}`, JSON.stringify(uniqueTransactions));
     } catch (err) {
       console.error('Error loading transactions:', err);
       setError('Failed to load transactions. Please try again.');
@@ -1115,6 +1161,8 @@ export const FinanceProvider = ({ children }) => {
     if (!user) return false;
     
     try {
+      console.log(`Recording payment for loan ${loanId}...`);
+      
       const loanRef = doc(db, 'finance_loans', loanId);
       const loanSnapshot = await getDoc(loanRef);
       
@@ -1129,75 +1177,74 @@ export const FinanceProvider = ({ children }) => {
         throw new Error('You do not have permission to update this loan');
       }
       
-      // Find the payment in the schedule
-      const paymentIndex = loanData.paymentSchedule.findIndex(
-        payment => payment.dueDate.toDate().getTime() === new Date(paymentData.dueDate).getTime()
-      );
-      
-      if (paymentIndex === -1) {
-        throw new Error('Payment not found in schedule');
+      // Validate payment amount
+      const paymentAmount = parseFloat(paymentData.amount);
+      if (isNaN(paymentAmount) || paymentAmount <= 0) {
+        throw new Error('Invalid payment amount');
       }
       
-      // Update payment status
-      const updatedSchedule = [...loanData.paymentSchedule];
-      updatedSchedule[paymentIndex] = {
-        ...updatedSchedule[paymentIndex],
-        status: 'paid'
+      // Calculate current total payments
+      const currentPayments = loanData.payments || [];
+      const totalPaid = currentPayments.reduce((sum, payment) => sum + (parseFloat(payment.amount) || 0), 0);
+      const remainingAmount = parseFloat(loanData.amount) - totalPaid;
+      
+      // Validate payment doesn't exceed remaining amount
+      if (paymentAmount > remainingAmount) {
+        throw new Error('Payment amount exceeds remaining loan balance');
+      }
+      
+      // Create new payment record
+      const newPayment = {
+        id: Date.now().toString(), // Simple ID generation
+        amount: paymentAmount,
+        date: paymentData.date || new Date(),
+        note: paymentData.note || '',
+        createdAt: new Date(),
+        updatedAt: new Date()
       };
       
-      // Check if all payments are made
-      const allPaid = updatedSchedule.every(payment => payment.status === 'paid');
+      // Add payment to the loan's payments array
+      const updatedPayments = [...currentPayments, newPayment];
+      const newTotalPaid = totalPaid + paymentAmount;
       
+      // Determine new loan status
+      let newStatus = loanData.status;
+      if (newTotalPaid >= parseFloat(loanData.amount)) {
+        newStatus = 'paid';
+      } else if (newTotalPaid > 0) {
+        newStatus = 'active'; // Ensure it's active if payments have been made
+      }
+      
+      // Update the loan document
       await updateDoc(loanRef, {
-        paymentSchedule: updatedSchedule,
-        status: allPaid ? 'paid' : 'active',
-        updatedAt: serverTimestamp()
+        payments: updatedPayments,
+        totalPaid: newTotalPaid,
+        status: newStatus,
+        updatedAt: new Date()
       });
       
-      // Update local state
-      setLoans(prev => 
-        prev.map(loan => 
-          loan.id === loanId 
-            ? { 
-                ...loan, 
-                paymentSchedule: updatedSchedule,
-                status: allPaid ? 'paid' : 'active',
-                updatedAt: new Date() 
-              } 
-            : loan
-        )
-      );
+      console.log(`Payment recorded successfully. New total paid: ${newTotalPaid}`);
       
-      // Update cache
-      const cachedLoans = JSON.parse(await offlineStorageService.getItem(`finance_loans_${currentScope}`) || '[]');
-      await offlineStorageService.setItem(
-        `finance_loans_${currentScope}`,
-        JSON.stringify(
-          cachedLoans.map(loan => 
-            loan.id === loanId 
-              ? { 
-                  ...loan, 
-                  paymentSchedule: updatedSchedule,
-                  status: allPaid ? 'paid' : 'active',
-                  updatedAt: new Date() 
-                } 
-              : loan
-          )
-        )
-      );
+      // Reload loans to reflect changes
+      await loadLoans();
       
       return true;
     } catch (err) {
       console.error('Error recording loan payment:', err);
-      setError('Failed to record loan payment. Please try again.');
+      setError(err.message || 'Failed to record payment. Please try again.');
       return false;
     }
   };
-
-  const deleteLoan = async (loanId) => {
+  
+  // Enhanced loan payment management functions
+  
+  // Record a partial payment against a loan (new approach)
+  const recordPartialLoanPayment = async (loanId, paymentData) => {
     if (!user) return false;
     
     try {
+      console.log(`Recording partial payment for loan ${loanId}...`);
+      
       const loanRef = doc(db, 'finance_loans', loanId);
       const loanSnapshot = await getDoc(loanRef);
       
@@ -1205,15 +1252,349 @@ export const FinanceProvider = ({ children }) => {
         throw new Error('Loan not found');
       }
       
-      const loanDoc = loanSnapshot.data();
+      const loanData = loanSnapshot.data();
       
-      // Check if user has permission to delete
-      if (loanDoc.userId !== user.uid) {
+      // Check if user owns the loan
+      if (loanData.userId !== user.uid) {
+        throw new Error('You do not have permission to update this loan');
+      }
+      
+      // Validate payment amount
+      const paymentAmount = parseFloat(paymentData.amount);
+      if (isNaN(paymentAmount) || paymentAmount <= 0) {
+        throw new Error('Invalid payment amount');
+      }
+      
+      // Calculate current total payments
+      const currentPayments = loanData.payments || [];
+      const totalPaid = currentPayments.reduce((sum, payment) => sum + (parseFloat(payment.amount) || 0), 0);
+      const remainingAmount = parseFloat(loanData.amount) - totalPaid;
+      
+      // Validate payment doesn't exceed remaining amount
+      if (paymentAmount > remainingAmount) {
+        throw new Error('Payment amount exceeds remaining loan balance');
+      }
+      
+      // Create new payment record
+      const newPayment = {
+        id: Date.now().toString(), // Simple ID generation
+        amount: paymentAmount,
+        date: paymentData.date || new Date(),
+        note: paymentData.note || '',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      
+      // Add payment to the loan's payments array
+      const updatedPayments = [...currentPayments, newPayment];
+      const newTotalPaid = totalPaid + paymentAmount;
+      
+      // Determine new loan status
+      let newStatus = loanData.status;
+      if (newTotalPaid >= parseFloat(loanData.amount)) {
+        newStatus = 'paid';
+      } else if (newTotalPaid > 0) {
+        newStatus = 'active'; // Ensure it's active if payments have been made
+      }
+      
+      // Update the loan document
+      await updateDoc(loanRef, {
+        payments: updatedPayments,
+        totalPaid: newTotalPaid,
+        status: newStatus,
+        updatedAt: new Date()
+      });
+      
+      console.log(`Payment recorded successfully. New total paid: ${newTotalPaid}`);
+      
+      // Reload loans to reflect changes
+      await loadLoans();
+      
+      return true;
+    } catch (err) {
+      console.error('Error recording partial loan payment:', err);
+      setError(err.message || 'Failed to record payment. Please try again.');
+      return false;
+    }
+  };
+  
+  // Update an existing loan payment
+  const updateLoanPayment = async (loanId, paymentId, updatedPaymentData) => {
+    if (!user) return false;
+    
+    try {
+      console.log(`Updating payment ${paymentId} for loan ${loanId}...`);
+      
+      const loanRef = doc(db, 'finance_loans', loanId);
+      const loanSnapshot = await getDoc(loanRef);
+      
+      if (!loanSnapshot.exists()) {
+        throw new Error('Loan not found');
+      }
+      
+      const loanData = loanSnapshot.data();
+      
+      // Check if user owns the loan
+      if (loanData.userId !== user.uid) {
+        throw new Error('You do not have permission to update this loan');
+      }
+      
+      const payments = loanData.payments || [];
+      const paymentIndex = payments.findIndex(payment => payment.id === paymentId);
+      
+      if (paymentIndex === -1) {
+        throw new Error('Payment not found');
+      }
+      
+      // Validate updated payment amount
+      const newAmount = parseFloat(updatedPaymentData.amount);
+      if (isNaN(newAmount) || newAmount <= 0) {
+        throw new Error('Invalid payment amount');
+      }
+      
+      // Calculate total without this payment
+      const otherPaymentsTotal = payments
+        .filter(payment => payment.id !== paymentId)
+        .reduce((sum, payment) => sum + (parseFloat(payment.amount) || 0), 0);
+      
+      // Check if new amount would exceed loan amount
+      if (otherPaymentsTotal + newAmount > parseFloat(loanData.amount)) {
+        throw new Error('Updated payment amount would exceed loan balance');
+      }
+      
+      // Update the payment
+      const updatedPayments = [...payments];
+      updatedPayments[paymentIndex] = {
+        ...updatedPayments[paymentIndex],
+        ...updatedPaymentData,
+        amount: newAmount,
+        updatedAt: new Date()
+      };
+      
+      const newTotalPaid = otherPaymentsTotal + newAmount;
+      
+      // Determine new loan status
+      let newStatus = loanData.status;
+      if (newTotalPaid >= parseFloat(loanData.amount)) {
+        newStatus = 'paid';
+      } else if (newTotalPaid > 0) {
+        newStatus = 'active';
+      } else {
+        newStatus = 'active'; // Default status
+      }
+      
+      // Update the loan document
+      await updateDoc(loanRef, {
+        payments: updatedPayments,
+        totalPaid: newTotalPaid,
+        status: newStatus,
+        updatedAt: new Date()
+      });
+      
+      console.log(`Payment updated successfully. New total paid: ${newTotalPaid}`);
+      
+      // Reload loans to reflect changes
+      await loadLoans();
+      
+      return true;
+    } catch (err) {
+      console.error('Error updating loan payment:', err);
+      setError(err.message || 'Failed to update payment. Please try again.');
+      return false;
+    }
+  };
+  
+  // Delete a loan payment
+  const deleteLoanPayment = async (loanId, paymentId) => {
+    if (!user) return false;
+    
+    try {
+      console.log(`Deleting payment ${paymentId} for loan ${loanId}...`);
+      
+      const loanRef = doc(db, 'finance_loans', loanId);
+      const loanSnapshot = await getDoc(loanRef);
+      
+      if (!loanSnapshot.exists()) {
+        throw new Error('Loan not found');
+      }
+      
+      const loanData = loanSnapshot.data();
+      
+      // Check if user owns the loan
+      if (loanData.userId !== user.uid) {
+        throw new Error('You do not have permission to update this loan');
+      }
+      
+      const payments = loanData.payments || [];
+      const updatedPayments = payments.filter(payment => payment.id !== paymentId);
+      
+      if (payments.length === updatedPayments.length) {
+        throw new Error('Payment not found');
+      }
+      
+      const newTotalPaid = updatedPayments.reduce((sum, payment) => sum + (parseFloat(payment.amount) || 0), 0);
+      
+      // Determine new loan status
+      let newStatus = loanData.status;
+      if (newTotalPaid >= parseFloat(loanData.amount)) {
+        newStatus = 'paid';
+      } else if (newTotalPaid > 0) {
+        newStatus = 'active';
+      } else {
+        newStatus = 'active'; // Default status
+      }
+      
+      // Update the loan document
+      await updateDoc(loanRef, {
+        payments: updatedPayments,
+        totalPaid: newTotalPaid,
+        status: newStatus,
+        updatedAt: new Date()
+      });
+      
+      console.log(`Payment deleted successfully. New total paid: ${newTotalPaid}`);
+      
+      // Reload loans to reflect changes
+      await loadLoans();
+      
+      return true;
+    } catch (err) {
+      console.error('Error deleting loan payment:', err);
+      setError(err.message || 'Failed to delete payment. Please try again.');
+      return false;
+    }
+  };
+  
+  // Mark loan as fully paid (quick action)
+  const markLoanAsPaid = async (loanId) => {
+    if (!user) return false;
+    
+    try {
+      console.log(`Marking loan ${loanId} as paid...`);
+      
+      const loanRef = doc(db, 'finance_loans', loanId);
+      const loanSnapshot = await getDoc(loanRef);
+      
+      if (!loanSnapshot.exists()) {
+        throw new Error('Loan not found');
+      }
+      
+      const loanData = loanSnapshot.data();
+      
+      // Check if user owns the loan
+      if (loanData.userId !== user.uid) {
+        throw new Error('You do not have permission to update this loan');
+      }
+      
+      const currentPayments = loanData.payments || [];
+      const totalPaid = currentPayments.reduce((sum, payment) => sum + (parseFloat(payment.amount) || 0), 0);
+      const remainingAmount = parseFloat(loanData.amount) - totalPaid;
+      
+      if (remainingAmount <= 0) {
+        // Already fully paid
+        return true;
+      }
+      
+      // Create final payment for remaining amount
+      const finalPayment = {
+        id: Date.now().toString(),
+        amount: remainingAmount,
+        date: new Date(),
+        note: 'Final payment - marked as paid',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      
+      const updatedPayments = [...currentPayments, finalPayment];
+      
+      // Update the loan document
+      await updateDoc(loanRef, {
+        payments: updatedPayments,
+        totalPaid: parseFloat(loanData.amount),
+        status: 'paid',
+        updatedAt: new Date()
+      });
+      
+      console.log(`Loan marked as paid with final payment of ${remainingAmount}`);
+      
+      // Reload loans to reflect changes
+      await loadLoans();
+      
+      return true;
+    } catch (err) {
+      console.error('Error marking loan as paid:', err);
+      setError(err.message || 'Failed to mark loan as paid. Please try again.');
+      return false;
+    }
+  };
+  
+  // Mark loan as unpaid (reverse all payments)
+  const markLoanAsUnpaid = async (loanId) => {
+    if (!user) return false;
+    
+    try {
+      console.log(`Marking loan ${loanId} as unpaid...`);
+      
+      const loanRef = doc(db, 'finance_loans', loanId);
+      const loanSnapshot = await getDoc(loanRef);
+      
+      if (!loanSnapshot.exists()) {
+        throw new Error('Loan not found');
+      }
+      
+      const loanData = loanSnapshot.data();
+      
+      // Check if user owns the loan
+      if (loanData.userId !== user.uid) {
+        throw new Error('You do not have permission to update this loan');
+      }
+      
+      // Clear all payments
+      await updateDoc(loanRef, {
+        payments: [],
+        totalPaid: 0,
+        status: 'active',
+        updatedAt: new Date()
+      });
+      
+      console.log(`Loan marked as unpaid - all payments removed`);
+      
+      // Reload loans to reflect changes
+      await loadLoans();
+      
+      return true;
+    } catch (err) {
+      console.error('Error marking loan as unpaid:', err);
+      setError(err.message || 'Failed to mark loan as unpaid. Please try again.');
+      return false;
+    }
+  };
+  
+  // Delete a loan
+  const deleteLoan = async (loanId) => {
+    if (!user) return false;
+    
+    try {
+      console.log(`Deleting loan ${loanId}...`);
+      
+      const loanRef = doc(db, 'finance_loans', loanId);
+      const loanSnapshot = await getDoc(loanRef);
+      
+      if (!loanSnapshot.exists()) {
+        throw new Error('Loan not found');
+      }
+      
+      const loanData = loanSnapshot.data();
+      
+      // Check if user owns the loan
+      if (loanData.userId !== user.uid) {
         throw new Error('You do not have permission to delete this loan');
       }
       
-      // Delete loan from Firestore
+      // Delete the loan from Firestore
       await deleteDoc(loanRef);
+      
+      console.log(`Loan ${loanId} deleted successfully`);
       
       // Update local state
       setLoans(prev => prev.filter(loan => loan.id !== loanId));
@@ -1228,11 +1609,11 @@ export const FinanceProvider = ({ children }) => {
       return true;
     } catch (err) {
       console.error('Error deleting loan:', err);
-      setError('Failed to delete loan. Please try again.');
+      setError(err.message || 'Failed to delete loan. Please try again.');
       return false;
     }
   };
-
+  
   // Welfare account management
   const loadWelfareAccounts = async () => {
     if (!user) return;
@@ -1787,6 +2168,11 @@ export const FinanceProvider = ({ children }) => {
       updateLoan,
       deleteLoan,
       recordLoanPayment,
+      recordPartialLoanPayment,
+      updateLoanPayment,
+      deleteLoanPayment,
+      markLoanAsPaid,
+      markLoanAsUnpaid,
       
       // Welfare management
       createWelfareAccount,
@@ -1972,7 +2358,7 @@ export const FinanceProvider = ({ children }) => {
           const updatedCachedAccounts = cachedAccounts.map(acc => {
             if (acc.id === accountId) {
               return { ...acc, balance: newBalance, updatedAt: new Date() };
-            }
+                       }
             return acc;
           });
           

@@ -41,6 +41,9 @@ import AddLoanScreen from '../screens/finance/AddLoanScreen';
 import EditLoanScreen from '../screens/finance/EditLoanScreen';
 import LoanDetailsScreen from '../screens/finance/LoanDetailsScreen';
 import RecordLoanPaymentScreen from '../screens/finance/RecordLoanPaymentScreen';
+import AddLoanPaymentScreen from '../screens/finance/AddLoanPaymentScreen';
+import LoanPaymentsScreen from '../screens/finance/LoanPaymentsScreen';
+import EditLoanPaymentScreen from '../screens/finance/EditLoanPaymentScreen';
 import WelfareAccountsScreen from '../screens/finance/WelfareAccountsScreen';
 import WelfareAccountDetailsScreen from '../screens/finance/WelfareAccountDetailsScreen';
 import AddWelfareAccountScreen from '../screens/finance/AddWelfareAccountScreen';
@@ -356,6 +359,33 @@ const AppStack = () => (
       component={RecordLoanPaymentScreen}
       options={{ 
         title: 'Record Payment',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="AddLoanPayment" 
+      component={AddLoanPaymentScreen}
+      options={{ 
+        title: 'Add Payment',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="LoanPayments" 
+      component={LoanPaymentsScreen}
+      options={{ 
+        title: 'Payment History',
+        headerStyle: { backgroundColor: '#6366f1' },
+        headerTintColor: '#fff'
+      }}
+    />
+    <Stack.Screen 
+      name="EditLoanPayment" 
+      component={EditLoanPaymentScreen}
+      options={{ 
+        title: 'Edit Payment',
         headerStyle: { backgroundColor: '#6366f1' },
         headerTintColor: '#fff'
       }}

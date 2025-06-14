@@ -181,7 +181,10 @@ const AddLoanScreen = ({ navigation, route }) => {
         amount: parseFloat(formData.amount),
         interestRate: parseFloat(formData.interestRate) || 0,
         term: parseInt(formData.term) || 12,
-        paymentSchedule
+        paymentSchedule,
+        // Initialize new payment system fields
+        payments: [],
+        totalPaid: 0
       };
       
       // Create loan

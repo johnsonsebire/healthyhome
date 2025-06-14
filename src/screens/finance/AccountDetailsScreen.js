@@ -58,6 +58,22 @@ const AccountDetailsScreen = ({ route, navigation }) => {
     }
   }, [accounts]);
   
+  // Recalculate account balance when component mounts or transactions change
+  useEffect(() => {
+    const recalculateBalance = async () => {
+      try {
+        if (account && account.id) {
+          await recalculateAccountBalance(account.id);
+          console.log('Account balance automatically recalculated');
+        }
+      } catch (error) {
+        console.error('Error automatically recalculating balance:', error);
+      }
+    };
+    
+    recalculateBalance();
+  }, [account?.id, transactions.length]);
+  
   // Filter transactions for this account
   useEffect(() => {
     console.log(`Total transactions in state: ${transactions.length}`);
@@ -93,6 +109,13 @@ const AccountDetailsScreen = ({ route, navigation }) => {
       // Calculate stats with enhanced precision and error handling
       let income = 0;
       let expense = 0;
+      
+      // Include initial balance as part of income calculation if available
+      const initialBalance = getInitialBalance(account);
+      if (initialBalance > 0) {
+        income += initialBalance;
+        console.log(`Added initial balance to income: +${initialBalance}`);
+      }
       
       // Process each transaction carefully
       uniqueTransactions.forEach(t => {
@@ -233,6 +256,9 @@ const AccountDetailsScreen = ({ route, navigation }) => {
   const onRefresh = async () => {
     setRefreshing(true);
     try {
+      // Recalculate account balance
+      await recalculateAccountBalance(account.id);
+      
       // Force a reload of transactions
       if (loadTransactions) {
         await loadTransactions();
@@ -343,6 +369,33 @@ const AccountDetailsScreen = ({ route, navigation }) => {
     });
   };
   
+  // Helper function to safely get initial balance
+  const getInitialBalance = (account) => {
+    if (!account) return 0;
+    
+    try {
+      let initialBalance = 0;
+      
+      if (typeof account.initialBalance === 'number') {
+        initialBalance = account.initialBalance;
+      } else if (typeof account.initialBalance === 'string') {
+        initialBalance = parseFloat(account.initialBalance);
+      } else if (account.initialBalance) {
+        initialBalance = parseFloat(account.initialBalance);
+      }
+      
+      if (isNaN(initialBalance)) {
+        console.warn(`Invalid initial balance for account ${account.id}, using 0`);
+        return 0;
+      }
+      
+      return Math.round(initialBalance * 100) / 100; // Round to 2 decimal places
+    } catch (error) {
+      console.error('Error parsing initial balance:', error);
+      return 0;
+    }
+  };
+  
   return (
     <View style={styles.container}>
       {/* Account options menu */}
@@ -356,11 +409,6 @@ const AccountDetailsScreen = ({ route, navigation }) => {
           icon="pencil" 
           onPress={navigateToEditAccount} 
           title="Edit Account" 
-        />
-        <Menu.Item 
-          icon="refresh" 
-          onPress={handleRecalculateBalance} 
-          title="Recalculate Balance" 
         />
         <Menu.Item 
           icon="delete" 
@@ -409,6 +457,9 @@ const AccountDetailsScreen = ({ route, navigation }) => {
                   <Text style={[styles.statValue, { color: '#4CAF50' }]}>
                     {formatCurrency(stats.totalIncome)}
                   </Text>
+                  {getInitialBalance(account) > 0 && (
+                    <Text style={styles.statNote}>Includes initial balance</Text>
+                  )}
                 </View>
                 
                 <View style={styles.statItem}>
@@ -548,6 +599,13 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  statNote: {
+    fontSize: 10,
+    color: '#666',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 2,
   },
   descriptionSection: {
     padding: 16,

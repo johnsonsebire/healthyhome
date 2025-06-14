@@ -17,6 +17,11 @@ const LoanDetailsScreen = ({ route, navigation }) => {
   const { 
     loans, 
     recordLoanPayment,
+    recordPartialLoanPayment,
+    updateLoanPayment,
+    deleteLoanPayment,
+    markLoanAsPaid,
+    markLoanAsUnpaid,
     updateLoan,
     deleteLoan
   } = useFinance();
@@ -94,20 +99,26 @@ const LoanDetailsScreen = ({ route, navigation }) => {
   
   const statusInfo = getLoanStatusInfo();
   
-  // Calculate total amount
+  // Calculate total amount (principal only for new payment system)
   const calculateTotalAmount = () => {
-    const principal = loan.amount || 0;
-    const interest = principal * (loan.interestRate / 100);
-    return principal + interest;
+    return loan.amount || 0;
   };
   
-  // Calculate paid amount
+  // Calculate paid amount (support both old schedule-based and new payments array)
   const calculatePaidAmount = () => {
-    if (!loan.paymentSchedule) return 0;
+    // New payment system - use payments array and totalPaid
+    if (loan.payments && Array.isArray(loan.payments)) {
+      return loan.totalPaid || loan.payments.reduce((sum, payment) => sum + (parseFloat(payment.amount) || 0), 0);
+    }
     
-    return loan.paymentSchedule
-      .filter(payment => payment.status === 'paid')
-      .reduce((sum, payment) => sum + (payment.amount || 0), 0);
+    // Fallback to old payment schedule system
+    if (loan.paymentSchedule) {
+      return loan.paymentSchedule
+        .filter(payment => payment.status === 'paid')
+        .reduce((sum, payment) => sum + (payment.amount || 0), 0);
+    }
+    
+    return 0;
   };
   
   // Calculate remaining amount
@@ -148,6 +159,18 @@ const LoanDetailsScreen = ({ route, navigation }) => {
     setMenuVisible(false);
     navigation.navigate('EditLoan', { loan });
   };
+
+  // Navigate to add payment
+  const navigateToAddPayment = () => {
+    setMenuVisible(false);
+    navigation.navigate('AddLoanPayment', { loan });
+  };
+
+  // Navigate to payment history
+  const navigateToPaymentHistory = () => {
+    setMenuVisible(false);
+    navigation.navigate('LoanPayments', { loan });
+  };
   
   // Handle loan deletion
   const handleDeleteLoan = () => {
@@ -176,13 +199,15 @@ const LoanDetailsScreen = ({ route, navigation }) => {
     );
   };
   
-  // Handle mark as paid
+  // Handle mark as paid (enhanced version)
   const handleMarkAsPaid = () => {
     setMenuVisible(false);
     
+    const remainingAmount = calculateRemainingAmount();
+    
     Alert.alert(
       'Mark Loan as Paid',
-      'Are you sure you want to mark this entire loan as paid?',
+      `This will record a payment of ${formatCurrency(remainingAmount)} to complete the loan. Are you sure?`,
       [
         {
           text: 'Cancel',
@@ -192,18 +217,37 @@ const LoanDetailsScreen = ({ route, navigation }) => {
           text: 'Mark as Paid',
           style: 'default',
           onPress: async () => {
-            const updatedSchedule = loan.paymentSchedule.map(payment => ({
-              ...payment,
-              status: 'paid'
-            }));
-            
-            const success = await updateLoan(loan.id, {
-              status: 'paid',
-              paymentSchedule: updatedSchedule
-            });
+            const success = await markLoanAsPaid(loan.id);
             
             if (success) {
               Alert.alert('Success', 'Loan marked as paid');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // Handle mark as unpaid (new function)
+  const handleMarkAsUnpaid = () => {
+    setMenuVisible(false);
+    
+    Alert.alert(
+      'Mark Loan as Unpaid',
+      'This will remove all payments and reset the loan status. Are you sure?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        },
+        {
+          text: 'Mark as Unpaid',
+          style: 'destructive',
+          onPress: async () => {
+            const success = await markLoanAsUnpaid(loan.id);
+            
+            if (success) {
+              Alert.alert('Success', 'Loan marked as unpaid - all payments removed');
             }
           }
         }
@@ -342,10 +386,28 @@ const LoanDetailsScreen = ({ route, navigation }) => {
           title="Edit Loan" 
         />
         <Menu.Item 
+          icon="payment" 
+          onPress={navigateToAddPayment} 
+          title="Add Payment" 
+          disabled={loan.status === 'paid'}
+        />
+        <Menu.Item 
+          icon="history" 
+          onPress={navigateToPaymentHistory} 
+          title="Payment History" 
+        />
+        <Divider />
+        <Menu.Item 
           icon="check-circle" 
           onPress={handleMarkAsPaid} 
           title="Mark as Paid" 
           disabled={loan.status === 'paid'}
+        />
+        <Menu.Item 
+          icon="undo" 
+          onPress={handleMarkAsUnpaid} 
+          title="Mark as Unpaid" 
+          disabled={loan.status !== 'paid'}
         />
         <Menu.Item 
           icon="alert-circle" 
@@ -434,6 +496,50 @@ const LoanDetailsScreen = ({ route, navigation }) => {
           </View>
         </View>
         
+        {/* Quick Payment Actions */}
+        {loan.status !== 'paid' && (
+          <>
+            <Divider style={styles.divider} />
+            
+            <View style={styles.quickActionsSection}>
+              <Text style={styles.quickActionsTitle}>Quick Actions</Text>
+              <View style={styles.quickActionsRow}>
+                <Button 
+                  mode="contained" 
+                  icon="payment" 
+                  onPress={navigateToAddPayment}
+                  style={[styles.quickActionButton, { backgroundColor: '#2196F3' }]}
+                  compact
+                >
+                  Add Payment
+                </Button>
+                
+                <Button 
+                  mode="outlined" 
+                  icon="history" 
+                  onPress={navigateToPaymentHistory}
+                  style={styles.quickActionButton}
+                  compact
+                >
+                  View Payments
+                </Button>
+                
+                {calculateRemainingAmount() > 0 && (
+                  <Button 
+                    mode="contained" 
+                    icon="check-circle" 
+                    onPress={handleMarkAsPaid}
+                    style={[styles.quickActionButton, { backgroundColor: '#4CAF50' }]}
+                    compact
+                  >
+                    Mark Paid
+                  </Button>
+                )}
+              </View>
+            </View>
+          </>
+        )}
+        
         <Divider style={styles.divider} />
         
         <View style={styles.detailsSection}>
@@ -509,17 +615,68 @@ const LoanDetailsScreen = ({ route, navigation }) => {
         )}
       </Card>
       
-      {/* Payment Schedule */}
+      {/* Payment History & Schedule */}
       <Card style={styles.paymentCard}>
-        <Card.Title title="Payment Schedule" />
+        <Card.Title title={loan.payments && loan.payments.length > 0 ? "Payment History" : "Payment Schedule"} />
         <Card.Content>
-          <FlatList
-            data={loan.paymentSchedule || []}
-            renderItem={renderPaymentItem}
-            keyExtractor={(item, index) => `payment-${index}`}
-            ItemSeparatorComponent={renderSeparator}
-            scrollEnabled={false}
-          />
+          {/* New Payment System - Show payment history */}
+          {loan.payments && loan.payments.length > 0 ? (
+            <View>
+              <Text style={styles.sectionSubtitle}>Recent Payments</Text>
+              <FlatList
+                data={loan.payments.slice(-5).reverse()} // Show last 5 payments
+                renderItem={({ item }) => (
+                  <View style={styles.paymentHistoryItem}>
+                    <View style={styles.paymentInfo}>
+                      <Text style={styles.paymentAmount}>{formatCurrency(item.amount)}</Text>
+                      <Text style={styles.paymentDate}>{formatDate(item.date)}</Text>
+                      {item.note && <Text style={styles.paymentNote}>{item.note}</Text>}
+                    </View>
+                    <Chip 
+                      icon="check-circle" 
+                      mode="flat" 
+                      style={[styles.statusChip, { backgroundColor: '#E8F5E9' }]}
+                      textStyle={{ color: '#4CAF50' }}
+                    >
+                      Paid
+                    </Chip>
+                  </View>
+                )}
+                keyExtractor={(item) => item.id}
+                ItemSeparatorComponent={renderSeparator}
+                scrollEnabled={false}
+              />
+              
+              {loan.payments.length > 5 && (
+                <Button 
+                  mode="text" 
+                  onPress={navigateToPaymentHistory}
+                  style={styles.viewAllButton}
+                >
+                  View All {loan.payments.length} Payments
+                </Button>
+              )}
+              
+              {/* Show remaining balance */}
+              {calculateRemainingAmount() > 0 && (
+                <View style={styles.remainingBalanceSection}>
+                  <Text style={styles.remainingBalanceLabel}>Remaining Balance</Text>
+                  <Text style={styles.remainingBalanceAmount}>
+                    {formatCurrency(calculateRemainingAmount())}
+                  </Text>
+                </View>
+              )}
+            </View>
+          ) : (
+            /* Fallback to old payment schedule system */
+            <FlatList
+              data={loan.paymentSchedule || []}
+              renderItem={renderPaymentItem}
+              keyExtractor={(item, index) => `payment-${index}`}
+              ItemSeparatorComponent={renderSeparator}
+              scrollEnabled={false}
+            />
+          )}
         </Card.Content>
       </Card>
     </ScrollView>
@@ -611,6 +768,25 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
   },
+  quickActionsSection: {
+    padding: 16,
+  },
+  quickActionsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+    color: '#333',
+  },
+  quickActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+  },
+  quickActionButton: {
+    marginHorizontal: 2,
+    marginVertical: 4,
+    minWidth: '30%',
+  },
   detailsSection: {
     padding: 16,
   },
@@ -679,6 +855,44 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     marginBottom: 4,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+    color: '#666',
+  },
+  paymentHistoryItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  paymentNote: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 2,
+  },
+  viewAllButton: {
+    marginTop: 8,
+  },
+  remainingBalanceSection: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#fff3cd',
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#ffc107',
+  },
+  remainingBalanceLabel: {
+    fontSize: 14,
+    color: '#856404',
+    marginBottom: 4,
+  },
+  remainingBalanceAmount: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#856404',
   },
 });
 

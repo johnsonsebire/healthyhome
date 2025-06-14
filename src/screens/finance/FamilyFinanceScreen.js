@@ -24,7 +24,8 @@ const FamilyFinanceScreen = ({ navigation }) => {
     transactions = [],
     isLoading,
     currentScope,
-    changeScope
+    changeScope,
+    recalculateAllAccountBalances
   } = useFinance();
   
   const { user } = useAuth();
@@ -41,6 +42,23 @@ const FamilyFinanceScreen = ({ navigation }) => {
       changeScope(FINANCE_SCOPE.NUCLEAR);
     }
   }, []);
+
+  // Automatically load transactions and recalculate balances when screen loads or scope changes
+  useEffect(() => {
+    const loadFinanceData = async () => {
+      try {
+        // Make sure we have the latest transactions
+        if (accounts.length > 0) {
+          // Recalculate all account balances to ensure accuracy
+          await recalculateAllAccountBalances();
+        }
+      } catch (error) {
+        console.error('Error loading finance data:', error);
+      }
+    };
+    
+    loadFinanceData();
+  }, [currentScope, accounts.length]);
 
   // Load user currency settings
   useEffect(() => {
@@ -161,12 +179,17 @@ const FamilyFinanceScreen = ({ navigation }) => {
   // Handle refresh
   const onRefresh = async () => {
     setRefreshing(true);
-    // Reload data
-    await Promise.all([
-      // Reload accounts and projects
-      generateReportData()
-    ]);
-    setRefreshing(false);
+    try {
+      // Recalculate all account balances for accuracy
+      await recalculateAllAccountBalances();
+      
+      // Reload data and reports
+      await generateReportData();
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setRefreshing(false);
+    }
   };
   
   // Navigate to account details
