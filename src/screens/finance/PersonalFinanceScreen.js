@@ -88,8 +88,16 @@ const PersonalFinanceScreen = ({ navigation }) => {
     }
     
     try {
-      // Get the 5 most recent transactions
-      const recent = [...transactions]
+      // Ensure transactions are deduplicated by ID before processing
+      const uniqueTransactionsMap = new Map();
+      transactions.forEach(transaction => {
+        if (transaction && transaction.id) {
+          uniqueTransactionsMap.set(transaction.id, transaction);
+        }
+      });
+      
+      // Convert back to array and sort by date
+      const uniqueTransactions = Array.from(uniqueTransactionsMap.values())
         .sort((a, b) => {
           try {
             const dateA = a.date ? (a.date.toDate ? a.date.toDate() : new Date(a.date)) : new Date();
@@ -99,8 +107,10 @@ const PersonalFinanceScreen = ({ navigation }) => {
             console.error('Error sorting transactions by date:', err);
             return 0;
           }
-        })
-        .slice(0, 5);
+        });
+      
+      // Get the 5 most recent transactions
+      const recent = uniqueTransactions.slice(0, 5);
       
       setRecentTransactions(recent);
       

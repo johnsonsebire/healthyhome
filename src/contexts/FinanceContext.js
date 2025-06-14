@@ -575,14 +575,59 @@ export const FinanceProvider = ({ children }) => {
         updatedAt: new Date()
       };
       
-      // Update local state
-      setTransactions(prev => [createdTransaction, ...prev]);
+      // Update local state with deduplication to prevent duplicates
+      setTransactions(prev => {
+        // Create a map to deduplicate transactions by ID
+        const uniqueTransactionsMap = new Map();
+        
+        // Add the new transaction first
+        uniqueTransactionsMap.set(createdTransaction.id, createdTransaction);
+        
+        // Add existing transactions, skipping any with the same ID as our new one
+        prev.forEach(transaction => {
+          if (transaction && transaction.id) {
+            uniqueTransactionsMap.set(transaction.id, transaction);
+          }
+        });
+        
+        // Convert back to array and sort by date (most recent first)
+        const result = Array.from(uniqueTransactionsMap.values());
+        result.sort((a, b) => {
+          const dateA = a.date && a.date.toDate ? a.date.toDate() : new Date(a.date || 0);
+          const dateB = b.date && b.date.toDate ? b.date.toDate() : new Date(b.date || 0);
+          return dateB - dateA;
+        });
+        
+        return result;
+      });
       
-      // Update cache
+      // Update cache with deduplication
       const cachedTransactions = JSON.parse(await offlineStorageService.getItem(`finance_transactions_${currentScope}`) || '[]');
+      
+      // Create a map to deduplicate cached transactions with the new one
+      const uniqueCachedTransactionsMap = new Map();
+      
+      // Add the new transaction first
+      uniqueCachedTransactionsMap.set(createdTransaction.id, createdTransaction);
+      
+      // Add existing cached transactions, skipping any with the same ID
+      cachedTransactions.forEach(transaction => {
+        if (transaction && transaction.id) {
+          uniqueCachedTransactionsMap.set(transaction.id, transaction);
+        }
+      });
+      
+      // Convert back to array and sort by date (most recent first)
+      const uniqueCachedTransactions = Array.from(uniqueCachedTransactionsMap.values());
+      uniqueCachedTransactions.sort((a, b) => {
+        const dateA = a.date && a.date.toDate ? a.date.toDate() : new Date(a.date || 0);
+        const dateB = b.date && b.date.toDate ? b.date.toDate() : new Date(b.date || 0);
+        return dateB - dateA;
+      });
+      
       await offlineStorageService.setItem(
         `finance_transactions_${currentScope}`,
-        JSON.stringify([createdTransaction, ...cachedTransactions])
+        JSON.stringify(uniqueCachedTransactions)
       );
       
       return createdTransaction;

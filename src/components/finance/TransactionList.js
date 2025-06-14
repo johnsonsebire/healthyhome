@@ -20,6 +20,20 @@ const TransactionList = ({
   };
   
   const currencyFormatter = formatCurrency || defaultFormatCurrency;
+  
+  // Deduplicate transactions at the component level as a final safeguard
+  const uniqueTransactions = React.useMemo(() => {
+    if (!transactions || !Array.isArray(transactions)) return [];
+    
+    const uniqueTransactionsMap = new Map();
+    transactions.forEach(transaction => {
+      if (transaction && transaction.id) {
+        uniqueTransactionsMap.set(transaction.id, transaction);
+      }
+    });
+    
+    return Array.from(uniqueTransactionsMap.values());
+  }, [transactions]);
   // Get transaction icon based on category
   const getTransactionIcon = (transaction) => {
     if (!transaction) return 'receipt';
@@ -197,7 +211,7 @@ const TransactionList = ({
   
   return (
     <FlatList
-      data={transactions}
+      data={uniqueTransactions}
       renderItem={renderTransactionItem}
       keyExtractor={(item, index) => {
         if (!item) return `empty-${index}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -217,7 +231,7 @@ const TransactionList = ({
       ListEmptyComponent={renderEmptyState}
       contentContainerStyle={[
         styles.listContent,
-        transactions.length === 0 && styles.emptyContainer
+        uniqueTransactions.length === 0 && styles.emptyContainer
       ]}
       showsVerticalScrollIndicator={false}
       refreshControl={refreshControl}
