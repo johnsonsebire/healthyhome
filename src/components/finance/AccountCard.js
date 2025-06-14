@@ -5,44 +5,65 @@ import { MaterialIcons } from '@expo/vector-icons';
 import currencyService from '../../services/currencyService';
 
 const AccountCard = ({ account, onPress }) => {
+  // Ensure account is not undefined before using it
+  if (!account) {
+    console.warn('AccountCard received undefined account prop');
+    return null; // Don't render anything if account is undefined
+  }
+  
   // Define a color based on account type or use the one provided
   const getAccountColor = () => {
-    if (account.color) return account.color;
-    
-    switch (account.type) {
-      case 'savings':
-        return '#4CAF50';
-      case 'checking':
-        return '#2196F3';
-      case 'credit':
-        return '#F44336';
-      case 'investment':
-        return '#9C27B0';
-      default:
-        return '#607D8B';
+    try {
+      if (account.color) return account.color;
+      
+      switch (account.type) {
+        case 'savings':
+          return '#4CAF50';
+        case 'checking':
+          return '#2196F3';
+        case 'credit':
+          return '#F44336';
+        case 'investment':
+          return '#9C27B0';
+        default:
+          return '#607D8B';
+      }
+    } catch (error) {
+      console.warn('Error getting account color:', error);
+      return '#607D8B'; // Default color as fallback
     }
   };
 
   // Format currency
   const formatCurrency = (amount) => {
-    return currencyService.formatCurrency(amount, account.currency || 'GHS');
+    try {
+      return currencyService.formatCurrency(amount, account.currency || 'GHS');
+    } catch (error) {
+      console.warn('Error formatting currency:', error);
+      return '0.00'; // Default value as fallback
+    }
   };
 
   // Get icon based on account type
   const getAccountIcon = () => {
-    if (account.icon) return account.icon;
-    
-    switch (account.type) {
-      case 'savings':
-        return 'savings';
-      case 'checking':
-        return 'account-balance';
-      case 'credit':
-        return 'credit-card';
-      case 'investment':
-        return 'trending-up';
-      default:
-        return 'account-balance-wallet';
+    try {
+      if (account.icon) return account.icon;
+      
+      switch (account.type) {
+        case 'savings':
+          return 'savings';
+        case 'checking':
+          return 'account-balance';
+        case 'credit':
+          return 'credit-card';
+        case 'investment':
+          return 'trending-up';
+        default:
+          return 'account-balance-wallet';
+      }
+    } catch (error) {
+      console.warn('Error getting account icon:', error);
+      return 'account-balance-wallet'; // Default icon as fallback
     }
   };
 
@@ -54,8 +75,8 @@ const AccountCard = ({ account, onPress }) => {
             <MaterialIcons name={getAccountIcon()} size={32} color={getAccountColor()} />
           </View>
           <View style={styles.accountInfo}>
-            <Text style={styles.accountName}>{account.name}</Text>
-            <Text style={styles.accountType}>{account.type}</Text>
+            <Text style={styles.accountName}>{account.name || 'Unnamed Account'}</Text>
+            <Text style={styles.accountType}>{account.type || 'Unknown Type'}</Text>
           </View>
           <View style={styles.balanceContainer}>
             <Text style={[styles.accountBalance, { color: getAccountColor() }]}>

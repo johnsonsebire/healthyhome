@@ -11,6 +11,8 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { Card, Button, Divider, Menu, Chip } from 'react-native-paper';
 import { useFinance } from '../../contexts/FinanceContext';
+import { useAuth } from '../../contexts/AuthContext';
+import currencyService from '../../services/currencyService';
 
 const LoanDetailsScreen = ({ route, navigation }) => {
   const { loan: initialLoan } = route.params;
@@ -26,10 +28,36 @@ const LoanDetailsScreen = ({ route, navigation }) => {
     deleteLoan
   } = useFinance();
   
+  const { user } = useAuth();
+  
   const [loan, setLoan] = useState(initialLoan);
   const [menuVisible, setMenuVisible] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [paymentMenuVisible, setPaymentMenuVisible] = useState(false);
+  const [userCurrencySettings, setUserCurrencySettings] = useState(null);
+  const [displayCurrency, setDisplayCurrency] = useState('GHS');
+  
+  // Load user currency settings
+  useEffect(() => {
+    const loadCurrencySettings = async () => {
+      if (user) {
+        try {
+          const settings = await currencyService.loadUserCurrencySettings(user.uid);
+          setUserCurrencySettings(settings);
+          setDisplayCurrency(settings.displayCurrency || 'GHS');
+        } catch (error) {
+          console.error('Error loading currency settings:', error);
+        }
+      }
+    };
+
+    loadCurrencySettings();
+  }, [user]);
+
+  // Initialize currency service
+  useEffect(() => {
+    currencyService.initializeExchangeRates();
+  }, []);
   
   // Set header title and options
   useEffect(() => {
@@ -54,24 +82,45 @@ const LoanDetailsScreen = ({ route, navigation }) => {
     }
   }, [loans]);
   
-  // Format currency
+  // Format currency using currency service
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', { 
-      style: 'currency', 
-      currency: 'USD',
-      minimumFractionDigits: 2 
-    }).format(amount);
+    // Use the loan's currency if available, otherwise use display currency
+    const targetCurrency = loan.currency || displayCurrency || 'GHS';
+    return currencyService.formatCurrency(amount, targetCurrency);
   };
   
   // Format date
   const formatDate = (date) => {
-    if (!date) return '';
-    const dateObj = date.toDate ? date.toDate() : new Date(date);
-    return dateObj.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    });
+    if (!date) return 'N/A';
+    
+    try {
+      let dateObj;
+      
+      // Handle Firestore timestamp
+      if (date && typeof date.toDate === 'function') {
+        dateObj = date.toDate();
+      } else if (date instanceof Date) {
+        dateObj = date;
+      } else {
+        // Try to parse string or number
+        dateObj = new Date(date);
+      }
+      
+      // Validate that the date is valid
+      if (isNaN(dateObj.getTime())) {
+        console.warn('Invalid date detected in LoanDetailsScreen:', date);
+        return 'Invalid Date';
+      }
+      
+      return dateObj.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+    } catch (error) {
+      console.error('Error formatting date in LoanDetailsScreen:', error, date);
+      return 'Invalid Date';
+    }
   };
   
   // Get loan status information

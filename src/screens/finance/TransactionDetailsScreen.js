@@ -12,6 +12,17 @@ import { Card, Button, Divider, Menu } from 'react-native-paper';
 import { useFinance } from '../../contexts/FinanceContext';
 
 const TransactionDetailsScreen = ({ route, navigation }) => {
+  // Verify transaction exists in route params to prevent crashes
+  if (!route.params || !route.params.transaction) {
+    console.error("TransactionDetailsScreen: No transaction provided in route params");
+    Alert.alert(
+      "Error", 
+      "Could not load transaction details. Please try again.",
+      [{ text: "OK", onPress: () => navigation.goBack() }]
+    );
+    return null;
+  }
+  
   const { transaction: initialTransaction } = route.params;
   const { 
     accounts, 
@@ -53,6 +64,10 @@ const TransactionDetailsScreen = ({ route, navigation }) => {
       const associatedAccount = accounts.find(a => a.id === transaction.accountId);
       if (associatedAccount) {
         setAccount(associatedAccount);
+      } else {
+        // Handle case when account doesn't exist anymore
+        console.warn(`Associated account ${transaction.accountId} not found for transaction ${transaction.id}`);
+        setAccount(null);
       }
     }
   }, [accounts, transaction]);
@@ -205,7 +220,7 @@ const TransactionDetailsScreen = ({ route, navigation }) => {
         <View style={styles.amountSection}>
           <Text style={styles.amountLabel}>Amount</Text>
           <Text style={[styles.amountValue, { color: getTransactionColor() }]}>
-            {transaction.type === 'income' ? '+' : '-'} {formatCurrency(transaction.amount, account?.currency)}
+            {transaction.type === 'income' ? '+' : '-'} {formatCurrency(transaction.amount, account?.currency || 'GHS')}
           </Text>
         </View>
         
@@ -233,7 +248,7 @@ const TransactionDetailsScreen = ({ route, navigation }) => {
             </Text>
           </View>
           
-          {account && (
+          {account ? (
             <TouchableOpacity style={styles.detailRow} onPress={navigateToAccountDetails}>
               <Text style={styles.detailLabel}>Account</Text>
               <View style={styles.accountDetail}>
@@ -241,6 +256,11 @@ const TransactionDetailsScreen = ({ route, navigation }) => {
                 <MaterialIcons name="chevron-right" size={20} color="#999" />
               </View>
             </TouchableOpacity>
+          ) : (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Account</Text>
+              <Text style={[styles.detailValue, {color: '#F44336'}]}>Account not found</Text>
+            </View>
           )}
           
           {transaction.paymentMethod && (

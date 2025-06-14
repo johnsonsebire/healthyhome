@@ -12,10 +12,13 @@ import { Button, Divider } from 'react-native-paper';
 import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFinance } from '../../contexts/FinanceContext';
+import { useAuth } from '../../contexts/AuthContext';
+import currencyService from '../../services/currencyService';
 
 const RecordLoanPaymentScreen = ({ navigation, route }) => {
   const { loan, payment } = route.params;
   const { recordLoanPayment } = useFinance();
+  const { user } = useAuth();
   
   // State for the form
   const [formData, setFormData] = useState({
@@ -26,6 +29,30 @@ const RecordLoanPaymentScreen = ({ navigation, route }) => {
   
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [userCurrencySettings, setUserCurrencySettings] = useState(null);
+  const [displayCurrency, setDisplayCurrency] = useState('GHS');
+  
+  // Load user currency settings
+  useEffect(() => {
+    const loadCurrencySettings = async () => {
+      if (user) {
+        try {
+          const settings = await currencyService.loadUserCurrencySettings(user.uid);
+          setUserCurrencySettings(settings);
+          setDisplayCurrency(settings.displayCurrency || 'GHS');
+        } catch (error) {
+          console.error('Error loading currency settings:', error);
+        }
+      }
+    };
+
+    loadCurrencySettings();
+  }, [user]);
+
+  // Initialize currency service
+  useEffect(() => {
+    currencyService.initializeExchangeRates();
+  }, []);
   
   // Handle input changes
   const handleInputChange = (field, value) => {
@@ -92,13 +119,11 @@ const RecordLoanPaymentScreen = ({ navigation, route }) => {
     }
   };
   
-  // Format currency
+  // Format currency using currency service
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', { 
-      style: 'currency', 
-      currency: 'USD',
-      minimumFractionDigits: 2 
-    }).format(amount);
+    // Use the loan's currency if available, otherwise use display currency
+    const targetCurrency = loan.currency || displayCurrency || 'GHS';
+    return currencyService.formatCurrency(amount, targetCurrency);
   };
   
   // Handle form submission

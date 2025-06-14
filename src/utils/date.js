@@ -3,12 +3,34 @@
 export const formatDate = (date) => {
   if (!date) return '';
   
-  const d = new Date(date);
-  return d.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  });
+  try {
+    let dateObj;
+    
+    // Handle Firestore timestamp
+    if (date && typeof date.toDate === 'function') {
+      dateObj = date.toDate();
+    } else if (date instanceof Date) {
+      dateObj = date;
+    } else {
+      // Try to parse string or number
+      dateObj = new Date(date);
+    }
+    
+    // Validate that the date is valid
+    if (isNaN(dateObj.getTime())) {
+      console.warn('Invalid date detected in formatDate utility:', date);
+      return 'Invalid Date';
+    }
+    
+    return dateObj.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  } catch (error) {
+    console.error('Error formatting date in utility:', error, date);
+    return 'Invalid Date';
+  }
 };
 
 export const formatDateTime = (date) => {

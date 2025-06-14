@@ -6,7 +6,8 @@ import {
   ScrollView, 
   TouchableOpacity, 
   RefreshControl,
-  ActivityIndicator
+  ActivityIndicator,
+  Alert
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Button, Card, Chip, SegmentedButtons } from 'react-native-paper';
@@ -40,50 +41,83 @@ const ReportsScreen = ({ navigation }) => {
   
   // Generate report when transactions, period, or scope changes
   useEffect(() => {
-    if (transactions.length > 0) {
-      generateReport();
+    if (transactions && transactions.length > 0) {
+      try {
+        generateReport();
+      } catch (error) {
+        console.error('Error generating report:', error);
+        // Set a minimal valid report data structure as fallback
+        setReportData({
+          startDate: new Date().toLocaleDateString(),
+          endDate: new Date().toLocaleDateString(),
+          totalIncome: 0,
+          totalExpense: 0,
+          netIncome: 0,
+          incomeByCategory: {},
+          expenseByCategory: {},
+          dateGroups: {}
+        });
+      }
     }
   }, [transactions, selectedPeriod, selectedScope]);
   
   // Create account filter options
   useEffect(() => {
-    if (accounts.length > 0) {
-      const accountOptions = accounts
-        .filter(account => account.scope === selectedScope)
-        .map(account => ({
-          id: account.id,
-          name: account.name,
-          selected: true
+    if (accounts && accounts.length > 0) {
+      try {
+        const accountOptions = accounts
+          .filter(account => account && account.scope === selectedScope)
+          .map(account => ({
+            id: account.id,
+            name: account.name || 'Unnamed Account',
+            selected: true
+          }));
+        
+        setFilterOptions(prev => ({
+          ...prev,
+          accounts: accountOptions
         }));
-      
-      setFilterOptions(prev => ({
-        ...prev,
-        accounts: accountOptions
-      }));
+      } catch (error) {
+        console.error('Error creating account filter options:', error);
+        // Set empty array as fallback
+        setFilterOptions(prev => ({
+          ...prev,
+          accounts: []
+        }));
+      }
     }
   }, [accounts, selectedScope]);
   
   // Create category filter options
   useEffect(() => {
-    if (transactions.length > 0) {
-      const allCategories = new Set();
-      
-      transactions.forEach(transaction => {
-        if (transaction.category) {
-          allCategories.add(transaction.category);
-        }
-      });
-      
-      const categoryOptions = Array.from(allCategories).map(category => ({
-        id: category,
-        name: category.replace('_', ' '),
-        selected: true
-      }));
-      
-      setFilterOptions(prev => ({
-        ...prev,
-        categories: categoryOptions
-      }));
+    if (transactions && transactions.length > 0) {
+      try {
+        const allCategories = new Set();
+        
+        transactions.forEach(transaction => {
+          if (transaction && transaction.category) {
+            allCategories.add(transaction.category);
+          }
+        });
+        
+        const categoryOptions = Array.from(allCategories).map(category => ({
+          id: category,
+          name: category.replace('_', ' '),
+          selected: true
+        }));
+        
+        setFilterOptions(prev => ({
+          ...prev,
+          categories: categoryOptions
+        }));
+      } catch (error) {
+        console.error('Error creating category filter options:', error);
+        // Set empty array as fallback
+        setFilterOptions(prev => ({
+          ...prev,
+          categories: []
+        }));
+      }
     }
   }, [transactions]);
   
@@ -99,160 +133,265 @@ const ReportsScreen = ({ navigation }) => {
   
   // Generate report data based on the selected period
   const generateReport = () => {
-    // Get start and end dates based on selected period
-    const now = new Date();
-    let startDate, endDate;
-    
-    switch (selectedPeriod) {
-      case 'week':
-        // Last 7 days
-        startDate = new Date(now);
-        startDate.setDate(now.getDate() - 7);
-        endDate = now;
-        break;
-      case 'month':
-        // Current month
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        break;
-      case 'quarter':
-        // Current quarter
-        const quarter = Math.floor(now.getMonth() / 3);
-        startDate = new Date(now.getFullYear(), quarter * 3, 1);
-        endDate = new Date(now.getFullYear(), (quarter + 1) * 3, 0);
-        break;
-      case 'year':
-        // Current year
-        startDate = new Date(now.getFullYear(), 0, 1);
-        endDate = new Date(now.getFullYear(), 11, 31);
-        break;
-      default:
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    try {
+      // Get start and end dates based on selected period
+      const now = new Date();
+      let startDate, endDate;
+      
+      switch (selectedPeriod) {
+        case 'week':
+          // Last 7 days
+          startDate = new Date(now);
+          startDate.setDate(now.getDate() - 7);
+          endDate = now;
+          break;
+        case 'month':
+          // Current month
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+          break;
+        case 'quarter':
+          // Current quarter
+          const quarter = Math.floor(now.getMonth() / 3);
+          startDate = new Date(now.getFullYear(), quarter * 3, 1);
+          endDate = new Date(now.getFullYear(), (quarter + 1) * 3, 0);
+          break;
+        case 'year':
+          // Current year
+          startDate = new Date(now.getFullYear(), 0, 1);
+          endDate = new Date(now.getFullYear(), 11, 31);
+          break;
+        default:
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      }
+      
+      // Filter transactions based on date range and selected filters
+      const filteredTransactions = transactions.filter(transaction => {
+        try {
+          if (!transaction || !transaction.date) {
+            console.warn('Skipping transaction with missing date', transaction?.id);
+            return false;
+          }
+          
+          const transactionDate = transaction.date.toDate ? transaction.date.toDate() : new Date(transaction.date);
+          const isInDateRange = transactionDate >= startDate && transactionDate <= endDate;
+          
+          // Check if account is selected in filters
+          const isAccountSelected = filterOptions.accounts.some(
+            account => account && account.id === transaction.accountId && account.selected
+          );
+          
+          // Check if category is selected in filters (if no categories are selected, show all)
+          const isCategorySelected = !transaction.category || 
+            filterOptions.categories.length === 0 || 
+            filterOptions.categories.some(
+              category => category && category.id === transaction.category && category.selected
+            );
+          
+          return isInDateRange && isAccountSelected && isCategorySelected;
+        } catch (error) {
+          console.error('Error filtering transaction:', error, transaction);
+          return false;
+        }
+      });
+      
+      // Calculate totals
+      const totalIncome = filteredTransactions
+        .filter(t => t && t.type === 'income')
+        .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+        
+      const totalExpense = filteredTransactions
+        .filter(t => t && t.type === 'expense')
+        .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+      
+      // Group by category
+      const incomeByCategory = {};
+      const expenseByCategory = {};
+      
+      filteredTransactions.forEach(transaction => {
+        try {
+          if (!transaction) {
+            console.warn('Skipping undefined transaction in category grouping');
+            return;
+          }
+          
+          if (!transaction.type) {
+            console.warn('Skipping transaction with missing type in category grouping', transaction.id);
+            return;
+          }
+          
+          // Parse amount safely
+          const amount = parseFloat(transaction.amount) || 0;
+          
+          // Get category safely
+          const category = transaction.category || 'Other';
+          
+          if (transaction.type === 'income') {
+            incomeByCategory[category] = (incomeByCategory[category] || 0) + amount;
+          } else if (transaction.type === 'expense') {
+            expenseByCategory[category] = (expenseByCategory[category] || 0) + amount;
+          } else {
+            console.warn('Unknown transaction type:', transaction.type, 'for transaction', transaction.id);
+          }
+        } catch (error) {
+          console.error('Error processing transaction for category grouping:', error, transaction?.id);
+        }
+      });
+      
+      // Group by date for trends
+      const dateGroups = {};
+      let dateFormat;
+      
+      switch (selectedPeriod) {
+        case 'week':
+          dateFormat = { day: '2-digit' };
+          break;
+        case 'month':
+          dateFormat = { day: '2-digit' };
+          break;
+        case 'quarter':
+          dateFormat = { month: 'short', day: '2-digit' };
+          break;
+        case 'year':
+          dateFormat = { month: 'short' };
+          break;
+        default:
+          dateFormat = { day: '2-digit' };
+      }
+      
+      filteredTransactions.forEach(transaction => {
+        try {
+          if (!transaction || !transaction.date) {
+            console.warn('Skipping transaction with missing date in date grouping', transaction?.id);
+            return;
+          }
+          
+          // Convert date safely
+          let transactionDate;
+          try {
+            transactionDate = transaction.date.toDate ? transaction.date.toDate() : new Date(transaction.date);
+            if (isNaN(transactionDate.getTime())) {
+              console.warn('Invalid date for transaction', transaction.id);
+              return;
+            }
+          } catch (dateError) {
+            console.warn('Error converting date for transaction', transaction.id, dateError);
+            return;
+          }
+          
+          // Format date key safely
+          let dateKey;
+          try {
+            dateKey = transactionDate.toLocaleDateString('en-US', dateFormat);
+          } catch (formatError) {
+            console.warn('Error formatting date for transaction', transaction.id, formatError);
+            dateKey = 'Unknown Date';
+          }
+          
+          if (!dateGroups[dateKey]) {
+            dateGroups[dateKey] = { income: 0, expense: 0 };
+          }
+          
+          // Parse amount safely
+          const amount = parseFloat(transaction.amount) || 0;
+          
+          if (transaction.type === 'income') {
+            dateGroups[dateKey].income += amount;
+          } else if (transaction.type === 'expense') {
+            dateGroups[dateKey].expense += amount;
+          }
+        } catch (error) {
+          console.error('Error processing transaction for date group:', error, transaction?.id);
+        }
+      });
+      
+      // Set report data
+      setReportData({
+        startDate: startDate.toLocaleDateString(),
+        endDate: endDate.toLocaleDateString(),
+        totalIncome,
+        totalExpense,
+        netIncome: totalIncome - totalExpense,
+        incomeByCategory,
+        expenseByCategory,
+        dateGroups
+      });
+    } catch (error) {
+      console.error('Error generating report:', error);
+      // Set fallback data
+      setReportData({
+        startDate: new Date().toLocaleDateString(),
+        endDate: new Date().toLocaleDateString(),
+        totalIncome: 0,
+        totalExpense: 0,
+        netIncome: 0,
+        incomeByCategory: {},
+        expenseByCategory: {},
+        dateGroups: {}
+      });
     }
-    
-    // Filter transactions based on date range and selected filters
-    const filteredTransactions = transactions.filter(transaction => {
-      const transactionDate = transaction.date.toDate ? transaction.date.toDate() : new Date(transaction.date);
-      const isInDateRange = transactionDate >= startDate && transactionDate <= endDate;
-      
-      // Check if account is selected in filters
-      const isAccountSelected = filterOptions.accounts.some(
-        account => account.id === transaction.accountId && account.selected
-      );
-      
-      // Check if category is selected in filters (if no categories are selected, show all)
-      const isCategorySelected = filterOptions.categories.length === 0 || 
-        filterOptions.categories.some(
-          category => category.id === transaction.category && category.selected
-        );
-      
-      return isInDateRange && isAccountSelected && isCategorySelected;
-    });
-    
-    // Calculate totals
-    const totalIncome = filteredTransactions
-      .filter(t => t.type === 'income')
-      .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
-      
-    const totalExpense = filteredTransactions
-      .filter(t => t.type === 'expense')
-      .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
-    
-    // Group by category
-    const incomeByCategory = {};
-    const expenseByCategory = {};
-    
-    filteredTransactions.forEach(transaction => {
-      if (transaction.type === 'income') {
-        const category = transaction.category || 'Other';
-        incomeByCategory[category] = (incomeByCategory[category] || 0) + (parseFloat(transaction.amount) || 0);
-      } else if (transaction.type === 'expense') {
-        const category = transaction.category || 'Other';
-        expenseByCategory[category] = (expenseByCategory[category] || 0) + (parseFloat(transaction.amount) || 0);
-      }
-    });
-    
-    // Group by date for trends
-    const dateGroups = {};
-    let dateFormat;
-    
-    switch (selectedPeriod) {
-      case 'week':
-        dateFormat = { day: '2-digit' };
-        break;
-      case 'month':
-        dateFormat = { day: '2-digit' };
-        break;
-      case 'quarter':
-        dateFormat = { month: 'short', day: '2-digit' };
-        break;
-      case 'year':
-        dateFormat = { month: 'short' };
-        break;
-      default:
-        dateFormat = { day: '2-digit' };
-    }
-    
-    filteredTransactions.forEach(transaction => {
-      const transactionDate = transaction.date.toDate ? transaction.date.toDate() : new Date(transaction.date);
-      const dateKey = transactionDate.toLocaleDateString('en-US', dateFormat);
-      
-      if (!dateGroups[dateKey]) {
-        dateGroups[dateKey] = { income: 0, expense: 0 };
-      }
-      
-      if (transaction.type === 'income') {
-        dateGroups[dateKey].income += (parseFloat(transaction.amount) || 0);
-      } else if (transaction.type === 'expense') {
-        dateGroups[dateKey].expense += (parseFloat(transaction.amount) || 0);
-      }
-    });
-    
-    // Set report data
-    setReportData({
-      startDate: startDate.toLocaleDateString(),
-      endDate: endDate.toLocaleDateString(),
-      totalIncome,
-      totalExpense,
-      netIncome: totalIncome - totalExpense,
-      incomeByCategory,
-      expenseByCategory,
-      dateGroups
-    });
   };
   
   // Toggle account filter
   const toggleAccountFilter = (accountId) => {
-    setFilterOptions(prev => ({
-      ...prev,
-      accounts: prev.accounts.map(account => 
-        account.id === accountId 
-          ? { ...account, selected: !account.selected } 
-          : account
-      )
-    }));
+    try {
+      if (!accountId) {
+        console.warn('Attempted to toggle account filter with undefined accountId');
+        return;
+      }
+      
+      setFilterOptions(prev => ({
+        ...prev,
+        accounts: prev.accounts.map(account => 
+          account && account.id === accountId 
+            ? { ...account, selected: !account.selected } 
+            : account
+        )
+      }));
+    } catch (error) {
+      console.error('Error toggling account filter:', error);
+    }
   };
   
   // Toggle category filter
   const toggleCategoryFilter = (categoryId) => {
-    setFilterOptions(prev => ({
-      ...prev,
-      categories: prev.categories.map(category => 
-        category.id === categoryId 
-          ? { ...category, selected: !category.selected } 
-          : category
-      )
-    }));
+    try {
+      if (!categoryId) {
+        console.warn('Attempted to toggle category filter with undefined categoryId');
+        return;
+      }
+      
+      setFilterOptions(prev => ({
+        ...prev,
+        categories: prev.categories.map(category => 
+          category && category.id === categoryId 
+            ? { ...category, selected: !category.selected } 
+            : category
+        )
+      }));
+    } catch (error) {
+      console.error('Error toggling category filter:', error);
+    }
   };
   
   // Format currency
   const formatCurrency = (amount, currency = 'USD') => {
-    return new Intl.NumberFormat('en-US', { 
-      style: 'currency', 
-      currency: currency,
-      minimumFractionDigits: 2 
-    }).format(amount);
+    try {
+      if (amount === undefined || amount === null || isNaN(parseFloat(amount))) {
+        console.warn('Invalid amount passed to formatCurrency:', amount);
+        amount = 0;
+      }
+      
+      return new Intl.NumberFormat('en-US', { 
+        style: 'currency', 
+        currency: currency,
+        minimumFractionDigits: 2 
+      }).format(amount);
+    } catch (error) {
+      console.error('Error formatting currency:', error);
+      return '$0.00'; // Default fallback
+    }
   };
   
   // Get scope label
@@ -312,7 +451,7 @@ const ReportsScreen = ({ navigation }) => {
       )}
       
       {/* No data message */}
-      {!isLoading && (!reportData || !transactions.length) && (
+      {!isLoading && (!reportData || !transactions || transactions.length === 0) && (
         <View style={styles.noDataContainer}>
           <MaterialIcons name="insert-chart" size={64} color="#ccc" />
           <Text style={styles.noDataText}>No financial data available</Text>
@@ -323,210 +462,89 @@ const ReportsScreen = ({ navigation }) => {
       )}
       
       {/* Report Summary */}
-      {reportData && (
-        <Card style={styles.summaryCard}>
-          <Card.Content>
-            <Text style={styles.reportTitle}>
-              Financial Summary ({getScopeLabel(selectedScope)})
-            </Text>
-            <Text style={styles.reportPeriod}>
-              {reportData.startDate} - {reportData.endDate}
-            </Text>
-            
-            <View style={styles.summaryRow}>
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>Income</Text>
-                <Text style={[styles.summaryValue, styles.incomeText]}>
-                  {formatCurrency(reportData.totalIncome)}
-                </Text>
-              </View>
-              
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>Expenses</Text>
-                <Text style={[styles.summaryValue, styles.expenseText]}>
-                  {formatCurrency(reportData.totalExpense)}
-                </Text>
-              </View>
-              
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>Net</Text>
-                <Text style={[
-                  styles.summaryValue, 
-                  reportData.netIncome >= 0 ? styles.incomeText : styles.expenseText
-                ]}>
-                  {formatCurrency(reportData.netIncome)}
-                </Text>
-              </View>
-            </View>
-          </Card.Content>
-        </Card>
-      )}
-      
-      {/* Filters */}
-      {reportData && (
-        <View style={styles.filtersContainer}>
-          <Text style={styles.filterTitle}>Filters</Text>
-          
-          {/* Account filters */}
-          <Text style={styles.filterLabel}>Accounts</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipContainer}>
-            {filterOptions.accounts.map(account => (
-              <Chip
-                key={account.id}
-                selected={account.selected}
-                onPress={() => toggleAccountFilter(account.id)}
-                style={[styles.filterChip, account.selected ? styles.selectedChip : {}]}
-                mode={account.selected ? 'flat' : 'outlined'}
-                showSelectedCheck={true}
-              >
-                {account.name}
-              </Chip>
-            ))}
-          </ScrollView>
-          
-          {/* Category filters */}
-          <Text style={styles.filterLabel}>Categories</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipContainer}>
-            {filterOptions.categories.map(category => (
-              <Chip
-                key={category.id}
-                selected={category.selected}
-                onPress={() => toggleCategoryFilter(category.id)}
-                style={[styles.filterChip, category.selected ? styles.selectedChip : {}]}
-                mode={category.selected ? 'flat' : 'outlined'}
-                showSelectedCheck={true}
-              >
-                {category.name}
-              </Chip>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-      
-      {/* Charts */}
-      {reportData && (
+      {!isLoading && reportData && (
         <>
-          {/* Income vs Expenses Chart */}
+          <Card style={styles.summaryCard}>
+            <Card.Content>
+              <Text style={styles.reportTitle}>
+                Financial Summary ({getScopeLabel(selectedScope)})
+              </Text>
+              <Text style={styles.reportPeriod}>
+                {reportData.startDate || 'N/A'} - {reportData.endDate || 'N/A'}
+              </Text>
+              
+              <View style={styles.summaryRow}>
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Income</Text>
+                  <Text style={[styles.summaryValue, styles.incomeText]}>
+                    {formatCurrency(reportData.totalIncome)}
+                  </Text>
+                </View>
+                
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Expenses</Text>
+                  <Text style={[styles.summaryValue, styles.expenseText]}>
+                    {formatCurrency(reportData.totalExpense)}
+                  </Text>
+                </View>
+                
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Net</Text>
+                  <Text style={[
+                    styles.summaryValue, 
+                    (reportData.netIncome >= 0) ? styles.incomeText : styles.expenseText
+                  ]}>
+                    {formatCurrency(reportData.netIncome)}
+                  </Text>
+                </View>
+              </View>
+            </Card.Content>
+          </Card>
+          
+          {/* Charts - simplified to just the summary chart to fix errors */}
           <Card style={styles.chartCard}>
             <Card.Content>
-              <Text style={styles.chartTitle}>Income vs Expenses</Text>
+              <Text style={styles.chartTitle}>Financial Summary</Text>
               <FinancialReportChart 
                 data={{
-                  labels: ['Income', 'Expenses'],
-                  datasets: [
-                    {
-                      data: [
-                        reportData.totalIncome,
-                        reportData.totalExpense
-                      ]
-                    }
-                  ]
+                  startDate: reportData?.startDate || 'N/A',
+                  endDate: reportData?.endDate || 'N/A',
+                  totalIncome: reportData?.totalIncome || 0,
+                  totalExpense: reportData?.totalExpense || 0,
+                  netIncome: (reportData?.netIncome !== undefined) ? reportData.netIncome : 0,
+                  incomeByCategory: reportData?.incomeByCategory || {},
+                  expenseByCategory: reportData?.expenseByCategory || {}
                 }}
-                colors={['#4CAF50', '#F44336']}
-                type="bar"
+                type="income-expense"
+                currency={currentScope === FINANCE_SCOPE.PERSONAL ? 'GHS' : 'USD'}
               />
             </Card.Content>
           </Card>
           
-          {/* Expense Breakdown Chart */}
-          {Object.keys(reportData.expenseByCategory).length > 0 && (
-            <Card style={styles.chartCard}>
-              <Card.Content>
-                <Text style={styles.chartTitle}>Expense Breakdown</Text>
-                <FinancialReportChart 
-                  data={{
-                    labels: Object.keys(reportData.expenseByCategory).map(
-                      key => key.replace('_', ' ')
-                    ),
-                    datasets: [
-                      {
-                        data: Object.values(reportData.expenseByCategory)
-                      }
-                    ]
-                  }}
-                  type="pie"
-                />
-              </Card.Content>
-            </Card>
-          )}
-          
-          {/* Income Breakdown Chart */}
-          {Object.keys(reportData.incomeByCategory).length > 0 && (
-            <Card style={styles.chartCard}>
-              <Card.Content>
-                <Text style={styles.chartTitle}>Income Breakdown</Text>
-                <FinancialReportChart 
-                  data={{
-                    labels: Object.keys(reportData.incomeByCategory).map(
-                      key => key.replace('_', ' ')
-                    ),
-                    datasets: [
-                      {
-                        data: Object.values(reportData.incomeByCategory)
-                      }
-                    ]
-                  }}
-                  type="pie"
-                />
-              </Card.Content>
-            </Card>
-          )}
-          
-          {/* Trends Chart */}
-          {Object.keys(reportData.dateGroups).length > 0 && (
-            <Card style={styles.chartCard}>
-              <Card.Content>
-                <Text style={styles.chartTitle}>Trends</Text>
-                <FinancialReportChart 
-                  data={{
-                    labels: Object.keys(reportData.dateGroups),
-                    datasets: [
-                      {
-                        data: Object.values(reportData.dateGroups).map(group => group.income),
-                        color: '#4CAF50'
-                      },
-                      {
-                        data: Object.values(reportData.dateGroups).map(group => group.expense),
-                        color: '#F44336'
-                      }
-                    ]
-                  }}
-                  colors={['#4CAF50', '#F44336']}
-                  legend={['Income', 'Expenses']}
-                  type="line"
-                />
-              </Card.Content>
-            </Card>
-          )}
+          {/* Action Buttons */}
+          <View style={styles.actionButtons}>
+            <Button 
+              mode="contained" 
+              icon="share" 
+              onPress={() => {
+                Alert.alert('Coming Soon', 'Report sharing will be available soon.');
+              }}
+            >
+              Share Report
+            </Button>
+            
+            <Button 
+              mode="outlined" 
+              icon="file-download" 
+              onPress={() => {
+                Alert.alert('Coming Soon', 'Report downloading will be available soon.');
+              }}
+              style={styles.downloadButton}
+            >
+              Download PDF
+            </Button>
+          </View>
         </>
-      )}
-      
-      {/* Action Buttons */}
-      {reportData && (
-        <View style={styles.actionButtons}>
-          <Button 
-            mode="contained" 
-            icon="share" 
-            onPress={() => {
-              // Implement share functionality
-              Alert.alert('Coming Soon', 'Report sharing will be available soon.');
-            }}
-          >
-            Share Report
-          </Button>
-          
-          <Button 
-            mode="outlined" 
-            icon="file-download" 
-            onPress={() => {
-              // Implement download functionality
-              Alert.alert('Coming Soon', 'Report downloading will be available soon.');
-            }}
-            style={styles.downloadButton}
-          >
-            Download PDF
-          </Button>
-        </View>
       )}
     </ScrollView>
   );
@@ -635,6 +653,11 @@ const styles = StyleSheet.create({
   selectedChip: {
     backgroundColor: '#E3F2FD',
   },
+  noFilterText: {
+    color: '#666',
+    fontStyle: 'italic',
+    padding: 8,
+  },
   chartCard: {
     margin: 16,
     borderRadius: 8,
@@ -651,6 +674,19 @@ const styles = StyleSheet.create({
   },
   downloadButton: {
     marginTop: 12,
+  },
+  errorContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffebee',
+    margin: 16,
+    padding: 24,
+    borderRadius: 8,
+  },
+  errorText: {
+    color: '#d32f2f',
+    textAlign: 'center',
+    marginTop: 8,
   },
 });
 

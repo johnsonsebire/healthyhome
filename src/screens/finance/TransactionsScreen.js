@@ -261,11 +261,35 @@ const TransactionsScreen = ({ navigation, route }) => {
   // Format date for display
   const formatDate = (date) => {
     if (!date) return '';
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    
+    try {
+      let dateObj;
+      
+      // Handle Firestore timestamp
+      if (date && typeof date.toDate === 'function') {
+        dateObj = date.toDate();
+      } else if (date instanceof Date) {
+        dateObj = date;
+      } else {
+        // Try to parse string or number
+        dateObj = new Date(date);
+      }
+      
+      // Validate that the date is valid
+      if (isNaN(dateObj.getTime())) {
+        console.warn('Invalid date detected in TransactionsScreen:', date);
+        return 'Invalid Date';
+      }
+      
+      return dateObj.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      console.error('Error formatting date in TransactionsScreen:', error, date);
+      return 'Invalid Date';
+    }
   };
 
   // Format currency for display

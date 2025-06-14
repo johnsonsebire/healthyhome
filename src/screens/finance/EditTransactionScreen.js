@@ -14,6 +14,17 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFinance } from '../../contexts/FinanceContext';
 
 const EditTransactionScreen = ({ navigation, route }) => {
+  // Verify transaction exists in route params to prevent crashes
+  if (!route.params || !route.params.transaction) {
+    console.error("EditTransactionScreen: No transaction provided in route params");
+    Alert.alert(
+      "Error", 
+      "Could not load transaction details. Please try again.",
+      [{ text: "OK", onPress: () => navigation.goBack() }]
+    );
+    return null;
+  }
+  
   const { transaction } = route.params;
   const financeContext = useFinance();
   const { accounts, updateTransaction } = financeContext;
@@ -103,11 +114,28 @@ const EditTransactionScreen = ({ navigation, route }) => {
     return formData.type === 'income' ? incomeCategories : expenseCategories;
   }, [formData.type, incomeCategories, expenseCategories]);
   
+  // Check if selected account exists
+  const accountExists = useCallback(() => {
+    try {
+      if (!formData.accountId) return false;
+      return accounts.some(account => account && account.id === formData.accountId);
+    } catch (error) {
+      console.error('Error checking if account exists:', error);
+      return false;
+    }
+  }, [accounts, formData.accountId]);
+  
   // Handle form submission
   const handleSubmit = useCallback(async () => {
     // Validate form
     if (!formData.accountId) {
       Alert.alert('Error', 'Please select an account');
+      return;
+    }
+    
+    // Check if selected account exists
+    if (!accountExists()) {
+      Alert.alert('Error', 'The selected account no longer exists. Please select a different account.');
       return;
     }
     
@@ -213,7 +241,8 @@ const EditTransactionScreen = ({ navigation, route }) => {
             onPress={() => setShowAccountMenu(true)}
           >
             <Text style={styles.selectorText}>
-              {accounts.find(a => a.id === formData.accountId)?.name || 'Select Account'}
+              {accounts.find(a => a && a.id === formData.accountId)?.name || 'Select Account'}
+              {formData.accountId && !accounts.some(a => a && a.id === formData.accountId) && ' (Account not found)'}
             </Text>
             <MaterialIcons name="arrow-drop-down" size={24} color="#666" />
           </TouchableOpacity>
@@ -224,16 +253,25 @@ const EditTransactionScreen = ({ navigation, route }) => {
             anchor={{ x: 0, y: 0 }}
             style={styles.menu}
           >
-            {accounts.map(account => (
+            {accounts
+              .filter(account => account && account.id) // Make sure account is valid
+              .map(account => (
+                <Menu.Item
+                  key={account.id}
+                  title={account.name || 'Unnamed Account'}
+                  onPress={() => {
+                    handleInputChange('accountId', account.id);
+                    setShowAccountMenu(false);
+                  }}
+                />
+              ))
+            }
+            {accounts.length === 0 && (
               <Menu.Item
-                key={account.id}
-                title={account.name}
-                onPress={() => {
-                  handleInputChange('accountId', account.id);
-                  setShowAccountMenu(false);
-                }}
+                title="No accounts available"
+                disabled={true}
               />
-            ))}
+            )}
           </Menu>
         </View>
         

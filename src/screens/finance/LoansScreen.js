@@ -12,7 +12,9 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { Button, Divider, Chip, SegmentedButtons, Card } from 'react-native-paper';
 import { useFinance, FINANCE_SCOPE } from '../../contexts/FinanceContext';
+import { useAuth } from '../../contexts/AuthContext';
 import LoanTracker from '../../components/finance/LoanTracker';
+import currencyService from '../../services/currencyService';
 
 const LoansScreen = ({ navigation }) => {
   const { 
@@ -22,10 +24,36 @@ const LoansScreen = ({ navigation }) => {
     changeScope
   } = useFinance();
   
+  const { user } = useAuth();
+  
   const [refreshing, setRefreshing] = useState(false);
   const [selectedScope, setSelectedScope] = useState(currentScope);
   const [filteredLoans, setFilteredLoans] = useState([]);
   const [filter, setFilter] = useState('all'); // all, active, paid, defaulted
+  const [userCurrencySettings, setUserCurrencySettings] = useState(null);
+  const [displayCurrency, setDisplayCurrency] = useState('GHS');
+  
+  // Load user currency settings
+  useEffect(() => {
+    const loadCurrencySettings = async () => {
+      if (user) {
+        try {
+          const settings = await currencyService.loadUserCurrencySettings(user.uid);
+          setUserCurrencySettings(settings);
+          setDisplayCurrency(settings.displayCurrency || 'GHS');
+        } catch (error) {
+          console.error('Error loading currency settings:', error);
+        }
+      }
+    };
+
+    loadCurrencySettings();
+  }, [user]);
+
+  // Initialize currency service
+  useEffect(() => {
+    currencyService.initializeExchangeRates();
+  }, []);
   
   // Load data when scope changes
   useEffect(() => {
@@ -73,11 +101,15 @@ const LoansScreen = ({ navigation }) => {
   // Handle refresh
   const onRefresh = async () => {
     setRefreshing(true);
-    // Reload data
-    await Promise.all([
-      // Reload loans
-    ]);
-    setRefreshing(false);
+    try {
+      // Refresh currency rates
+      await currencyService.refreshRates();
+      // Reload loan data would happen automatically via context
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setRefreshing(false);
+    }
   };
   
   // Navigate to loan details
@@ -95,13 +127,11 @@ const LoansScreen = ({ navigation }) => {
     navigation.navigate('RecordLoanPayment', { loan, payment });
   };
   
-  // Format currency
-  const formatCurrency = (amount, currency = 'USD') => {
-    return new Intl.NumberFormat('en-US', { 
-      style: 'currency', 
-      currency: currency,
-      minimumFractionDigits: 2 
-    }).format(amount);
+  // Format currency using currency service
+  const formatCurrency = (amount, currency = null) => {
+    // Use the loan's currency if provided, otherwise use display currency
+    const targetCurrency = currency || displayCurrency || 'GHS';
+    return currencyService.formatCurrency(amount, targetCurrency);
   };
 
   // Calculate loan summary metrics
@@ -542,11 +572,6 @@ const styles = StyleSheet.create({
     height: 32,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  summaryCard: {
-    margin: 16,
-    marginBottom: 8,
-    elevation: 2,
   },
 });
 
