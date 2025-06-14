@@ -21,6 +21,15 @@ const TransactionList = ({
   
   const currencyFormatter = formatCurrency || defaultFormatCurrency;
   
+  // Format category for display
+  const formatCategory = (category) => {
+    if (!category) return '';
+    return category
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+  
   // Deduplicate transactions at the component level as a final safeguard
   const uniqueTransactions = React.useMemo(() => {
     if (!transactions || !Array.isArray(transactions)) return [];
@@ -148,7 +157,7 @@ const TransactionList = ({
       // Ensure description is not empty
       const description = item.description || 
         (transactionCategory !== 'other_expense' && transactionCategory !== 'other_income' 
-          ? transactionCategory.replace('_', ' ') 
+          ? formatCategory(transactionCategory)
           : (transactionType === 'income' ? 'Income' : 'Expense'));
 
       return (

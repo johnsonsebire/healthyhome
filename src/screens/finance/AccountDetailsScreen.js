@@ -6,10 +6,12 @@ import {
   ScrollView, 
   TouchableOpacity, 
   Alert,
-  RefreshControl
+  RefreshControl,
+  FlatList
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { Card, Button, Divider, Menu } from 'react-native-paper';
+import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Card, Button, Divider, Menu, Chip, Portal, Modal } from 'react-native-paper';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFinance } from '../../contexts/FinanceContext';
 import TransactionList from '../../components/finance/TransactionList';
 
@@ -27,6 +29,7 @@ const AccountDetailsScreen = ({ route, navigation }) => {
   
   const [account, setAccount] = useState(initialAccount);
   const [accountTransactions, setAccountTransactions] = useState([]);
+  const [filteredTransactions, setFilteredTransactions] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const [stats, setStats] = useState({
@@ -34,6 +37,22 @@ const AccountDetailsScreen = ({ route, navigation }) => {
     totalExpense: 0,
     netIncome: 0
   });
+  
+  // Period filtering states
+  const [selectedPeriod, setSelectedPeriod] = useState('all');
+  const [showPeriodMenu, setShowPeriodMenu] = useState(false);
+  const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
+  const [customStartDate, setCustomStartDate] = useState(new Date());
+  const [customEndDate, setCustomEndDate] = useState(new Date());
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(20);
+  const [paginatedTransactions, setPaginatedTransactions] = useState([]);
+  const [hasMoreTransactions, setHasMoreTransactions] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   
   // Set header title and options
   useEffect(() => {
@@ -181,6 +200,127 @@ const AccountDetailsScreen = ({ route, navigation }) => {
       console.log(`No transactions available for account ${account.id}`);
     }
   }, [transactions, account.id]);
+
+  // Period filtering logic
+  useEffect(() => {
+    if (accountTransactions.length === 0) {
+      setFilteredTransactions([]);
+      setPaginatedTransactions([]);
+      setCurrentPage(1);
+      setHasMoreTransactions(false);
+      return;
+    }
+
+    const now = new Date();
+    let filtered = [...accountTransactions];
+
+    switch (selectedPeriod) {
+      case 'week':
+        const weekStart = new Date(now);
+        weekStart.setDate(now.getDate() - 7);
+        filtered = accountTransactions.filter(t => {
+          const transactionDate = t.date?.toDate ? t.date.toDate() : new Date(t.date);
+          return transactionDate >= weekStart;
+        });
+        break;
+      
+      case 'month':
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        filtered = accountTransactions.filter(t => {
+          const transactionDate = t.date?.toDate ? t.date.toDate() : new Date(t.date);
+          return transactionDate >= monthStart;
+        });
+        break;
+      
+      case 'year':
+        const yearStart = new Date(now.getFullYear(), 0, 1);
+        filtered = accountTransactions.filter(t => {
+          const transactionDate = t.date?.toDate ? t.date.toDate() : new Date(t.date);
+          return transactionDate >= yearStart;
+        });
+        break;
+      
+      case 'custom':
+        filtered = accountTransactions.filter(t => {
+          try {
+            const transactionDate = t.date?.toDate ? t.date.toDate() : new Date(t.date);
+            
+            // Reset time to start of day for comparison
+            const transactionDateOnly = new Date(transactionDate);
+            transactionDateOnly.setHours(0, 0, 0, 0);
+            
+            const startDate = new Date(customStartDate);
+            startDate.setHours(0, 0, 0, 0);
+            
+            const endDate = new Date(customEndDate);
+            endDate.setHours(23, 59, 59, 999); // Include full end date
+            
+            return transactionDateOnly >= startDate && transactionDateOnly <= endDate;
+          } catch (error) {
+            console.error('Error filtering transaction by custom date:', error, t);
+            return false;
+          }
+        });
+        break;
+      
+      case 'all':
+      default:
+        // No filtering needed
+        break;
+    }
+
+    setFilteredTransactions(filtered);
+    setCurrentPage(1); // Reset pagination when period changes
+  }, [accountTransactions, selectedPeriod, customStartDate, customEndDate]);
+
+  // Pagination logic
+  useEffect(() => {
+    const startIndex = 0;
+    const endIndex = currentPage * pageSize;
+    const paginated = filteredTransactions.slice(startIndex, endIndex);
+    
+    setPaginatedTransactions(paginated);
+    setHasMoreTransactions(endIndex < filteredTransactions.length);
+  }, [filteredTransactions, currentPage, pageSize]);
+
+  // Load more transactions for pagination
+  const loadMoreTransactions = () => {
+    if (!loadingMore && hasMoreTransactions) {
+      setLoadingMore(true);
+      setCurrentPage(prev => prev + 1);
+      setLoadingMore(false);
+    }
+  };
+
+  // Period selection functions
+  const handlePeriodChange = (period) => {
+    setSelectedPeriod(period);
+    setShowPeriodMenu(false);
+    
+    if (period === 'custom') {
+      setShowCustomDatePicker(true);
+    }
+  };
+
+  const getPeriodLabel = () => {
+    switch (selectedPeriod) {
+      case 'week': return 'This Week';
+      case 'month': return 'This Month';
+      case 'year': return 'This Year';
+      case 'custom': return 'Custom Range';
+      case 'all':
+      default: return 'All Time';
+    }
+  };
+  
+  // Format category for display
+  const formatCategory = (category) => {
+    if (!category) return '';
+    return category
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
   
   // Format currency with enhanced error handling
   const formatCurrency = (amount) => {
@@ -418,107 +558,294 @@ const AccountDetailsScreen = ({ route, navigation }) => {
         />
       </Menu>
       
-      {/* Use FlatList with header components to avoid nesting */}
-      <TransactionList 
-        transactions={accountTransactions} 
-        onTransactionPress={navigateToTransactionDetails} 
-        formatCurrency={(val) => formatCurrency(val)}
+      <ScrollView
+        style={styles.scrollView}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        ListHeaderComponent={() => (
-          <>
-            {/* Account overview card */}
-            <Card style={styles.overviewCard}>
-              <View style={styles.accountHeader}>
-                <View style={styles.iconContainer}>
-                  <MaterialIcons 
-                    name={getAccountIcon()} 
-                    size={40} 
-                    color={getAccountColor()} 
+      >
+        {/* Account overview card */}
+        <Card style={styles.overviewCard}>
+          <View style={styles.accountHeader}>
+            <View style={styles.iconContainer}>
+              <MaterialIcons 
+                name={getAccountIcon()} 
+                size={40} 
+                color={getAccountColor()} 
+              />
+            </View>
+            <View style={styles.accountInfo}>
+              <Text style={styles.accountName}>{account.name}</Text>
+              <Text style={styles.accountType}>{account.type}</Text>
+            </View>
+          </View>
+          
+          <Divider style={styles.divider} />
+          
+          <View style={styles.balanceSection}>
+            <Text style={styles.balanceLabel}>Current Balance</Text>
+            <Text style={[styles.balanceAmount, { color: getAccountColor() }]}>
+              {formatCurrency(account.balance || 0)}
+            </Text>
+          </View>
+          
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>Income</Text>
+              <Text style={[styles.statValue, { color: '#4CAF50' }]}>
+                {formatCurrency(stats.totalIncome)}
+              </Text>
+              {getInitialBalance(account) > 0 && (
+                <Text style={styles.statNote}>Includes initial balance</Text>
+              )}
+            </View>
+            
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>Expenses</Text>
+              <Text style={[styles.statValue, { color: '#F44336' }]}>
+                {formatCurrency(stats.totalExpense)}
+              </Text>
+            </View>
+            
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>Net</Text>
+              <Text style={[styles.statValue, { 
+                color: stats.netIncome >= 0 ? '#4CAF50' : '#F44336' 
+              }]}>
+                {formatCurrency(stats.netIncome)}
+              </Text>
+            </View>
+          </View>
+          
+          {account.description && (
+            <View style={styles.descriptionSection}>
+              <Text style={styles.descriptionLabel}>Description</Text>
+              <Text style={styles.descriptionText}>{account.description}</Text>
+            </View>
+          )}
+          
+          <View style={styles.metaSection}>
+            <Text style={styles.metaText}>
+              Created: {formatDate(account.createdAt)}
+            </Text>
+            {account.updatedAt && (
+              <Text style={styles.metaText}>
+                Last updated: {formatDate(account.updatedAt)}
+              </Text>
+            )}
+          </View>
+        </Card>
+        
+        {/* Action buttons */}
+        <View style={styles.actionButtonsContainer}>
+          <Button 
+            mode="contained" 
+            icon="plus" 
+            onPress={navigateToAddTransaction}
+            style={styles.addButton}
+          >
+            Add Transaction
+          </Button>
+        </View>
+        
+        {/* Transactions section with period filter */}
+        <Card style={styles.transactionsCard}>
+          <View style={styles.transactionsHeader}>
+            <Text style={styles.sectionTitle}>Transactions</Text>
+            <View style={styles.periodFilterContainer}>
+              <Menu
+                visible={showPeriodMenu}
+                onDismiss={() => setShowPeriodMenu(false)}
+                anchor={
+                  <TouchableOpacity
+                    style={styles.periodSelector}
+                    onPress={() => setShowPeriodMenu(true)}
+                  >
+                    <Text style={styles.periodText}>{getPeriodLabel()}</Text>
+                    <MaterialCommunityIcons name="chevron-down" size={20} color="#666" />
+                  </TouchableOpacity>
+                }
+              >
+                <Menu.Item onPress={() => handlePeriodChange('all')} title="All Time" />
+                <Menu.Item onPress={() => handlePeriodChange('week')} title="This Week" />
+                <Menu.Item onPress={() => handlePeriodChange('month')} title="This Month" />
+                <Menu.Item onPress={() => handlePeriodChange('year')} title="This Year" />
+                <Menu.Item onPress={() => handlePeriodChange('custom')} title="Custom Range" />
+              </Menu>
+            </View>
+          </View>
+          
+          {/* Transaction count and results info */}
+          <View style={styles.transactionInfo}>
+            <Text style={styles.transactionCount}>
+              {filteredTransactions.length === 0 
+                ? 'No transactions found' 
+                : `${filteredTransactions.length} transaction${filteredTransactions.length !== 1 ? 's' : ''} found`
+              }
+            </Text>
+            {selectedPeriod === 'custom' && (
+              <Text style={styles.customDateRange}>
+                {customStartDate.toLocaleDateString()} - {customEndDate.toLocaleDateString()}
+              </Text>
+            )}
+          </View>
+          
+          {/* Transaction list with pagination */}
+          <FlatList
+            data={paginatedTransactions}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            scrollEnabled={false}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.transactionItem}
+                onPress={() => navigateToTransactionDetails(item)}
+              >
+                <View style={styles.transactionIcon}>
+                  <MaterialCommunityIcons
+                    name={item.type === 'income' ? 'plus-circle' : 'minus-circle'}
+                    size={24}
+                    color={item.type === 'income' ? '#4CAF50' : '#F44336'}
                   />
                 </View>
-                <View style={styles.accountInfo}>
-                  <Text style={styles.accountName}>{account.name}</Text>
-                  <Text style={styles.accountType}>{account.type}</Text>
-                </View>
-              </View>
-              
-              <Divider style={styles.divider} />
-              
-              <View style={styles.balanceSection}>
-                <Text style={styles.balanceLabel}>Current Balance</Text>
-                <Text style={[styles.balanceAmount, { color: getAccountColor() }]}>
-                  {formatCurrency(account.balance || 0)}
-                </Text>
-              </View>
-              
-              <View style={styles.statsRow}>
-                <View style={styles.statItem}>
-                  <Text style={styles.statLabel}>Income</Text>
-                  <Text style={[styles.statValue, { color: '#4CAF50' }]}>
-                    {formatCurrency(stats.totalIncome)}
+                <View style={styles.transactionDetails}>
+                  <Text style={styles.transactionDescription}>
+                    {item.description || 'No description'}
                   </Text>
-                  {getInitialBalance(account) > 0 && (
-                    <Text style={styles.statNote}>Includes initial balance</Text>
+                  <Text style={styles.transactionDate}>
+                    {formatDate(item.date)}
+                  </Text>
+                  {item.category && (
+                    <Text style={styles.transactionCategory}>{formatCategory(item.category)}</Text>
                   )}
                 </View>
-                
-                <View style={styles.statItem}>
-                  <Text style={styles.statLabel}>Expenses</Text>
-                  <Text style={[styles.statValue, { color: '#F44336' }]}>
-                    {formatCurrency(stats.totalExpense)}
-                  </Text>
-                </View>
-                
-                <View style={styles.statItem}>
-                  <Text style={styles.statLabel}>Net</Text>
-                  <Text style={[styles.statValue, { 
-                    color: stats.netIncome >= 0 ? '#4CAF50' : '#F44336' 
-                  }]}>
-                    {formatCurrency(stats.netIncome)}
-                  </Text>
-                </View>
-              </View>
-              
-              {account.description && (
-                <View style={styles.descriptionSection}>
-                  <Text style={styles.descriptionLabel}>Description</Text>
-                  <Text style={styles.descriptionText}>{account.description}</Text>
-                </View>
-              )}
-              
-              <View style={styles.metaSection}>
-                <Text style={styles.metaText}>
-                  Created: {formatDate(account.createdAt)}
+                <Text style={[
+                  styles.transactionAmount,
+                  { color: item.type === 'income' ? '#4CAF50' : '#F44336' }
+                ]}>
+                  {item.type === 'income' ? '+' : '-'}{formatCurrency(Math.abs(item.amount))}
                 </Text>
-                {account.updatedAt && (
-                  <Text style={styles.metaText}>
-                    Last updated: {formatDate(account.updatedAt)}
-                  </Text>
-                )}
+              </TouchableOpacity>
+            )}
+            ListEmptyComponent={() => (
+              <View style={styles.emptyState}>
+                <MaterialCommunityIcons name="receipt" size={48} color="#ccc" />
+                <Text style={styles.emptyStateText}>No transactions found</Text>
+                <Text style={styles.emptyStateSubtext}>
+                  {selectedPeriod === 'all' 
+                    ? 'Add your first transaction to get started'
+                    : 'Try selecting a different time period'
+                  }
+                </Text>
               </View>
-            </Card>
+            )}
+            ListFooterComponent={() => 
+              hasMoreTransactions ? (
+                <TouchableOpacity
+                  style={styles.loadMoreButton}
+                  onPress={loadMoreTransactions}
+                  disabled={loadingMore}
+                >
+                  <Text style={styles.loadMoreText}>
+                    {loadingMore ? 'Loading...' : 'Load More'}
+                  </Text>
+                </TouchableOpacity>
+              ) : paginatedTransactions.length > 0 ? (
+                <View style={styles.endOfListIndicator}>
+                  <Text style={styles.endOfListText}>End of transactions</Text>
+                </View>
+              ) : null
+            }
+          />
+        </Card>
+      </ScrollView>
+
+      {/* Custom date picker modals */}
+      <Portal>
+        <Modal
+          visible={showCustomDatePicker}
+          onDismiss={() => setShowCustomDatePicker(false)}
+          contentContainerStyle={styles.datePickerModal}
+        >
+          <View style={styles.datePickerContainer}>
+            <Text style={styles.datePickerTitle}>Select Date Range</Text>
             
-            {/* Action buttons */}
-            <View style={styles.actionButtonsContainer}>
-              <Button 
-                mode="contained" 
-                icon="plus" 
-                onPress={navigateToAddTransaction}
-                style={styles.addButton}
+            <View style={styles.dateInputRow}>
+              <Text style={styles.dateLabel}>Start Date:</Text>
+              <TouchableOpacity
+                style={styles.dateButton}
+                onPress={() => setShowStartDatePicker(true)}
               >
-                Add Transaction
+                <Text style={styles.dateButtonText}>
+                  {customStartDate.toLocaleDateString()}
+                </Text>
+                <MaterialCommunityIcons name="calendar" size={20} color="#666" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.dateInputRow}>
+              <Text style={styles.dateLabel}>End Date:</Text>
+              <TouchableOpacity
+                style={styles.dateButton}
+                onPress={() => setShowEndDatePicker(true)}
+              >
+                <Text style={styles.dateButtonText}>
+                  {customEndDate.toLocaleDateString()}
+                </Text>
+                <MaterialCommunityIcons name="calendar" size={20} color="#666" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.datePickerActions}>
+              <Button
+                mode="outlined"
+                onPress={() => setShowCustomDatePicker(false)}
+                style={styles.cancelButton}
+              >
+                Cancel
+              </Button>
+              <Button
+                mode="contained"
+                onPress={() => {
+                  setShowCustomDatePicker(false);
+                  // Period filtering will trigger automatically via useEffect
+                }}
+                style={styles.applyButton}
+              >
+                Apply
               </Button>
             </View>
-            
-            {/* Transactions header */}
-            <View style={styles.transactionsSection}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Transactions</Text>
-              </View>
-            </View>
-          </>
-        )}
-      />
+          </View>
+        </Modal>
+      </Portal>
+
+      {/* Start date picker */}
+      {showStartDatePicker && (
+        <DateTimePicker
+          value={customStartDate}
+          mode="date"
+          display="default"
+          onChange={(event, selectedDate) => {
+            setShowStartDatePicker(false);
+            if (selectedDate) {
+              setCustomStartDate(selectedDate);
+            }
+          }}
+        />
+      )}
+
+      {/* End date picker */}
+      {showEndDatePicker && (
+        <DateTimePicker
+          value={customEndDate}
+          mode="date"
+          display="default"
+          onChange={(event, selectedDate) => {
+            setShowEndDatePicker(false);
+            if (selectedDate) {
+              setCustomEndDate(selectedDate);
+            }
+          }}
+        />
+      )}
     </View>
   );
 };
@@ -527,6 +854,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+    paddingBottom: 20,
+  },
+  scrollView: {
+    flex: 1,
   },
   menu: {
     position: 'absolute',
@@ -636,22 +967,177 @@ const styles = StyleSheet.create({
   addButton: {
     borderRadius: 4,
   },
-  transactionsSection: {
-    marginTop: 8,
-    backgroundColor: '#fff',
-    paddingBottom: 16,
+  transactionsCard: {
+    margin: 16,
+    marginTop: 0,
+    borderRadius: 8,
+    elevation: 4,
   },
-  sectionHeader: {
-    padding: 16,
+  transactionsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  periodFilterContainer: {
+    alignItems: 'flex-end',
+  },
+  periodSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  periodText: {
+    fontSize: 14,
+    color: '#333',
+    marginRight: 4,
+  },
+  transactionInfo: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  transactionCount: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  customDateRange: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 2,
+  },
+  transactionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    backgroundColor: '#fff',
+  },
+  transactionIcon: {
+    marginRight: 12,
+  },
+  transactionDetails: {
+    flex: 1,
+  },
+  transactionDescription: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 2,
+  },
+  transactionDate: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 2,
+  },
+  transactionCategory: {
+    fontSize: 12,
+    color: '#888',
+    fontStyle: 'italic',
+  },
+  transactionAmount: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  emptyState: {
+    alignItems: 'center',
+    padding: 32,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: '#888',
+    textAlign: 'center',
+  },
+  loadMoreButton: {
+    padding: 16,
+    alignItems: 'center',
+    backgroundColor: '#f8f8f8',
+  },
+  loadMoreText: {
+    fontSize: 14,
+    color: '#2196F3',
+    fontWeight: '500',
+  },
+  endOfListIndicator: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  endOfListText: {
+    fontSize: 12,
+    color: '#999',
+  },
+  datePickerModal: {
+    backgroundColor: 'white',
+    margin: 20,
+    borderRadius: 8,
+    elevation: 5,
+  },
+  datePickerContainer: {
+    padding: 20,
+  },
+  datePickerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  dateInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  dateLabel: {
+    fontSize: 16,
+    color: '#333',
+    width: 80,
+  },
+  dateButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  dateButtonText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  datePickerActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  cancelButton: {
+    flex: 1,
+    marginRight: 8,
+  },
+  applyButton: {
+    flex: 1,
+    marginLeft: 8,
   },
 });
 

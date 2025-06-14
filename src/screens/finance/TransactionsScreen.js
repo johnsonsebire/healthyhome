@@ -292,6 +292,15 @@ const TransactionsScreen = ({ navigation, route }) => {
     }
   };
 
+  // Format category for display
+  const formatCategory = (category) => {
+    if (!category) return '';
+    return category
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
   // Format currency for display
   const formatCurrency = (amount, currency) => {
     if (userCurrencySettings?.autoConvert && currency !== displayCurrency) {
@@ -341,8 +350,8 @@ const TransactionsScreen = ({ navigation, route }) => {
           textStyle={filterCategory !== 'all' ? styles.selectedChipText : styles.chipText}
           icon={filterCategory !== 'all' ? 'check' : props => <MaterialCommunityIcons name="shape" {...props} />}
         >
-          {filterCategory === 'all' ? 'All Categories' : 
-           filterCategory.charAt(0).toUpperCase() + filterCategory.slice(1)}
+        {filterCategory === 'all' ? 'All Categories' : 
+           formatCategory(filterCategory)}
         </Chip>
       )}
 
@@ -516,7 +525,7 @@ const TransactionsScreen = ({ navigation, route }) => {
         {categories.map(category => (
           <Menu.Item 
             key={category}
-            title={category.charAt(0).toUpperCase() + category.slice(1)} 
+            title={formatCategory(category)} 
             onPress={() => { setFilterCategory(category); setShowCategoryMenu(false); }}
             leadingIcon={filterCategory === category ? 'check' : undefined}
           />
@@ -691,6 +700,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+    paddingBottom: 20,
   },
   headerButtons: {
     flexDirection: 'row',

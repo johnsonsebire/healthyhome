@@ -7,10 +7,12 @@ import {
   TouchableOpacity, 
   RefreshControl,
   ActivityIndicator,
-  Alert
+  Alert,
+  Modal
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Button, Card, Chip, SegmentedButtons } from 'react-native-paper';
+import { Button, Card, Chip, SegmentedButtons, Portal } from 'react-native-paper';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFinance, FINANCE_SCOPE } from '../../contexts/FinanceContext';
 import FinancialReportChart from '../../components/finance/FinancialReportChart';
 
@@ -24,13 +26,20 @@ const ReportsScreen = ({ navigation }) => {
   } = useFinance();
   
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState('month');
+  const [selectedPeriod, setSelectedPeriod] = useState('week');
   const [selectedScope, setSelectedScope] = useState(currentScope);
   const [reportData, setReportData] = useState(null);
   const [filterOptions, setFilterOptions] = useState({
     accounts: [],
     categories: []
   });
+
+  // Custom date range states
+  const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
+  const [customStartDate, setCustomStartDate] = useState(new Date());
+  const [customEndDate, setCustomEndDate] = useState(new Date());
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   
   // Load data when scope changes
   useEffect(() => {
@@ -42,6 +51,12 @@ const ReportsScreen = ({ navigation }) => {
   // Generate report when transactions, period, or scope changes
   useEffect(() => {
     if (transactions && transactions.length > 0) {
+      // Handle custom date picker changes
+      if (selectedPeriod === 'custom') {
+        setShowCustomDatePicker(true);
+        return;
+      }
+      
       try {
         generateReport();
       } catch (error) {
@@ -59,7 +74,7 @@ const ReportsScreen = ({ navigation }) => {
         });
       }
     }
-  }, [transactions, selectedPeriod, selectedScope]);
+  }, [transactions, selectedPeriod, selectedScope, customStartDate, customEndDate]);
   
   // Create account filter options
   useEffect(() => {
@@ -160,6 +175,12 @@ const ReportsScreen = ({ navigation }) => {
           // Current year
           startDate = new Date(now.getFullYear(), 0, 1);
           endDate = new Date(now.getFullYear(), 11, 31);
+          break;
+        case 'custom':
+          // Use custom date range
+          startDate = new Date(customStartDate);
+          endDate = new Date(customEndDate);
+          endDate.setHours(23, 59, 59, 999); // Include full end date
           break;
         default:
           startDate = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -407,6 +428,26 @@ const ReportsScreen = ({ navigation }) => {
         return 'Personal';
     }
   };
+
+  // Handle custom date picker
+  const handleCustomDateApply = () => {
+    setShowCustomDatePicker(false);
+    generateReport();
+  };
+
+  const handleStartDateChange = (event, selectedDate) => {
+    setShowStartDatePicker(false);
+    if (selectedDate) {
+      setCustomStartDate(selectedDate);
+    }
+  };
+
+  const handleEndDateChange = (event, selectedDate) => {
+    setShowEndDatePicker(false);
+    if (selectedDate) {
+      setCustomEndDate(selectedDate);
+    }
+  };
   
   return (
     <ScrollView 
@@ -426,7 +467,8 @@ const ReportsScreen = ({ navigation }) => {
             { value: 'week', label: 'Week' },
             { value: 'month', label: 'Month' },
             { value: 'quarter', label: 'Quarter' },
-            { value: 'year', label: 'Year' }
+            { value: 'year', label: 'Year' },
+            { value: 'custom', label: 'Custom' }
           ]}
           style={styles.segmentedButtons}
         />
@@ -546,6 +588,82 @@ const ReportsScreen = ({ navigation }) => {
           </View>
         </>
       )}
+      
+      {/* Custom Date Picker Modal */}
+      <Portal>
+        <Modal
+          visible={showCustomDatePicker}
+          onDismiss={() => setShowCustomDatePicker(false)}
+          contentContainerStyle={styles.datePickerModal}
+        >
+          <View style={styles.datePickerContainer}>
+            <Text style={styles.datePickerTitle}>Select Date Range</Text>
+            
+            <View style={styles.dateInputRow}>
+              <Text style={styles.dateLabel}>Start Date:</Text>
+              <TouchableOpacity
+                style={styles.dateButton}
+                onPress={() => setShowStartDatePicker(true)}
+              >
+                <Text style={styles.dateButtonText}>
+                  {customStartDate.toLocaleDateString()}
+                </Text>
+                <MaterialIcons name="calendar-today" size={20} color="#666" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.dateInputRow}>
+              <Text style={styles.dateLabel}>End Date:</Text>
+              <TouchableOpacity
+                style={styles.dateButton}
+                onPress={() => setShowEndDatePicker(true)}
+              >
+                <Text style={styles.dateButtonText}>
+                  {customEndDate.toLocaleDateString()}
+                </Text>
+                <MaterialIcons name="calendar-today" size={20} color="#666" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.datePickerActions}>
+              <Button
+                mode="outlined"
+                onPress={() => setShowCustomDatePicker(false)}
+                style={styles.cancelButton}
+              >
+                Cancel
+              </Button>
+              <Button
+                mode="contained"
+                onPress={handleCustomDateApply}
+                style={styles.applyButton}
+              >
+                Apply
+              </Button>
+            </View>
+          </View>
+        </Modal>
+      </Portal>
+
+      {/* Start date picker for custom range */}
+      {showStartDatePicker && (
+        <DateTimePicker
+          value={customStartDate}
+          mode="date"
+          display="default"
+          onChange={handleStartDateChange}
+        />
+      )}
+
+      {/* End date picker for custom range */}
+      {showEndDatePicker && (
+        <DateTimePicker
+          value={customEndDate}
+          mode="date"
+          display="default"
+          onChange={handleEndDateChange}
+        />
+      )}
     </ScrollView>
   );
 };
@@ -554,6 +672,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+    paddingBottom: 20,
   },
   optionsContainer: {
     padding: 16,
@@ -687,6 +806,61 @@ const styles = StyleSheet.create({
     color: '#d32f2f',
     textAlign: 'center',
     marginTop: 8,
+  },
+  // Custom date picker styles
+  datePickerModal: {
+    backgroundColor: 'white',
+    margin: 20,
+    borderRadius: 12,
+    padding: 20,
+    elevation: 4,
+  },
+  datePickerContainer: {
+    minHeight: 200,
+  },
+  datePickerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  dateInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  dateLabel: {
+    fontSize: 16,
+    color: '#333',
+    width: 80,
+  },
+  dateButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  dateButtonText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  datePickerActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  cancelButton: {
+    flex: 1,
+    marginRight: 8,
+  },
+  applyButton: {
+    flex: 1,
+    marginLeft: 8,
   },
 });
 

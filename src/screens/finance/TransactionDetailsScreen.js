@@ -72,6 +72,15 @@ const TransactionDetailsScreen = ({ route, navigation }) => {
     }
   }, [accounts, transaction]);
   
+  // Format category for display
+  const formatCategory = (category) => {
+    if (!category) return '';
+    return category
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
   // Format currency
   const formatCurrency = (amount, currency = 'USD') => {
     return new Intl.NumberFormat('en-US', { 
@@ -214,7 +223,7 @@ const TransactionDetailsScreen = ({ route, navigation }) => {
               {transaction.description || transaction.category || (transaction.type === 'income' ? 'Income' : 'Expense')}
             </Text>
             <Text style={styles.transactionCategory}>
-              {transaction.category ? transaction.category.replace('_', ' ') : transaction.type}
+              {transaction.category ? formatCategory(transaction.category) : transaction.type}
             </Text>
           </View>
         </View>
@@ -329,6 +338,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+    paddingBottom: 20,
   },
   menu: {
     position: 'absolute',

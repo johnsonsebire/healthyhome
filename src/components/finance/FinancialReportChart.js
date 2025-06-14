@@ -28,6 +28,15 @@ const FinancialReportChart = ({ data, type = 'income-expense', currency = 'GHS' 
       return '0.00';
     }
   };
+
+  // Format category for display
+  const formatCategory = (category) => {
+    if (!category) return '';
+    return category
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
   
   // Simple income/expense summary that avoids complex operations
   const renderSummary = () => {
@@ -96,7 +105,7 @@ const FinancialReportChart = ({ data, type = 'income-expense', currency = 'GHS' 
       const renderCategory = (name, amount, isIncome) => {
         return (
           <View key={name} style={styles.categoryItem}>
-            <Text style={styles.categoryName}>{name || 'Other'}</Text>
+            <Text style={styles.categoryName}>{formatCategory(name) || 'Other'}</Text>
             <Text
               style={[
                 styles.categoryAmount,
