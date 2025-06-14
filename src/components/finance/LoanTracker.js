@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Card } from 'react-native-paper';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 const LoanTracker = ({ loan, onPress, onRecordPayment }) => {
   // Format currency
@@ -162,7 +162,7 @@ const LoanTracker = ({ loan, onPress, onRecordPayment }) => {
           
           <View style={styles.detailsContainer}>
             <View style={styles.detailItem}>
-              <MaterialIcons name="date-range" size={16} color="#666" />
+              <MaterialCommunityIcons name="calendar-range" size={16} color="#666" />
               <Text style={styles.detailText}>
                 Start: {formatDate(loan.startDate)}
               </Text>

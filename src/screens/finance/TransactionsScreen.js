@@ -8,7 +8,7 @@ import {
   RefreshControl,
   Alert
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Button, Card, Chip, Menu, Searchbar, Divider } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFinance, FINANCE_SCOPE } from '../../contexts/FinanceContext';
@@ -315,7 +315,7 @@ const TransactionsScreen = ({ navigation, route }) => {
         onPress={() => setShowTypeMenu(true)}
         style={[styles.filterChip, filterType !== 'all' && styles.selectedChip]}
         textStyle={filterType !== 'all' ? styles.selectedChipText : styles.chipText}
-        icon={filterType !== 'all' ? 'check' : 'filter-list'}
+        icon={filterType !== 'all' ? 'check' : props => <MaterialCommunityIcons name="filter-variant" {...props} />}
       >
         {filterType === 'all' ? 'All Types' : filterType.charAt(0).toUpperCase() + filterType.slice(1)}
       </Chip>
@@ -326,7 +326,7 @@ const TransactionsScreen = ({ navigation, route }) => {
         onPress={() => setShowAccountMenu(true)}
         style={[styles.filterChip, filterAccount !== 'all' && styles.selectedChip]}
         textStyle={filterAccount !== 'all' ? styles.selectedChipText : styles.chipText}
-        icon={filterAccount !== 'all' ? 'check' : 'account-balance-wallet'}
+        icon={filterAccount !== 'all' ? 'check' : props => <MaterialCommunityIcons name="wallet" {...props} />}
       >
         {filterAccount === 'all' ? 'All Accounts' : 
          scopedAccounts.find(a => a.id === filterAccount)?.name || 'Account'}
@@ -339,7 +339,7 @@ const TransactionsScreen = ({ navigation, route }) => {
           onPress={() => setShowCategoryMenu(true)}
           style={[styles.filterChip, filterCategory !== 'all' && styles.selectedChip]}
           textStyle={filterCategory !== 'all' ? styles.selectedChipText : styles.chipText}
-          icon={filterCategory !== 'all' ? 'check' : 'category'}
+          icon={filterCategory !== 'all' ? 'check' : props => <MaterialCommunityIcons name="shape" {...props} />}
         >
           {filterCategory === 'all' ? 'All Categories' : 
            filterCategory.charAt(0).toUpperCase() + filterCategory.slice(1)}
@@ -352,7 +352,7 @@ const TransactionsScreen = ({ navigation, route }) => {
         onPress={() => setShowDateFilter(true)}
         style={[styles.filterChip, (dateRange.start || dateRange.end) && styles.selectedChip]}
         textStyle={(dateRange.start || dateRange.end) ? styles.selectedChipText : styles.chipText}
-        icon="date-range"
+        icon={props => <MaterialCommunityIcons name="calendar-range" {...props} />}
       >
         {dateRange.start || dateRange.end ? 'Date Range' : 'Filter Date'}
       </Chip>

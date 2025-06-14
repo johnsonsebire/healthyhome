@@ -7,7 +7,7 @@ import {
   TouchableOpacity, 
   Alert 
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Card, Button, Divider, Menu } from 'react-native-paper';
 import { useFinance } from '../../contexts/FinanceContext';
 
@@ -111,7 +111,7 @@ const TransactionDetailsScreen = ({ route, navigation }) => {
   const getTransactionIcon = () => {
     const iconMap = {
       // Income categories
-      'salary': 'account-balance-wallet',
+      'salary': props => <MaterialCommunityIcons name="wallet" {...props} />,
       'investment': 'trending-up',
       'gift': 'card-giftcard',
       'other_income': 'attach-money',
@@ -199,11 +199,15 @@ const TransactionDetailsScreen = ({ route, navigation }) => {
       <Card style={styles.overviewCard}>
         <View style={styles.transactionHeader}>
           <View style={[styles.iconContainer, { backgroundColor: getTransactionColor() + '20' }]}>
-            <MaterialIcons 
-              name={getTransactionIcon()} 
-              size={40} 
-              color={getTransactionColor()} 
-            />
+            {typeof getTransactionIcon() === 'function' ? (
+              getTransactionIcon()({ size: 40, color: getTransactionColor() })
+            ) : (
+              <MaterialIcons 
+                name={getTransactionIcon()} 
+                size={40} 
+                color={getTransactionColor()} 
+              />
+            )}
           </View>
           <View style={styles.transactionInfo}>
             <Text style={styles.transactionTitle}>

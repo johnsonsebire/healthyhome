@@ -8,7 +8,7 @@ import {
   Dimensions,
   Alert
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 const itemWidth = (width - 48) / 2; // 2 columns with padding
@@ -51,7 +51,8 @@ const MenuScreen = ({ navigation }) => {
       id: 'finance',
       title: 'Finance',
       description: 'Money management',
-      icon: 'account-balance-wallet',
+      icon: 'wallet',
+      isMaterialCommunity: true,
       color: '#607D8B',
       onPress: () => navigation.navigate('Finance')
     },
@@ -138,7 +139,11 @@ const MenuScreen = ({ navigation }) => {
       activeOpacity={0.7}
     >
       <View style={[styles.iconContainer, { backgroundColor: shortcut.color }]}>
-        <MaterialIcons name={shortcut.icon} size={28} color="#fff" />
+        {shortcut.isMaterialCommunity ? (
+          <MaterialCommunityIcons name={shortcut.icon} size={28} color="#fff" />
+        ) : (
+          <MaterialIcons name={shortcut.icon} size={28} color="#fff" />
+        )}
         {shortcut.isComingSoon && (
           <View style={styles.comingSoonBadge}>
             <Text style={styles.comingSoonText}>Soon</Text>

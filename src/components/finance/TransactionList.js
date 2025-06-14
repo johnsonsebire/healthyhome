@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { Divider } from 'react-native-paper';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import currencyService from '../../services/currencyService';
 
 const TransactionList = ({ 
@@ -29,7 +29,7 @@ const TransactionList = ({
     
     const iconMap = {
       // Income categories
-      'salary': 'account-balance-wallet',
+      'salary': 'wallet',
       'investment': 'trending-up',
       'gift': 'card-giftcard',
       'other_income': 'attach-money',
@@ -144,11 +144,19 @@ const TransactionList = ({
           onLongPress={() => onTransactionLongPress && onTransactionLongPress(item)}
         >
           <View style={styles.iconContainer}>
-            <MaterialIcons 
-              name={getTransactionIcon(item)} 
-              size={24} 
-              color={getTransactionColor(item)} 
-            />
+            {getTransactionIcon(item) === 'wallet' ? (
+              <MaterialCommunityIcons 
+                name="wallet"
+                size={24}
+                color={getTransactionColor(item)}
+              />
+            ) : (
+              <MaterialIcons 
+                name={getTransactionIcon(item)} 
+                size={24} 
+                color={getTransactionColor(item)} 
+              />
+            )}
           </View>
           <View style={styles.transactionDetails}>
             <Text style={styles.transactionDescription}>
@@ -192,12 +200,18 @@ const TransactionList = ({
       data={transactions}
       renderItem={renderTransactionItem}
       keyExtractor={(item, index) => {
-        if (!item) return `empty-${index}-${Math.random().toString()}`;
-        // Use a consistent key to prevent duplicates in the UI
-        if (item.id) return `transaction-${item.id}`;
-        if (item.transactionId) return `transaction-${item.transactionId}`;
-        // Include the index as part of the key to ensure uniqueness
-        return `transaction-${index}-${item.date?.toString() || ''}-${item.amount || ''}-${item.description || ''}`;
+        if (!item) return `empty-${index}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Create a truly unique key with a combination of id and index
+        if (item.id) return `transaction-${item.id}-${index}`;
+        if (item.transactionId) return `transaction-${item.transactionId}-${index}`;
+        
+        // As a last resort, create a unique composite key with multiple properties and the index
+        const dateStr = item.date ? 
+          (typeof item.date.toDate === 'function' ? item.date.toDate().getTime() : new Date(item.date).getTime()) : 
+          Date.now();
+        
+        return `transaction-${index}-${dateStr}-${item.amount || '0'}-${item.type || ''}-${Math.random().toString(36).substr(2, 5)}`;
       }}
       ItemSeparatorComponent={renderSeparator}
       ListEmptyComponent={renderEmptyState}

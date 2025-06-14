@@ -9,7 +9,7 @@ import {
   Alert
 } from 'react-native';
 import { Button, Divider, Menu } from 'react-native-paper';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFinance } from '../../contexts/FinanceContext';
 import { useFamilySharing } from '../../contexts/FamilySharingContext';
 
@@ -82,7 +82,7 @@ const EditAccountScreen = ({ navigation, route }) => {
   // Icons
   const icons = [
     { value: 'account-balance', label: 'Bank' },
-    { value: 'account-balance-wallet', label: 'Wallet' },
+    { value: 'wallet', label: 'Wallet', isMaterialCommunity: true },
     { value: 'credit-card', label: 'Credit Card' },
     { value: 'savings', label: 'Savings' },
     { value: 'attach-money', label: 'Cash' },

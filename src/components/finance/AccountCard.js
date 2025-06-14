@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Card as PaperCard } from 'react-native-paper';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import currencyService from '../../services/currencyService';
 
 const AccountCard = ({ account, onPress }) => {
@@ -59,11 +59,11 @@ const AccountCard = ({ account, onPress }) => {
         case 'investment':
           return 'trending-up';
         default:
-          return 'account-balance-wallet';
+          return 'wallet';
       }
     } catch (error) {
       console.warn('Error getting account icon:', error);
-      return 'account-balance-wallet'; // Default icon as fallback
+      return 'wallet'; // Default icon as fallback
     }
   };
 

@@ -8,7 +8,7 @@ import {
   RefreshControl,
   Alert
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Button, Card, Chip, Menu, Searchbar } from 'react-native-paper';
 import { useFinance, FINANCE_SCOPE } from '../../contexts/FinanceContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -221,7 +221,7 @@ const AccountsScreen = ({ navigation, route }) => {
   // Render empty state
   const renderEmptyState = () => (
     <View style={styles.emptyStateContainer}>
-      <MaterialIcons name="account-balance-wallet" size={64} color="#ccc" />
+      <MaterialCommunityIcons name="wallet" size={64} color="#ccc" />
       <Text style={styles.emptyStateTitle}>No Accounts Found</Text>
       <Text style={styles.emptyStateDescription}>
         {searchQuery || filterType !== 'all' 

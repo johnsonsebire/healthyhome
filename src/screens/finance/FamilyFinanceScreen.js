@@ -8,7 +8,7 @@ import {
   RefreshControl,
   Alert 
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFinance, FINANCE_SCOPE } from '../../contexts/FinanceContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useFamilySharing } from '../../contexts/FamilySharingContext';
@@ -329,7 +329,7 @@ const FamilyFinanceScreen = ({ navigation }) => {
         
         {(familyAccounts || []).length === 0 ? (
           <View style={styles.emptyStateContainer}>
-            <MaterialIcons name="account-balance-wallet" size={48} color="#ccc" />
+            <MaterialCommunityIcons name="wallet" size={48} color="#ccc" />
             <Text style={styles.emptyStateText}>No family accounts yet</Text>
             <TouchableOpacity 
               style={styles.emptyStateButton}
