@@ -28,7 +28,16 @@ const ReportsScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState('week');
   const [selectedScope, setSelectedScope] = useState(currentScope);
-  const [reportData, setReportData] = useState(null);
+  const [reportData, setReportData] = useState({
+    startDate: new Date().toLocaleDateString(),
+    endDate: new Date().toLocaleDateString(),
+    totalIncome: 0,
+    totalExpense: 0,
+    netIncome: 0,
+    incomeByCategory: {},
+    expenseByCategory: {},
+    dateGroups: {}
+  });
   const [filterOptions, setFilterOptions] = useState({
     accounts: [],
     categories: []
@@ -48,7 +57,7 @@ const ReportsScreen = ({ navigation }) => {
     }
   }, [selectedScope]);
   
-  // Generate report when transactions, period, or scope changes
+  // Generate report when transactions, period, scope, or filter options change
   useEffect(() => {
     // Handle custom date picker changes
     if (selectedPeriod === 'custom') {
@@ -56,23 +65,44 @@ const ReportsScreen = ({ navigation }) => {
       return;
     }
     
-    try {
-      generateReport();
-    } catch (error) {
-      console.error('Error generating report:', error);
-      // Set a minimal valid report data structure as fallback
-      setReportData({
-        startDate: new Date().toLocaleDateString(),
-        endDate: new Date().toLocaleDateString(),
-        totalIncome: 0,
-        totalExpense: 0,
-        netIncome: 0,
-        incomeByCategory: {},
-        expenseByCategory: {},
-        dateGroups: {}
-      });
+    // Only generate report if we have transactions and accounts data loaded
+    if (transactions && accounts && filterOptions.accounts.length > 0) {
+      try {
+        generateReport();
+      } catch (error) {
+        console.error('Error generating report:', error);
+        // Set a minimal valid report data structure as fallback
+        setReportData({
+          startDate: new Date().toLocaleDateString(),
+          endDate: new Date().toLocaleDateString(),
+          totalIncome: 0,
+          totalExpense: 0,
+          netIncome: 0,
+          incomeByCategory: {},
+          expenseByCategory: {},
+          dateGroups: {}
+        });
+      }
+    } else if (transactions && accounts) {
+      // If we have transactions and accounts but no filter options yet, generate with empty filters
+      try {
+        generateReportWithoutFilters();
+      } catch (error) {
+        console.error('Error generating report without filters:', error);
+        // Set a minimal valid report data structure as fallback
+        setReportData({
+          startDate: new Date().toLocaleDateString(),
+          endDate: new Date().toLocaleDateString(),
+          totalIncome: 0,
+          totalExpense: 0,
+          netIncome: 0,
+          incomeByCategory: {},
+          expenseByCategory: {},
+          dateGroups: {}
+        });
+      }
     }
-  }, [transactions, selectedPeriod, selectedScope, customStartDate, customEndDate]);
+  }, [transactions, selectedPeriod, selectedScope, customStartDate, customEndDate, filterOptions.accounts, accounts]);
   
   // Create account filter options
   useEffect(() => {
@@ -144,6 +174,175 @@ const ReportsScreen = ({ navigation }) => {
     setRefreshing(false);
   };
   
+  // Generate report data based on the selected period (without filters for initial load)
+  const generateReportWithoutFilters = () => {
+    try {
+      // Get start and end dates based on selected period
+      const now = new Date();
+      let startDate, endDate;
+      
+      switch (selectedPeriod) {
+        case 'week':
+          // Last 7 days
+          startDate = new Date(now);
+          startDate.setDate(now.getDate() - 7);
+          endDate = now;
+          break;
+        case 'month':
+          // Current month
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+          break;
+        case 'quarter':
+          // Current quarter
+          const quarter = Math.floor(now.getMonth() / 3);
+          startDate = new Date(now.getFullYear(), quarter * 3, 1);
+          endDate = new Date(now.getFullYear(), (quarter + 1) * 3, 0);
+          break;
+        case 'year':
+          // Current year
+          startDate = new Date(now.getFullYear(), 0, 1);
+          endDate = new Date(now.getFullYear(), 11, 31);
+          break;
+        case 'custom':
+          // Use custom date range
+          startDate = new Date(customStartDate);
+          endDate = new Date(customEndDate);
+          endDate.setHours(23, 59, 59, 999); // Include full end date
+          break;
+        default:
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      }
+      
+      // Filter transactions based on date range only (no account/category filters)
+      const filteredTransactions = (transactions || []).filter(transaction => {
+        try {
+          if (!transaction || !transaction.date) {
+            console.warn('Skipping transaction with missing date', transaction?.id);
+            return false;
+          }
+          
+          const transactionDate = transaction.date.toDate ? transaction.date.toDate() : new Date(transaction.date);
+          const isInDateRange = transactionDate >= startDate && transactionDate <= endDate;
+          
+          // Only filter by scope if we have accounts data
+          if (accounts && accounts.length > 0) {
+            const transactionAccount = accounts.find(account => account && account.id === transaction.accountId);
+            const isInScope = transactionAccount && transactionAccount.scope === selectedScope;
+            return isInDateRange && isInScope;
+          }
+          
+          return isInDateRange;
+        } catch (error) {
+          console.error('Error filtering transaction:', error, transaction);
+          return false;
+        }
+      });
+      
+      // Calculate totals
+      const totalIncome = filteredTransactions
+        .filter(t => t && t.type === 'income')
+        .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+        
+      const totalExpense = filteredTransactions
+        .filter(t => t && t.type === 'expense')
+        .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+      
+      // Group by category
+      const incomeByCategory = {};
+      const expenseByCategory = {};
+      
+      filteredTransactions.forEach(transaction => {
+        try {
+          if (!transaction) return;
+          
+          const amount = parseFloat(transaction.amount) || 0;
+          const category = transaction.category || 'Other';
+          
+          if (transaction.type === 'income') {
+            incomeByCategory[category] = (incomeByCategory[category] || 0) + amount;
+          } else if (transaction.type === 'expense') {
+            expenseByCategory[category] = (expenseByCategory[category] || 0) + amount;
+          }
+        } catch (error) {
+          console.error('Error processing transaction for category grouping:', error, transaction?.id);
+        }
+      });
+      
+      // Group by date for trends
+      const dateGroups = {};
+      let dateFormat = { day: '2-digit' };
+      
+      switch (selectedPeriod) {
+        case 'week':
+          dateFormat = { day: '2-digit' };
+          break;
+        case 'month':
+          dateFormat = { day: '2-digit' };
+          break;
+        case 'quarter':
+          dateFormat = { month: 'short', day: '2-digit' };
+          break;
+        case 'year':
+          dateFormat = { month: 'short' };
+          break;
+        default:
+          dateFormat = { day: '2-digit' };
+      }
+      
+      filteredTransactions.forEach(transaction => {
+        try {
+          if (!transaction || !transaction.date) return;
+          
+          const transactionDate = transaction.date.toDate ? transaction.date.toDate() : new Date(transaction.date);
+          if (isNaN(transactionDate.getTime())) return;
+          
+          const dateKey = transactionDate.toLocaleDateString('en-US', dateFormat);
+          
+          if (!dateGroups[dateKey]) {
+            dateGroups[dateKey] = { income: 0, expense: 0 };
+          }
+          
+          const amount = parseFloat(transaction.amount) || 0;
+          
+          if (transaction.type === 'income') {
+            dateGroups[dateKey].income += amount;
+          } else if (transaction.type === 'expense') {
+            dateGroups[dateKey].expense += amount;
+          }
+        } catch (error) {
+          console.error('Error processing transaction for date group:', error, transaction?.id);
+        }
+      });
+      
+      // Set report data
+      setReportData({
+        startDate: startDate.toLocaleDateString(),
+        endDate: endDate.toLocaleDateString(),
+        totalIncome,
+        totalExpense,
+        netIncome: totalIncome - totalExpense,
+        incomeByCategory,
+        expenseByCategory,
+        dateGroups
+      });
+    } catch (error) {
+      console.error('Error generating report without filters:', error);
+      // Set fallback data
+      setReportData({
+        startDate: new Date().toLocaleDateString(),
+        endDate: new Date().toLocaleDateString(),
+        totalIncome: 0,
+        totalExpense: 0,
+        netIncome: 0,
+        incomeByCategory: {},
+        expenseByCategory: {},
+        dateGroups: {}
+      });
+    }
+  };
+
   // Generate report data based on the selected period
   const generateReport = () => {
     try {
@@ -491,7 +690,7 @@ const ReportsScreen = ({ navigation }) => {
       )}
       
       {/* No data message */}
-      {!isLoading && (!reportData || !transactions || transactions.length === 0) && (
+      {!isLoading && !reportData && (!transactions || transactions.length === 0) && (
         <View style={styles.noDataContainer}>
           <MaterialIcons name="insert-chart" size={64} color="#ccc" />
           <Text style={styles.noDataText}>No financial data available</Text>
@@ -501,7 +700,7 @@ const ReportsScreen = ({ navigation }) => {
         </View>
       )}
       
-      {/* Report Summary */}
+      {/* Report Summary - Show even if no transactions, will display zeros */}
       {!isLoading && reportData && (
         <>
           <Card style={styles.summaryCard}>
@@ -670,7 +869,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
-    paddingBottom: 20,
+    paddingBottom: 40,
   },
   optionsContainer: {
     padding: 16,

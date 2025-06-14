@@ -5,7 +5,6 @@ import {
   StyleSheet, 
   ScrollView, 
   TouchableOpacity, 
-  FlatList,
   RefreshControl,
   Alert
 } from 'react-native';
@@ -257,7 +256,7 @@ const LoansScreen = ({ navigation }) => {
 
           <View style={styles.statusRow}>
             <View style={styles.statusItem}>
-              <Chip icon="schedule" mode="flat" style={[styles.statusChip, { backgroundColor: '#E3F2FD' }]}>
+              <Chip icon="access-time" mode="flat" style={[styles.statusChip, { backgroundColor: '#E3F2FD' }]}>
                 {loanSummary.activeLoans} Active
               </Chip>
             </View>
@@ -327,20 +326,13 @@ const LoansScreen = ({ navigation }) => {
     </View>
   );
   
-  // Render a loan item
-  const renderLoanItem = ({ item }) => (
-    <LoanTracker
-      loan={item}
-      onPress={() => navigateToLoanDetails(item)}
-      onRecordPayment={(payment) => handleRecordPayment(item, payment)}
-    />
-  );
-  
-  // Render separator between items
-  const renderSeparator = () => <View style={styles.separator} />;
-  
   return (
-    <View style={styles.container}>
+    <ScrollView 
+      style={styles.container}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
       {/* Scope Selector */}
       <View style={styles.scopeSelector}>
         <SegmentedButtons
@@ -403,17 +395,25 @@ const LoansScreen = ({ navigation }) => {
       </View>
       
       {/* Loans List */}
-      <FlatList
-        data={filteredLoans}
-        renderItem={renderLoanItem}
-        keyExtractor={(item) => item.id}
-        ItemSeparatorComponent={renderSeparator}
-        ListEmptyComponent={renderEmptyState}
-        contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      />
+      <View style={styles.loansListContainer}>
+        {filteredLoans.length === 0 ? (
+          renderEmptyState()
+        ) : (
+          filteredLoans.map((loan, index) => (
+            <View key={loan.id}>
+              <LoanTracker
+                loan={loan}
+                onPress={() => navigateToLoanDetails(loan)}
+                onRecordPayment={(payment) => handleRecordPayment(loan, payment)}
+              />
+              {index < filteredLoans.length - 1 && <View style={styles.separator} />}
+            </View>
+          ))
+        )}
+      </View>
+      
+      {/* Bottom padding for FAB */}
+      <View style={styles.bottomPadding} />
       
       {/* Add Loan Button */}
       <TouchableOpacity 
@@ -422,7 +422,7 @@ const LoansScreen = ({ navigation }) => {
       >
         <MaterialIcons name="add" size={24} color="#fff" />
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 };
 
@@ -471,6 +471,12 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 16,
     paddingBottom: 80,
+  },
+  loansListContainer: {
+    padding: 16,
+  },
+  bottomPadding: {
+    height: 80,
   },
   separator: {
     height: 12,
